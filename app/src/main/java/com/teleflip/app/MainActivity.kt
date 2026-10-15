@@ -37,6 +37,7 @@ import com.teleflip.app.ui.MenuOption
 import com.teleflip.app.ui.MessageAdapter
 import com.teleflip.app.ui.OptionsMenuDialog
 import com.teleflip.app.ui.SoftkeyManager
+import com.teleflip.app.ui.SoftkeyUtils
 import com.teleflip.app.ui.SymbolsDialog
 import java.util.Locale
 import kotlinx.coroutines.flow.collectLatest
@@ -1028,14 +1029,12 @@ class MainActivity : AppCompatActivity() {
         val keyCode = event.keyCode
 
         // Top Left hardware softkey always triggers softkey action
-        if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT || keyCode == KeyEvent.KEYCODE_MENU ||
-            keyCode == 132 /* F2 */ || keyCode == 60 || keyCode == 228) {
+        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
             if (softkeyManager.handleKeyEvent(keyCode, event)) return true
         }
 
         // Back key and Top Right hardware softkey handling
-        if ((keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT ||
-                keyCode == 229 || keyCode == 230 || keyCode == 61 || keyCode == 158) && event.action == KeyEvent.ACTION_DOWN) {
+        if (SoftkeyUtils.isBackOrSoftRightKey(keyCode) && event.action == KeyEvent.ACTION_DOWN) {
             if (voiceRecorder.isRecording()) {
                 activeChat?.let { cancelVoiceRecordingUI(it) }
                 return true
@@ -1074,7 +1073,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // D-Pad Center / Enter Key
-        if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) && event.action == KeyEvent.ACTION_DOWN) {
+        if (SoftkeyUtils.isCenterKey(keyCode) && event.action == KeyEvent.ACTION_DOWN) {
             if (voiceRecorder.isRecording()) {
                 activeChat?.let { stopAndSendVoiceRecording(it) }
                 return true

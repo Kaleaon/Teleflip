@@ -39,8 +39,7 @@ class SoftkeyManager(
         if (event.action != KeyEvent.ACTION_DOWN) return false
 
         // Top Left Button (Soft Left)
-        if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT || keyCode == KeyEvent.KEYCODE_MENU ||
-            keyCode == 132 /* KEYCODE_F2 */ || keyCode == 60 || keyCode == 228) {
+        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
             onLeftClick?.let {
                 it.invoke()
                 return true
@@ -48,8 +47,7 @@ class SoftkeyManager(
         }
 
         // Top Right Button (Soft Right)
-        if (keyCode == KeyEvent.KEYCODE_SOFT_RIGHT || keyCode == 229 || keyCode == 230 ||
-            keyCode == 61 || keyCode == 158) {
+        if (SoftkeyUtils.isSoftRightKey(keyCode)) {
             onRightClick?.let {
                 it.invoke()
                 return true
@@ -57,7 +55,7 @@ class SoftkeyManager(
         }
 
         // Center / Enter Key
-        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+        if (SoftkeyUtils.isCenterKey(keyCode)) {
             onCenterClick?.let {
                 it.invoke()
                 return true

@@ -52,7 +52,7 @@ class OptionsMenuDialog(
         }
 
         // Back or Soft Right closes menu
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
+        if (SoftkeyUtils.isBackOrSoftRightKey(keyCode)) {
             dismiss()
             return true
         }
