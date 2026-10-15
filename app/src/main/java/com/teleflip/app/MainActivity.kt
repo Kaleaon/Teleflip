@@ -40,6 +40,7 @@ import com.teleflip.app.ui.SoftkeyManager
 import com.teleflip.app.ui.SymbolsDialog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 enum class Screen {
     LOGIN,
@@ -512,14 +513,30 @@ class MainActivity : AppCompatActivity() {
         when (msg.mediaType) {
             MediaType.VOICE -> {
                 val isPlaying = msg.mediaFilePath != null && voicePlayer.isPlayingPath(msg.mediaFilePath)
-                softkeyManager.update(
-                    left = "Options",
-                    center = if (isPlaying) "Pause" else "Play",
-                    right = "Back",
-                    onLeft = { showMessageOptionsMenu(msg) },
-                    onCenter = { handlePlayVoiceMessage(msg) },
-                    onRight = { showChatListScreen() },
-                )
+                if (isPlaying) {
+                    val speedText = String.format(Locale.US, "Speed %.1fx", voicePlayer.currentSpeed)
+                    softkeyManager.update(
+                        left = speedText,
+                        center = "Pause",
+                        right = "Back",
+                        onLeft = {
+                            voicePlayer.cyclePlaybackSpeed()
+                            messageAdapter?.setPlaybackSpeed(voicePlayer.currentSpeed)
+                            updateSoftkeysForFocusedMessage(chat, msg)
+                        },
+                        onCenter = { handlePlayVoiceMessage(msg) },
+                        onRight = { showChatListScreen() },
+                    )
+                } else {
+                    softkeyManager.update(
+                        left = "Options",
+                        center = "Play",
+                        right = "Back",
+                        onLeft = { showMessageOptionsMenu(msg) },
+                        onCenter = { handlePlayVoiceMessage(msg) },
+                        onRight = { showChatListScreen() },
+                    )
+                }
             }
             MediaType.LOCATION -> {
                 softkeyManager.update(
@@ -562,22 +579,28 @@ class MainActivity : AppCompatActivity() {
         if (voicePlayer.isPlayingPath(path)) {
             voicePlayer.stop()
             messageAdapter?.setPlayingMessageId(null)
+            activeChat?.let { updateSoftkeysForFocusedMessage(it, msg) }
         } else {
-            messageAdapter?.setPlayingMessageId(msg.id)
+            messageAdapter?.setPlayingMessageId(msg.id, voicePlayer.currentSpeed)
             val success =
                 voicePlayer.play(
                     path = path,
                     onError = {
                         messageAdapter?.setPlayingMessageId(null)
+                        activeChat?.let { updateSoftkeysForFocusedMessage(it, msg) }
                         showToast("Unable to play audio recording", true)
                     },
                     onCompletion = {
                         messageAdapter?.setPlayingMessageId(null)
+                        activeChat?.let { updateSoftkeysForFocusedMessage(it, msg) }
                     },
                 )
             if (!success) {
                 messageAdapter?.setPlayingMessageId(null)
+                activeChat?.let { updateSoftkeysForFocusedMessage(it, msg) }
                 showToast("Unable to play audio recording", true)
+            } else {
+                activeChat?.let { updateSoftkeysForFocusedMessage(it, msg) }
             }
         }
     }
@@ -741,9 +764,31 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (msg.mediaType == MediaType.VOICE) {
+            val isPlaying = msg.mediaFilePath != null && voicePlayer.isPlayingPath(msg.mediaFilePath)
             options.add(
-                MenuOption(options.size + 1, "Play Voice Note") {
+                MenuOption(options.size + 1, if (isPlaying) "Pause Voice Note" else "Play Voice Note") {
                     handlePlayVoiceMessage(msg)
+                },
+            )
+            options.add(
+                MenuOption(options.size + 1, "Speed 1.0x") {
+                    voicePlayer.setPlaybackSpeed(1.0f)
+                    messageAdapter?.setPlaybackSpeed(1.0f)
+                    activeChat?.let { updateSoftkeysForFocusedMessage(it, msg) }
+                },
+            )
+            options.add(
+                MenuOption(options.size + 1, "Speed 1.5x") {
+                    voicePlayer.setPlaybackSpeed(1.5f)
+                    messageAdapter?.setPlaybackSpeed(1.5f)
+                    activeChat?.let { updateSoftkeysForFocusedMessage(it, msg) }
+                },
+            )
+            options.add(
+                MenuOption(options.size + 1, "Speed 2.0x") {
+                    voicePlayer.setPlaybackSpeed(2.0f)
+                    messageAdapter?.setPlaybackSpeed(2.0f)
+                    activeChat?.let { updateSoftkeysForFocusedMessage(it, msg) }
                 },
             )
         }
