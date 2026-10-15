@@ -90,16 +90,8 @@ public class PhoneFormat {
         return res.toString();
     }
 
-    public static String stripExceptNumbers(String str) {
-        return stripExceptNumbers(str, false);
-    }
-
     public PhoneFormat() {
         init(null);
-    }
-
-    public PhoneFormat(String countryCode) {
-        init(countryCode);
     }
 
     public void init(String countryCode) {
@@ -149,22 +141,6 @@ public class PhoneFormat {
 
         parseDataHeader();
         initialzed = true;
-    }
-
-    public String defaultCallingCode() {
-        return callingCodeForCountryCode(defaultCountry);
-    }
-
-    public String callingCodeForCountryCode(String countryCode) {
-        return countryCallingCode.get(countryCode.toLowerCase());
-    }
-
-    public ArrayList countriesForCallingCode(String callingCode) {
-        if (callingCode.startsWith("+")) {
-            callingCode = callingCode.substring(1);
-        }
-
-        return callingCodeCountries.get(callingCode);
     }
 
     public CallingCodeInfo findCallingCodeInfo(String str) {
@@ -229,37 +205,6 @@ public class PhoneFormat {
             return orig;
         }
 
-    }
-
-    public boolean isPhoneNumberValid(String phoneNumber) {
-        if (!initialzed) {
-            return true;
-        }
-        String str = strip(phoneNumber);
-
-        if (str.startsWith("+")) {
-            String rest = str.substring(1);
-            CallingCodeInfo info = findCallingCodeInfo(rest);
-            return info != null && info.isValidPhoneNumber(rest);
-        } else {
-            CallingCodeInfo info = callingCodeInfo(defaultCallingCode);
-            if (info == null) {
-                return false;
-            }
-
-            String accessCode = info.matchingAccessCode(str);
-            if (accessCode != null) {
-                String rest = str.substring(accessCode.length());
-                if (rest.length() != 0) {
-                    CallingCodeInfo info2 = findCallingCodeInfo(rest);
-                    return info2 != null && info2.isValidPhoneNumber(rest);
-                } else {
-                    return false;
-                }
-            } else {
-                return info.isValidPhoneNumber(str);
-            }
-        }
     }
 
     int value32(int offset) {
@@ -372,12 +317,6 @@ public class PhoneFormat {
 
                         rules.add(rule);
 
-                        if (rule.hasIntlPrefix) {
-                            ruleSet.hasRuleWithIntlPrefix = true;
-                        }
-                        if (rule.hasTrunkPrefix) {
-                            ruleSet.hasRuleWithTrunkPrefix = true;
-                        }
                     }
                     ruleSet.rules = rules;
                     ruleSets.add(ruleSet);
