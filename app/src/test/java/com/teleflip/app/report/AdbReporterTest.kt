@@ -7,6 +7,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class AdbReporterTest {
 
@@ -17,14 +19,13 @@ class AdbReporterTest {
 
     @Before
     fun setUp() {
-        testLogFile = tempFolder.newFile("test_teleflip_reports.log")
-        setLogFile(testLogFile)
+        AdbReporter.resetForTest()
+        testLogFile = tempFolder.newFile("test_teleflip_reports_${System.currentTimeMillis()}.log")
+        AdbReporter.setLogFile(testLogFile)
     }
 
-    private fun setLogFile(file: File?) {
-        val field = AdbReporter::class.java.getDeclaredField("logFile")
-        field.isAccessible = true
-        field.set(AdbReporter, file)
+    private fun setLogFile(file: File) {
+        AdbReporter.setLogFile(file)
     }
 
     @Test
@@ -121,5 +122,92 @@ class AdbReporterTest {
         method.isAccessible = true
         val formatted = method.invoke(AdbReporter, "TEST_LEVEL", "TestComp", "TestMsg") as String
         assertTrue(formatted.matches(Regex("""\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] \[TEST_LEVEL\] \[TestComp\] TestMsg""")))
+    }
+
+    @Test
+    fun testAsyncLoggingAndFlush() {
+        AdbReporter.reportInfo("TestComponent", "Info message 1")
+        AdbReporter.reportWarning("TestComponent", "Warning message 2")
+        AdbReporter.reportPopup("TestPopup", "Popup message 3", false)
+
+        // Force flush to ensure worker queue processes items
+        AdbReporter.flush()
+
+        val logs = AdbReporter.getRecentLogs(10)
+        assertEquals(3, logs.size)
+        assertTrue(logs[0].contains("[INFO] [TestComponent] Info message 1"))
+        assertTrue(logs[1].contains("[WARN] [TestComponent] Warning message 2"))
+        assertTrue(logs[2].contains("[INFO_POPUP] [TestPopup] Popup message 3"))
+    }
+
+    @Test
+    fun testReportErrorSynchronousFlush() {
+        AdbReporter.reportInfo("AsyncComp", "Pending info line")
+        
+        // reportError must synchronously flush pending lines and the error line
+        val exception = RuntimeException("Test Error")
+        AdbReporter.reportError("ErrorComponent", "Fatal issue occurred", exception)
+
+        val lines = testLogFile.readLines().filter { it.isNotBlank() }
+        assertTrue(lines.any { it.contains("[INFO] [AsyncComp] Pending info line") })
+        assertTrue(lines.any { it.contains("[ERROR] [ErrorComponent] Fatal issue occurred") })
+        assertTrue(lines.any { it.contains("Test Error") })
+    }
+
+    @Test
+    fun testReportCrashSynchronousFlush() {
+        AdbReporter.reportInfo("CrashContext", "Before crash log")
+        
+        val crashException = IllegalStateException("Critical crash test")
+        AdbReporter.reportCrash("MainThread", crashException)
+
+        val lines = testLogFile.readLines().filter { it.isNotBlank() }
+        assertTrue(lines.any { it.contains("[INFO] [CrashContext] Before crash log") })
+        assertTrue(lines.any { it.contains("[FATAL CRASH] [MainThread] Critical crash test") })
+        assertTrue(lines.any { it.contains("Critical crash test") })
+    }
+
+    @Test
+    fun testConcurrentLoggingThreadSafety() {
+        val threadCount = 10
+        val logsPerThread = 50
+        val latch = CountDownLatch(threadCount)
+
+        for (i in 0 until threadCount) {
+            val threadId = i
+            Thread {
+                try {
+                    for (j in 0 until logsPerThread) {
+                        if (j % 10 == 0) {
+                            AdbReporter.reportError("Thread-$threadId", "Error at iteration $j")
+                        } else {
+                            AdbReporter.reportInfo("Thread-$threadId", "Info at iteration $j")
+                        }
+                    }
+                } finally {
+                    latch.countDown()
+                }
+            }.start()
+        }
+
+        assertTrue("Threads timed out", latch.await(5, TimeUnit.SECONDS))
+        
+        AdbReporter.flush()
+
+        val lines = testLogFile.readLines().filter { it.isNotBlank() }
+        // Verify total lines equal expected count (each info/error produces formatted lines)
+        assertTrue("Log count (${lines.size}) should be at least total entries", lines.size >= threadCount * logsPerThread)
+    }
+
+    @Test
+    fun testGetRecentLogsFlushesAndLimitsOutput() {
+        for (i in 1..50) {
+            AdbReporter.reportInfo("Batch", "Message $i")
+        }
+
+        val recent = AdbReporter.getRecentLogs(15)
+        assertEquals(15, recent.size)
+        assertTrue(recent.first().contains("Message 36"))
+        assertTrue(recent.last().contains("Message 50"))
     }
 }
