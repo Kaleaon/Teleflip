@@ -3,14 +3,49 @@ package com.teleflip.app.media
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.media.PlaybackParams
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import java.io.File
 
 class VoicePlayer(private val context: Context) {
     private val tag = "VoicePlayer"
-    private var mediaPlayer: MediaPlayer? = null
+    internal var mediaPlayer: MediaPlayer? = null
     private var currentPlayingPath: String? = null
+
+    var currentSpeed: Float = 1.0f
+        private set
+
+    fun cyclePlaybackSpeed(): Float {
+        currentSpeed = when (currentSpeed) {
+            1.0f -> 1.5f
+            1.5f -> 2.0f
+            else -> 1.0f
+        }
+        applyPlaybackSpeed()
+        return currentSpeed
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        currentSpeed = speed
+        applyPlaybackSpeed()
+    }
+
+    internal var sdkVersion: Int = Build.VERSION.SDK_INT
+
+    internal fun applyPlaybackSpeed() {
+        val player = mediaPlayer ?: return
+        if (sdkVersion >= Build.VERSION_CODES.M) {
+            try {
+                val params = player.playbackParams
+                player.playbackParams = params.setSpeed(currentSpeed)
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to set playback params speed: ${e.message}")
+                currentSpeed = 1.0f
+            }
+        }
+    }
 
     fun play(
         path: String,
@@ -35,6 +70,7 @@ class VoicePlayer(private val context: Context) {
                 setOnPreparedListener { mp ->
                     try {
                         mp.start()
+                        applyPlaybackSpeed()
                     } catch (e: Exception) {
                         Log.e(tag, "Failed to start playback after prepare: ${e.message}")
                         stop()
