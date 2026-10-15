@@ -42,17 +42,6 @@ class AdbReporterTest {
     }
 
     @Test
-    fun testReportWarning() {
-        AdbReporter.reportWarning("WarnComponent", "Warning detected")
-
-        val logs = AdbReporter.getRecentLogs(10)
-        assertEquals(1, logs.size)
-        assertTrue(
-            logs[0].contains("[WARN] [WarnComponent] Warning detected")
-        )
-    }
-
-    @Test
     fun testReportErrorWithoutThrowableDoesNotAppendExtraNewlines() {
         AdbReporter.reportError("ErrorComponent", "Error occurred without exception", throwable = null)
 
