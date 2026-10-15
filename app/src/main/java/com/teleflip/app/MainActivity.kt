@@ -144,6 +144,13 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             telegramManager.chats.collectLatest { chats ->
+                if (currentScreen == Screen.CONVERSATION && activeChat != null) {
+                    val updatedActive = chats.find { it.id == activeChat?.id }
+                    if (updatedActive != null) {
+                        activeChat = updatedActive
+                        findViewById<TextView>(R.id.tv_conv_star_badge)?.visibility = if (updatedActive.isPremium) View.VISIBLE else View.GONE
+                    }
+                }
                 if (currentScreen == Screen.CHAT_LIST) {
                     val filtered = if (currentChatTypeFilter == null) {
                         chats
@@ -344,6 +351,8 @@ class MainActivity : AppCompatActivity() {
         val view = LayoutInflater.from(this).inflate(R.layout.view_chat_conversation, mainContainer, true)
 
         view.findViewById<TextView>(R.id.tv_conv_title).text = chat.title
+        val tvConvStarBadge = view.findViewById<TextView>(R.id.tv_conv_star_badge)
+        tvConvStarBadge?.visibility = if (chat.isPremium) View.VISIBLE else View.GONE
         val subtitle = view.findViewById<TextView>(R.id.tv_conv_subtitle)
         subtitle.text = when (chat.chatType) {
             ChatType.CHANNEL -> "Channel"

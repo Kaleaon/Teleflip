@@ -51,6 +51,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     private val _messages = MutableStateFlow<Map<Long, List<MessageModel>>>(emptyMap())
     val messages: StateFlow<Map<Long, List<MessageModel>>> = _messages.asStateFlow()
 
+    val userSubscriberCache = java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
+    val chatIdToUserId = java.util.concurrent.ConcurrentHashMap<Long, Long>()
+
     private var tdClient: Client? = null
     var isDemoMode = false
         private set
@@ -101,7 +104,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         val demoChats = listOf(
             ChatModel(1L, "Telegram News", "Welcome to TeleFlip on your flip phone!", "12:00", 1, ChatType.CHANNEL, "TN", true),
-            ChatModel(2L, "Alice Smith", "Hey, does your flip phone have Telegram now?", "12:35", 2, ChatType.DIRECT, "AS"),
+            ChatModel(2L, "Alice Smith", "Hey, does your flip phone have Telegram now?", "12:35", 2, ChatType.DIRECT, "AS", isPremium = true),
             ChatModel(3L, "Family Group", "Dinner tonight at 7 PM", "11:15", 0, ChatType.GROUP, "FG"),
             ChatModel(4L, "Tech & Gadgets", "Physical keypads are having a huge comeback!", "Yesterday", 0, ChatType.GROUP, "TG"),
             ChatModel(5L, "Bob Jones", "Sent photo of the classic phone", "Oct 14", 0, ChatType.DIRECT, "BJ")
@@ -114,7 +117,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         )
         demoMessages[2L] = listOf(
             MessageModel(201L, 2L, "Alice Smith", "Hey, does your flip phone have Telegram now?", "12:35", false, MessageStatus.READ),
-            MessageModel(202L, 2L, "Alice Smith", "How is typing with the 9-key keypad?", "12:36", false, MessageStatus.READ)
+            MessageModel(202L, 2L, "Alice Smith", "How is typing with the 9-key keypad?", "12:36", false, MessageStatus.READ),
+            MessageModel(203L, 2L, "Alice Smith", "", "12:37", false, MessageStatus.READ, MediaType.STICKER, stickerEmoji = "🎉", isPremiumSticker = true)
         )
         demoMessages[3L] = listOf(
             MessageModel(301L, 3L, "Mom", "Don't forget family dinner tonight at 7!", "11:00", false, MessageStatus.READ),
@@ -384,6 +388,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         if (isDemoMode) return // Keep user in demo mode without TDLib interference
 
         when (obj.constructor) {
+            TdApi.UpdateUser.CONSTRUCTOR -> {
+                val updateUser = obj as TdApi.UpdateUser
+                updateUserCache(updateUser.user)
+            }
+            TdApi.User.CONSTRUCTOR -> {
+                val user = obj as TdApi.User
+                updateUserCache(user)
+            }
             TdApi.UpdateAuthorizationState.CONSTRUCTOR -> {
                 val auth = (obj as TdApi.UpdateAuthorizationState).authorizationState
                 handleAuthState(auth)
@@ -499,6 +511,31 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         com.teleflip.app.report.AdbReporter.reportInfo(tag, "Connection state: $label")
     }
 
+    fun updateUserCache(user: TdApi.User) {
+        userSubscriberCache[user.id] = user.isPremium
+        val list = _chats.value.toMutableList()
+        var updated = false
+        for (i in list.indices) {
+            val chat = list[i]
+            val uId = chatIdToUserId[chat.id] ?: if (chat.chatType == ChatType.DIRECT) chat.id else null
+            if (uId == user.id && chat.isPremium != user.isPremium) {
+                list[i] = chat.copy(isPremium = user.isPremium)
+                updated = true
+            }
+        }
+        if (updated) {
+            _chats.value = list
+        }
+        synchronized(pendingChats) {
+            for ((id, chat) in pendingChats) {
+                val uId = chatIdToUserId[id] ?: if (chat.chatType == ChatType.DIRECT) id else null
+                if (uId == user.id && chat.isPremium != user.isPremium) {
+                    pendingChats[id] = chat.copy(isPremium = user.isPremium)
+                }
+            }
+        }
+    }
+
     private val pendingChats = mutableMapOf<Long, ChatModel>()
     private var batchJob: Job? = null
 
@@ -512,6 +549,18 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.ChatTypePrivate.CONSTRUCTOR -> ChatType.DIRECT
             TdApi.ChatTypeBasicGroup.CONSTRUCTOR, TdApi.ChatTypeSupergroup.CONSTRUCTOR -> ChatType.GROUP
             else -> ChatType.CHANNEL
+        }
+
+        var isPremium = false
+        if (chat.type.constructor == TdApi.ChatTypePrivate.CONSTRUCTOR) {
+            val privateUserId = (chat.type as TdApi.ChatTypePrivate).userId
+            chatIdToUserId[chat.id] = privateUserId
+            val cachedPremium = userSubscriberCache[privateUserId]
+            if (cachedPremium != null) {
+                isPremium = cachedPremium
+            } else {
+                tdClient?.send(TdApi.GetUser(privateUserId), this)
+            }
         }
 
         val letters = title.split(" ")
@@ -543,7 +592,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             chatType = type,
             avatarLetters = letters,
             avatarPath = avatarPath,
-            avatarFileId = avatarFileId
+            avatarFileId = avatarFileId,
+            isPremium = isPremium
         )
 
         synchronized(pendingChats) {
@@ -587,6 +637,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     private fun handleIncomingMessage(msg: TdApi.Message) {
         val mediaType = extractMediaType(msg.content)
         val mediaInfo = extractMediaFileInfo(msg.content)
+        var stickerEmoji = ""
+        var isPremiumSticker = false
+        if (msg.content is TdApi.MessageSticker) {
+            val stickerMsg = msg.content as TdApi.MessageSticker
+            stickerEmoji = stickerMsg.sticker?.emoji ?: ""
+            isPremiumSticker = stickerMsg.isPremium
+        }
         val model = MessageModel(
             id = msg.id,
             chatId = msg.chatId,
@@ -598,7 +655,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             mediaType = mediaType,
             mediaCaption = extractMediaCaption(msg.content),
             mediaFilePath = mediaInfo.second,
-            mediaFileId = mediaInfo.first
+            mediaFileId = mediaInfo.first,
+            stickerEmoji = stickerEmoji,
+            isPremiumSticker = isPremiumSticker
         )
 
         appendMessage(msg.chatId, model)
@@ -609,6 +668,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val chatId = msgs.first().chatId
         val list = msgs.reversed().map { msg ->
             val mediaInfo = extractMediaFileInfo(msg.content)
+            var stickerEmoji = ""
+            var isPremiumSticker = false
+            if (msg.content is TdApi.MessageSticker) {
+                val stickerMsg = msg.content as TdApi.MessageSticker
+                stickerEmoji = stickerMsg.sticker?.emoji ?: ""
+                isPremiumSticker = stickerMsg.isPremium
+            }
             MessageModel(
                 id = msg.id,
                 chatId = msg.chatId,
@@ -620,7 +686,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 mediaType = extractMediaType(msg.content),
                 mediaCaption = extractMediaCaption(msg.content),
                 mediaFilePath = mediaInfo.second,
-                mediaFileId = mediaInfo.first
+                mediaFileId = mediaInfo.first,
+                stickerEmoji = stickerEmoji,
+                isPremiumSticker = isPremiumSticker
             )
         }
         val currentMap = _messages.value.toMutableMap()
@@ -764,7 +832,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessageAudio.CONSTRUCTOR -> "🎵 [Audio]"
             TdApi.MessageVideo.CONSTRUCTOR -> "📹 [Video]"
             TdApi.MessageDocument.CONSTRUCTOR -> "📄 " + (content as TdApi.MessageDocument).document.fileName
-            TdApi.MessageSticker.CONSTRUCTOR -> (content as TdApi.MessageSticker).sticker.emoji + " [Sticker]"
+            TdApi.MessageSticker.CONSTRUCTOR -> {
+                val emoji = (content as TdApi.MessageSticker).sticker?.emoji ?: ""
+                if (emoji.isNotBlank()) "🎨 [Sticker $emoji]" else "🎨 [Sticker]"
+            }
             else -> "[Message]"
         }
     }
