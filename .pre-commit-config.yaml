@@ -1,0 +1,21 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ktlint
+        name: Ktlint
+        entry: ./gradlew ktlintCheck
+        language: system
+        pass_filenames: false
+        files: \.kt$|\.kts$
+      - id: detekt
+        name: Detekt
+        entry: ./gradlew detekt
+        language: system
+        pass_filenames: false
+        files: \.kt$|\.kts$
+      - id: android-lint
+        name: Android Lint
+        entry: ./gradlew lintDebug
+        language: system
+        pass_filenames: false
+        files: \.kt$|\.java$|\.xml$

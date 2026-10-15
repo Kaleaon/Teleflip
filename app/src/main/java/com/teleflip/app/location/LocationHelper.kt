@@ -19,7 +19,7 @@ data class LocationInfo(
     val longitude: Double,
     val accuracyMeters: Float,
     val googleMapsUrl: String,
-    val openStreetMapUrl: String
+    val openStreetMapUrl: String,
 )
 
 class LocationHelper(private val context: Context) {
@@ -28,17 +28,18 @@ class LocationHelper(private val context: Context) {
     @SuppressLint("MissingPermission")
     fun fetchCurrentLocation(
         onSuccess: (LocationInfo) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
     ) {
         try {
             // Check last known location first (immediate)
             val gpsLast = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
             val netLast = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            val bestLast = when {
-                gpsLast != null && netLast != null -> if (gpsLast.time > netLast.time) gpsLast else netLast
-                gpsLast != null -> gpsLast
-                else -> netLast
-            }
+            val bestLast =
+                when {
+                    gpsLast != null && netLast != null -> if (gpsLast.time > netLast.time) gpsLast else netLast
+                    gpsLast != null -> gpsLast
+                    else -> netLast
+                }
 
             if (bestLast != null && (System.currentTimeMillis() - bestLast.time) < 1000 * 60 * 5) {
                 // If last known location is fresh (< 5 mins), return it immediately
@@ -47,15 +48,23 @@ class LocationHelper(private val context: Context) {
             }
 
             // Otherwise request single fresh fix
-            val listener = object : LocationListener {
-                override fun onLocationChanged(loc: Location) {
-                    locationManager.removeUpdates(this)
-                    onSuccess(buildLocationInfo(loc))
+            val listener =
+                object : LocationListener {
+                    override fun onLocationChanged(loc: Location) {
+                        locationManager.removeUpdates(this)
+                        onSuccess(buildLocationInfo(loc))
+                    }
+
+                    override fun onStatusChanged(
+                        p: String?,
+                        s: Int,
+                        e: Bundle?,
+                    ) {}
+
+                    override fun onProviderEnabled(p: String) {}
+
+                    override fun onProviderDisabled(p: String) {}
                 }
-                override fun onStatusChanged(p: String?, s: Int, e: Bundle?) {}
-                override fun onProviderEnabled(p: String) {}
-                override fun onProviderDisabled(p: String) {}
-            }
 
             val hasGps = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
             val hasNet = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
@@ -84,7 +93,6 @@ class LocationHelper(private val context: Context) {
                     onError("GPS timed out acquiring position. Try outdoors with clear sky view.")
                 }
             }, 6000)
-
         } catch (e: Exception) {
             onError("Location error: ${e.message}")
         }
@@ -103,18 +111,23 @@ class LocationHelper(private val context: Context) {
             longitude = lng,
             accuracyMeters = loc.accuracy,
             googleMapsUrl = gmaps,
-            openStreetMapUrl = osm
+            openStreetMapUrl = osm,
         )
     }
 
     companion object {
-        fun openInOrganicMaps(context: Context, latitude: Double, longitude: Double) {
+        fun openInOrganicMaps(
+            context: Context,
+            latitude: Double,
+            longitude: Double,
+        ) {
             try {
                 val uri = Uri.parse("geo:$latitude,$longitude?q=$latitude,$longitude")
-                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                    setPackage("app.organicmaps")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+                val intent =
+                    Intent(Intent.ACTION_VIEW, uri).apply {
+                        setPackage("app.organicmaps")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
                 context.startActivity(intent)
             } catch (e: Exception) {
                 // If Organic Maps explicit package fails, try generic geo intent
@@ -129,7 +142,11 @@ class LocationHelper(private val context: Context) {
             }
         }
 
-        fun copyGoogleMapsLink(context: Context, latitude: Double, longitude: Double) {
+        fun copyGoogleMapsLink(
+            context: Context,
+            latitude: Double,
+            longitude: Double,
+        ) {
             val link = "https://maps.google.com/?q=$latitude,$longitude"
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText("Google Maps Location", link))

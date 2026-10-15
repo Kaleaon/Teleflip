@@ -5,16 +5,15 @@ import android.media.MediaPlayer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 
 class VoicePlayerTest {
-
     @Test
     fun testVoicePlayerInitialStateAndSafeStop() {
         val player = VoicePlayer(dummyContext())
         assertFalse("VoicePlayer should not be playing initially", player.isPlayingPath("/fake/path.m4a"))
-        
+
         player.stop()
         assertFalse("VoicePlayer should remain idle after stop", player.isPlayingPath("/fake/path.m4a"))
     }

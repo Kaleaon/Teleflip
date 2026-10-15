@@ -11,7 +11,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class AdbReporterTest {
-
     @get:Rule
     val tempFolder = TemporaryFolder()
 
@@ -37,7 +36,12 @@ class AdbReporterTest {
         val logLine = logs[0]
         assertTrue(
             "Log line format should match date pattern and header brackets: $logLine",
-            logLine.matches(Regex("""\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] \[INFO\] \[TestComponent\] This is an info log message"""))
+            logLine.matches(
+                Regex(
+                    """\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] """ +
+                        """\[INFO\] \[TestComponent\] This is an info log message""",
+                ),
+            ),
         )
     }
 
@@ -102,12 +106,13 @@ class AdbReporterTest {
 
     @Test
     fun testPrivateFormatLogLineHelper() {
-        val method = AdbReporter::class.java.getDeclaredMethod(
-            "formatLogLine",
-            String::class.java,
-            String::class.java,
-            String::class.java
-        )
+        val method =
+            AdbReporter::class.java.getDeclaredMethod(
+                "formatLogLine",
+                String::class.java,
+                String::class.java,
+                String::class.java,
+            )
         method.isAccessible = true
         val formatted = method.invoke(AdbReporter, "TEST_LEVEL", "TestComp", "TestMsg") as String
         assertTrue(formatted.matches(Regex("""\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] \[TEST_LEVEL\] \[TestComp\] TestMsg""")))

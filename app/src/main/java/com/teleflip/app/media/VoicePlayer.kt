@@ -3,7 +3,6 @@ package com.teleflip.app.media
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.media.PlaybackParams
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -18,11 +17,12 @@ class VoicePlayer(private val context: Context) {
         private set
 
     fun cyclePlaybackSpeed(): Float {
-        currentSpeed = when (currentSpeed) {
-            1.0f -> 1.5f
-            1.5f -> 2.0f
-            else -> 1.0f
-        }
+        currentSpeed =
+            when (currentSpeed) {
+                1.0f -> 1.5f
+                1.5f -> 2.0f
+                else -> 1.0f
+            }
         applyPlaybackSpeed()
         return currentSpeed
     }
@@ -50,45 +50,46 @@ class VoicePlayer(private val context: Context) {
     fun play(
         path: String,
         onError: (() -> Unit)? = null,
-        onCompletion: () -> Unit
+        onCompletion: () -> Unit,
     ): Boolean {
         try {
             stop()
             val file = File(path)
-            val player = MediaPlayer().apply {
-                if (file.exists()) {
-                    setDataSource(context, Uri.fromFile(file))
-                } else {
-                    setDataSource(path)
-                }
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .build()
-                )
-                setOnPreparedListener { mp ->
-                    try {
-                        mp.start()
-                        applyPlaybackSpeed()
-                    } catch (e: Exception) {
-                        Log.e(tag, "Failed to start playback after prepare: ${e.message}")
+            val player =
+                MediaPlayer().apply {
+                    if (file.exists()) {
+                        setDataSource(context, Uri.fromFile(file))
+                    } else {
+                        setDataSource(path)
+                    }
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build(),
+                    )
+                    setOnPreparedListener { mp ->
+                        try {
+                            mp.start()
+                            applyPlaybackSpeed()
+                        } catch (e: Exception) {
+                            Log.e(tag, "Failed to start playback after prepare: ${e.message}")
+                            stop()
+                            onError?.invoke()
+                        }
+                    }
+                    setOnCompletionListener {
+                        currentPlayingPath = null
+                        onCompletion()
+                    }
+                    setOnErrorListener { _, what, extra ->
+                        Log.e(tag, "MediaPlayer error: what=$what, extra=$extra")
                         stop()
                         onError?.invoke()
+                        true
                     }
+                    prepareAsync()
                 }
-                setOnCompletionListener {
-                    currentPlayingPath = null
-                    onCompletion()
-                }
-                setOnErrorListener { _, what, extra ->
-                    Log.e(tag, "MediaPlayer error: what=$what, extra=$extra")
-                    stop()
-                    onError?.invoke()
-                    true
-                }
-                prepareAsync()
-            }
 
             mediaPlayer = player
             currentPlayingPath = path

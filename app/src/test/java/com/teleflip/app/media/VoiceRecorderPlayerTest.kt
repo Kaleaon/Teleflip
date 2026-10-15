@@ -6,16 +6,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 
 class VoiceRecorderPlayerTest {
-
     @Test
     fun testVoicePlayerInitialStateAndSafeStop() {
         val player = VoicePlayer(dummyContext())
         assertFalse("VoicePlayer should not be playing initially", player.isPlayingPath("/fake/path.m4a"))
-        
+
         // Ensure safe stop on non-playing instance does not throw exceptions
         player.stop()
         assertFalse("VoicePlayer should remain idle after stop", player.isPlayingPath("/fake/path.m4a"))
