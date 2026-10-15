@@ -1,6 +1,5 @@
 package com.teleflip.app.ui
 
-import android.graphics.BitmapFactory
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -14,7 +13,6 @@ import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
-import java.io.File
 import java.util.Locale
 
 class MessageAdapter(
@@ -125,18 +123,8 @@ class MessageAdapter(
             }
 
             // Photo image display if downloaded
-            if (message.mediaType == MediaType.PHOTO && !message.mediaFilePath.isNullOrEmpty() && File(message.mediaFilePath).exists()) {
-                try {
-                    val bmp = BitmapFactory.decodeFile(message.mediaFilePath)
-                    if (bmp != null) {
-                        ivPhoto.setImageBitmap(bmp)
-                        ivPhoto.visibility = View.VISIBLE
-                    } else {
-                        ivPhoto.visibility = View.GONE
-                    }
-                } catch (e: Exception) {
-                    ivPhoto.visibility = View.GONE
-                }
+            if (message.mediaType == MediaType.PHOTO) {
+                ivPhoto.loadBitmapFromFile(message.mediaFilePath)
             } else {
                 ivPhoto.visibility = View.GONE
             }

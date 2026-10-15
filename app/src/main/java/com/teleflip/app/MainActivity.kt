@@ -38,6 +38,7 @@ import com.teleflip.app.ui.MessageAdapter
 import com.teleflip.app.ui.OptionsMenuDialog
 import com.teleflip.app.ui.SoftkeyManager
 import com.teleflip.app.ui.SymbolsDialog
+import com.teleflip.app.ui.loadCircularAvatarOrFallback
 import java.util.Locale
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -354,29 +355,7 @@ class MainActivity : AppCompatActivity() {
 
         val ivConvAvatar = view.findViewById<ImageView>(R.id.iv_conv_avatar)
         val tvConvAvatar = view.findViewById<TextView>(R.id.tv_conv_avatar)
-        if (!chat.avatarPath.isNullOrEmpty() && java.io.File(chat.avatarPath).exists()) {
-            try {
-                val bmp = android.graphics.BitmapFactory.decodeFile(chat.avatarPath)
-                if (bmp != null) {
-                    val circ = androidx.core.graphics.drawable.RoundedBitmapDrawableFactory.create(resources, bmp).apply { isCircular = true }
-                    ivConvAvatar?.setImageDrawable(circ)
-                    ivConvAvatar?.visibility = View.VISIBLE
-                    tvConvAvatar?.visibility = View.GONE
-                } else {
-                    ivConvAvatar?.visibility = View.GONE
-                    tvConvAvatar?.visibility = View.VISIBLE
-                    tvConvAvatar?.setText(chat.avatarLetters)
-                }
-            } catch (e: Exception) {
-                ivConvAvatar?.visibility = View.GONE
-                tvConvAvatar?.visibility = View.VISIBLE
-                tvConvAvatar?.setText(chat.avatarLetters)
-            }
-        } else {
-            ivConvAvatar?.visibility = View.GONE
-            tvConvAvatar?.visibility = View.VISIBLE
-            tvConvAvatar?.setText(chat.avatarLetters)
-        }
+        ivConvAvatar?.loadCircularAvatarOrFallback(chat.avatarPath, chat.avatarLetters, tvConvAvatar)
 
         rvMessages = view.findViewById(R.id.rv_messages)
         val layoutManager = LinearLayoutManager(this).apply {

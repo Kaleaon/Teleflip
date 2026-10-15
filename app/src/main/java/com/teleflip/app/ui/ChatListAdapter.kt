@@ -1,16 +1,13 @@
 package com.teleflip.app.ui
 
-import android.graphics.BitmapFactory
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.R
 import com.teleflip.app.model.ChatModel
-import java.io.File
 
 class ChatListAdapter(
     private val onChatSelected: (ChatModel) -> Unit
@@ -58,25 +55,7 @@ class ChatListAdapter(
             }
 
             // Render photo avatar or fallback to colored letter initials
-            if (!chat.avatarPath.isNullOrEmpty() && File(chat.avatarPath).exists()) {
-                try {
-                    val bitmap = BitmapFactory.decodeFile(chat.avatarPath)
-                    if (bitmap != null) {
-                        val circularDrawable = RoundedBitmapDrawableFactory.create(itemView.resources, bitmap).apply {
-                            isCircular = true
-                        }
-                        ivAvatar.setImageDrawable(circularDrawable)
-                        ivAvatar.visibility = View.VISIBLE
-                        tvAvatar.visibility = View.GONE
-                    } else {
-                        showLetterFallback(chat)
-                    }
-                } catch (e: Exception) {
-                    showLetterFallback(chat)
-                }
-            } else {
-                showLetterFallback(chat)
-            }
+            ivAvatar.loadCircularAvatarOrFallback(chat.avatarPath, chat.avatarLetters, tvAvatar)
 
             tvTitle.text = chat.title
             tvTime.text = chat.time
@@ -92,12 +71,6 @@ class ChatListAdapter(
             itemView.setOnClickListener {
                 onChatSelected(chat)
             }
-        }
-
-        private fun showLetterFallback(chat: ChatModel) {
-            ivAvatar.visibility = View.GONE
-            tvAvatar.visibility = View.VISIBLE
-            tvAvatar.text = chat.avatarLetters
         }
     }
 }
