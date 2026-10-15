@@ -63,11 +63,14 @@ public class PhoneFormat {
     }
 
     public static String strip(String str) {
-        StringBuilder res = new StringBuilder(str);
-        String phoneChars = "0123456789+*#";
-        for (int i = res.length() - 1; i >= 0; i--) {
-            if (!phoneChars.contains(res.substring(i, i + 1))) {
-                res.deleteCharAt(i);
+        if (str == null) {
+            return null;
+        }
+        StringBuilder res = new StringBuilder(str.length());
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if ((c >= '0' && c <= '9') || c == '+' || c == '*' || c == '#') {
+                res.append(c);
             }
         }
         return res.toString();
@@ -77,14 +80,11 @@ public class PhoneFormat {
         if (str == null) {
             return null;
         }
-        StringBuilder res = new StringBuilder(str);
-        String phoneChars = "0123456789";
-        if (includePlus) {
-            phoneChars += "+";
-        }
-        for (int i = res.length() - 1; i >= 0; i--) {
-            if (!phoneChars.contains(res.substring(i, i + 1))) {
-                res.deleteCharAt(i);
+        StringBuilder res = new StringBuilder(str.length());
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if ((c >= '0' && c <= '9') || (includePlus && c == '+')) {
+                res.append(c);
             }
         }
         return res.toString();
