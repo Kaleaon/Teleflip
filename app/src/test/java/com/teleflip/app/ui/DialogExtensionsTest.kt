@@ -14,7 +14,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class DialogExtensionsTest {
-
     private lateinit var context: Application
 
     @Before
@@ -149,10 +148,11 @@ class DialogExtensionsTest {
     @Test
     fun optionsMenuDialog_handlesNumberKeysCorrectly() {
         var actionExecuted = false
-        val options = listOf(
-            MenuOption(1, "Option 1") { actionExecuted = true },
-            MenuOption(2, "Option 2") { }
-        )
+        val options =
+            listOf(
+                MenuOption(1, "Option 1") { actionExecuted = true },
+                MenuOption(2, "Option 2") { },
+            )
         val dialog = OptionsMenuDialog(context, "Test Menu", options)
         dialog.show()
 

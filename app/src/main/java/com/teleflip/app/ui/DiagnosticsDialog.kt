@@ -26,6 +26,4 @@ class DiagnosticsDialog(context: Context) : Dialog(context, R.style.Theme_TeleFl
 
         btnClose?.requestFocus()
     }
-
 }
-

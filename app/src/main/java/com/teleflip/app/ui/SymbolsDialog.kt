@@ -37,7 +37,6 @@ class SymbolsDialog(
         }
     }
 
-
     inner class SymbolAdapter : RecyclerView.Adapter<SymbolAdapter.SymbolViewHolder>() {
         override fun onCreateViewHolder(
             parent: ViewGroup,
