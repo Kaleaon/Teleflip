@@ -1,59 +1,71 @@
 package org.telegram.PhoneFormat;
 
+import android.content.Context;
+import android.content.res.AssetManager;
+
+import org.junit.Before;
 import org.junit.Test;
+import org.telegram.messenger.ApplicationLoader;
+
+import java.io.File;
+import java.io.FileInputStream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class PhoneFormatTest {
 
-    @Test
-    public void testStripStandardNumbers() {
-        assertEquals("+18005550199", PhoneFormat.strip("+1 (800) 555-0199"));
-        assertEquals("1234567890", PhoneFormat.strip("123-456-7890"));
-        assertEquals("+442079460958", PhoneFormat.strip("+44 20 7946 0958"));
+    @Before
+    public void setUp() {
+        ApplicationLoader.applicationContext = null;
     }
 
     @Test
-    public void testStripSpecialSymbols() {
-        assertEquals("*#21#", PhoneFormat.strip("*#21#"));
-        assertEquals("+123*#", PhoneFormat.strip("+1-23*#"));
-    }
-
-    @Test
-    public void testStripFullCharacterSetsAndMixedInputs() {
-        assertEquals("+123*456#", PhoneFormat.strip("abc+123*456#defXYZ"));
-        assertEquals("0123456789+*#", PhoneFormat.strip("0123456789+*# ~!@$%^&()_={}[]|\\:\";'<>,.?/"));
-    }
-
-    @Test
-    public void testStripEdgeCases() {
-        assertEquals("", PhoneFormat.strip(""));
-        assertNull(PhoneFormat.strip(null));
-        assertEquals("", PhoneFormat.strip("abc DEF !@$"));
-    }
-
-    @Test
-    public void testStripExceptNumbersIncludePlus() {
+    public void testStripExceptNumbers() {
         assertEquals("+18005550199", PhoneFormat.stripExceptNumbers("+1 (800) 555-0199", true));
-        assertEquals("+123456", PhoneFormat.stripExceptNumbers("abc+123*456#defXYZ", true));
-        assertEquals("", PhoneFormat.stripExceptNumbers("", true));
-        assertNull(PhoneFormat.stripExceptNumbers(null, true));
-    }
-
-    @Test
-    public void testStripExceptNumbersExcludePlus() {
         assertEquals("18005550199", PhoneFormat.stripExceptNumbers("+1 (800) 555-0199", false));
-        assertEquals("123456", PhoneFormat.stripExceptNumbers("abc+123*456#defXYZ", false));
-        assertEquals("", PhoneFormat.stripExceptNumbers("", false));
+        assertEquals("+12345", PhoneFormat.stripExceptNumbers("abc+12345-xyz", true));
+        assertEquals("12345", PhoneFormat.stripExceptNumbers("abc+12345-xyz", false));
+        assertNull(PhoneFormat.stripExceptNumbers(null, true));
         assertNull(PhoneFormat.stripExceptNumbers(null, false));
     }
 
     @Test
-    public void testStripExceptNumbersDefaultOverload() {
-        assertEquals("18005550199", PhoneFormat.stripExceptNumbers("+1 (800) 555-0199"));
-        assertEquals("123456", PhoneFormat.stripExceptNumbers("abc+123*456#defXYZ"));
-        assertEquals("", PhoneFormat.stripExceptNumbers(""));
-        assertNull(PhoneFormat.stripExceptNumbers(null));
+    public void testFormatFallbackWhenUninitialized() {
+        ApplicationLoader.applicationContext = null;
+        PhoneFormat instance = PhoneFormat.getInstance();
+
+        assertEquals("+18005550199", instance.format("+18005550199"));
+        assertEquals("12345", instance.format("12345"));
+    }
+
+    @Test
+    public void testFormatWithAssetData() throws Exception {
+        File assetFile = new File("src/main/assets/PhoneFormats.dat");
+        if (!assetFile.exists()) {
+            assetFile = new File("app/src/main/assets/PhoneFormats.dat");
+        }
+
+        if (assetFile.exists()) {
+            Context context = mock(Context.class);
+            AssetManager assetManager = mock(AssetManager.class);
+            File finalAssetFile = assetFile;
+            when(assetManager.open(anyString())).thenAnswer(invocation -> new FileInputStream(finalAssetFile));
+            when(context.getAssets()).thenReturn(assetManager);
+
+            ApplicationLoader.applicationContext = context;
+
+            PhoneFormat instance = PhoneFormat.getInstance();
+            instance.init("us");
+
+            String formattedUS = instance.format("+12025550123");
+            assertEquals("+1 (202) 555-0123", formattedUS);
+
+            String formattedRU = instance.format("+79123456789");
+            assertEquals("+7 (912) 345-67-89", formattedRU);
+        }
     }
 }

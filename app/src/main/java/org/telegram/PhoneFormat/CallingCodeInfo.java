@@ -88,36 +88,4 @@ public class CallingCodeInfo {
 
         return orig;
     }
-
-    boolean isValidPhoneNumber(String orig) {
-        String str = orig;
-        String trunkPrefix = null;
-        String intlPrefix = null;
-        if (str.startsWith(callingCode)) {
-            intlPrefix = callingCode;
-            str = str.substring(intlPrefix.length());
-        } else {
-            String trunk = matchingTrunkCode(str);
-            if (trunk != null) {
-                trunkPrefix = trunk;
-                str = str.substring(trunkPrefix.length());
-            }
-        }
-
-        for (RuleSet set : ruleSets) {
-            boolean valid = set.isValid(str, intlPrefix, trunkPrefix, true);
-            if (valid) {
-                return true;
-            }
-        }
-
-        for (RuleSet set : ruleSets) {
-            boolean valid = set.isValid(str, intlPrefix, trunkPrefix, false);
-            if (valid) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

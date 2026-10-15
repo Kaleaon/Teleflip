@@ -26,6 +26,7 @@ class OptionsMenuDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_options_menu)
+        setupDismissKeys()
 
         findViewById<TextView>(R.id.tv_menu_title)?.text = title
 
@@ -51,12 +52,6 @@ class OptionsMenuDialog(
                 options[index].action.invoke()
                 return true
             }
-        }
-
-        // Back or Soft Right closes menu
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
-            dismiss()
-            return true
         }
 
         return super.onKeyDown(keyCode, event)
