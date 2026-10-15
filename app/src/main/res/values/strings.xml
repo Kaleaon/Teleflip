@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TeleFlip</string>
+
+    <!-- Accessibility Content Descriptions -->
+    <string name="cd_contact_avatar">Contact avatar</string>
+    <string name="cd_avatar_format">%1$s\'s avatar</string>
+    <string name="cd_photo_attachment">Photo attachment</string>
+    <string name="cd_photo_attachment_format">Photo: %1$s</string>
+</resources>
