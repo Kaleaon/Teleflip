@@ -55,9 +55,17 @@ android {
         jvmTarget = '17'
     }
 
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+
     buildFeatures {
         viewBinding true
         buildConfig true
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
     }
 }
 
@@ -74,4 +82,7 @@ dependencies {
     // TDLib native Android library and coroutine wrapper
     implementation 'io.github.tdlib-android:core:0.1.1'
     implementation 'io.github.tdlib-android:ktx:0.1.1'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.11.0'
 }
