@@ -72,13 +72,21 @@ class VoiceRecorder(private val context: Context) {
         isRecording = false
         handler.removeCallbacks(tickerRunnable)
 
-        try {
-            recorder?.stop()
-            recorder?.release()
-        } catch (e: Exception) {
-            Log.e(tag, "Error stopping recorder: ${e.message}")
-        } finally {
-            recorder = null
+        val rec = recorder
+        recorder = null
+
+        if (rec != null) {
+            try {
+                rec.stop()
+            } catch (e: Exception) {
+                Log.e(tag, "Error stopping recorder: ${e.message}")
+            } finally {
+                try {
+                    rec.release()
+                } catch (e: Exception) {
+                    Log.e(tag, "Error releasing recorder: ${e.message}")
+                }
+            }
         }
 
         val file = currentFile
@@ -92,13 +100,22 @@ class VoiceRecorder(private val context: Context) {
     fun cancelRecording() {
         isRecording = false
         handler.removeCallbacks(tickerRunnable)
-        try {
-            recorder?.stop()
-            recorder?.release()
-        } catch (e: Exception) {
-            // ignore on cancel
-        } finally {
-            recorder = null
+
+        val rec = recorder
+        recorder = null
+
+        if (rec != null) {
+            try {
+                rec.stop()
+            } catch (e: Exception) {
+                // ignore on cancel
+            } finally {
+                try {
+                    rec.release()
+                } catch (e: Exception) {
+                    // ignore on cancel
+                }
+            }
         }
         currentFile?.delete()
         currentFile = null
