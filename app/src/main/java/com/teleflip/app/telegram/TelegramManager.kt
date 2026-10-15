@@ -139,6 +139,25 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
         set(value) = prefs.edit().putString("api_hash", value).apply()
 
+    var keypadTimeoutMs: Long
+        get() {
+            return try {
+                val v = prefs.getLong("keypad_timeout_ms", 500L)
+                if (v == 300L || v == 500L || v == 900L) v else 500L
+            } catch (e: Exception) {
+                try {
+                    val v = prefs.getInt("keypad_timeout_ms", 500).toLong()
+                    if (v == 300L || v == 500L || v == 900L) v else 500L
+                } catch (e2: Exception) {
+                    500L
+                }
+            }
+        }
+        set(value) {
+            val validValue = if (value == 300L || value == 500L || value == 900L) value else 500L
+            prefs.edit().putLong("keypad_timeout_ms", validValue).apply()
+        }
+
     init {
         try {
             System.loadLibrary("tdjni")

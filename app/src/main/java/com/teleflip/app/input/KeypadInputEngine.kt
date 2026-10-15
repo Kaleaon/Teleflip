@@ -23,6 +23,7 @@ enum class InputMode(val label: String) {
 class KeypadInputEngine(
     private val editText: EditText,
     private val modeIndicator: TextView? = null,
+    var timeoutMs: Long = 500L,
     private val onSymbolRequested: (() -> Unit)? = null
 ) {
     var currentMode = InputMode.CAP_FIRST
@@ -31,7 +32,6 @@ class KeypadInputEngine(
     private var lastKeyCode = -1
     private var charIndex = 0
     private var lastKeyTime = 0L
-    private val timeoutMs = 900L
     private val handler = Handler(Looper.getMainLooper())
     private val commitRunnable = Runnable { commitCurrentChar() }
 
@@ -62,7 +62,8 @@ class KeypadInputEngine(
         val isHandledKey = keyCode in keyMap.keys ||
                            keyCode == KeyEvent.KEYCODE_STAR ||
                            keyCode == KeyEvent.KEYCODE_POUND ||
-                           keyCode == KeyEvent.KEYCODE_DEL
+                           keyCode == KeyEvent.KEYCODE_DEL ||
+                           keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
 
         if (!isHandledKey) return false
 
@@ -72,6 +73,12 @@ class KeypadInputEngine(
         }
 
         if (event.action != KeyEvent.ACTION_DOWN) return false
+
+        // Manual Commit with D-Pad Right
+        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            commitCurrentChar()
+            return true
+        }
 
         // Open Symbols Picker with * (STAR)
         if (keyCode == KeyEvent.KEYCODE_STAR) {
