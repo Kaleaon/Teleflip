@@ -15,7 +15,7 @@ import com.teleflip.app.R
 class SymbolsDialog(
     context: Context,
     private val onSymbolSelected: (String) -> Unit
-) : Dialog(context, R.style.Theme_TeleFlip) {
+) : BaseDialog(context) {
 
     private val symbols = listOf(
         "?", "!", "@", "#", "$", "%", "&", "*",
@@ -37,8 +37,12 @@ class SymbolsDialog(
         }
     }
 
+    override fun onBackPressed() {
+        dismiss()
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
+        if (isBackOrRightSoftKey(keyCode)) {
             dismiss()
             return true
         }

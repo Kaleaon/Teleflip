@@ -95,10 +95,31 @@ class MainActivity : AppCompatActivity() {
 
         mainContainer = findViewById(R.id.main_container)
 
+        val softkeyBar = findViewById<View>(R.id.softkey_bar)
         val tvLsk = findViewById<TextView>(R.id.tv_softkey_left)
         val tvCenter = findViewById<TextView>(R.id.tv_softkey_center)
         val tvRsk = findViewById<TextView>(R.id.tv_softkey_right)
-        softkeyManager = SoftkeyManager(tvLsk, tvCenter, tvRsk)
+        softkeyManager = SoftkeyManager(softkeyBar, tvLsk, tvCenter, tvRsk)
+
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (voiceRecorder.isRecording()) {
+                    activeChat?.let { cancelVoiceRecordingUI(it) }
+                    return
+                }
+                when (currentScreen) {
+                    Screen.CONVERSATION -> showChatListScreen()
+                    Screen.SETTINGS -> {
+                        if (telegramManager.authState.value is AuthState.Ready) {
+                            showChatListScreen()
+                        } else {
+                            showLoginScreen(telegramManager.authState.value)
+                        }
+                    }
+                    Screen.LOGIN, Screen.CHAT_LIST -> finish()
+                }
+            }
+        })
 
         telegramManager = TelegramManager(this)
         voiceRecorder = VoiceRecorder(this)
@@ -304,6 +325,21 @@ class MainActivity : AppCompatActivity() {
     private fun showToast(msg: String, isError: Boolean = false) {
         com.teleflip.app.report.AdbReporter.reportPopup("UI_Popup", msg, isError)
         Toast.makeText(this, msg, if (isError) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+    }
+
+    private var activeDialogCount = 0
+
+    fun onDialogShown() {
+        activeDialogCount++
+        softkeyManager.setSoftkeyBarVisible(false)
+    }
+
+    fun onDialogDismissed() {
+        activeDialogCount--
+        if (activeDialogCount <= 0) {
+            activeDialogCount = 0
+            softkeyManager.setSoftkeyBarVisible(true)
+        }
     }
 
     private fun showChatListOptionsMenu() {
@@ -994,30 +1030,10 @@ class MainActivity : AppCompatActivity() {
             if (softkeyManager.handleKeyEvent(keyCode, event)) return true
         }
 
-        // Back key and Top Right hardware softkey handling
-        if ((keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT ||
-                keyCode == 229 || keyCode == 230 || keyCode == 61 || keyCode == 158) && event.action == KeyEvent.ACTION_DOWN) {
-            if (voiceRecorder.isRecording()) {
-                activeChat?.let { cancelVoiceRecordingUI(it) }
-                return true
-            }
-            if (currentScreen == Screen.LOGIN) {
-                telegramManager.enableDemoMode()
-                showChatListScreen()
-                return true
-            }
-            if (currentScreen == Screen.CONVERSATION) {
-                showChatListScreen()
-                return true
-            }
-            if (currentScreen == Screen.SETTINGS) {
-                if (telegramManager.authState.value is AuthState.Ready) {
-                    showChatListScreen()
-                } else {
-                    showLoginScreen(telegramManager.authState.value)
-                }
-                return true
-            }
+        // Top Right hardware softkey handling (isolated from KEYCODE_BACK)
+        if (keyCode == KeyEvent.KEYCODE_SOFT_RIGHT || keyCode == 229 || keyCode == 230 ||
+            keyCode == 61 || keyCode == 158) {
+            if (softkeyManager.handleKeyEvent(keyCode, event)) return true
         }
 
         // Dedicated Call button: Start voice note recording or send in conversation
@@ -1136,9 +1152,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        if (softkeyManager.handleBack()) {
-            return
-        }
         super.onBackPressed()
     }
 }
