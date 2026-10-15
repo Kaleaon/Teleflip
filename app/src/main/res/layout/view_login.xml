@@ -112,6 +112,22 @@
             android:background="@drawable/bg_button_selector"
             android:focusable="true"
             android:nextFocusUp="@+id/et_login_input"
+            android:nextFocusDown="@+id/btn_retry_connection"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Retry Connection Button -->
+        <Button
+            android:id="@+id/btn_retry_connection"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:text="Retry Connection"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:visibility="gone"
+            android:nextFocusUp="@+id/btn_login_submit"
             android:nextFocusDown="@+id/btn_use_sim_number"
             android:layout_marginBottom="12dp" />
 

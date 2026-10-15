@@ -1,4 +1,4 @@
-package com.teleflip.app
+﻿package com.teleflip.app
 
 import android.Manifest
 import android.content.ClipData
@@ -165,9 +165,20 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             telegramManager.connectionState.collectLatest { status ->
-                val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
+val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
                 tvConnectionStatus?.text = status
                 tvConnectionStatus?.announceForAccessibility("Connection status: $status")
+                if (currentScreen == Screen.LOGIN) {
+                    updateLoginConnectionState(status)
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            telegramManager.isAuthQueryInProgressFlow.collectLatest { inProgress ->
+                if (currentScreen == Screen.LOGIN) {
+                    updateLoginProgressState(inProgress)
+                }
             }
         }
 
@@ -900,6 +911,7 @@ class MainActivity : AppCompatActivity() {
         val tvMode = view.findViewById<TextView>(R.id.tv_login_input_mode)
         etLoginInput = view.findViewById(R.id.et_login_input)
         val btnSubmit = view.findViewById<Button>(R.id.btn_login_submit)
+        val btnRetry = view.findViewById<Button>(R.id.btn_retry_connection)
         val btnUseSim = view.findViewById<Button>(R.id.btn_use_sim_number)
         val btnDemo = view.findViewById<Button>(R.id.btn_demo_mode)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
@@ -910,6 +922,10 @@ class MainActivity : AppCompatActivity() {
             timeoutMs = telegramManager.keypadTimeoutMs
         ) {
             showSymbolsDialog { symbol -> loginInputEngine?.insertSymbol(symbol) }
+        }
+
+        btnRetry?.setOnClickListener {
+            telegramManager.retryConnection()
         }
 
         when (state) {
@@ -934,12 +950,8 @@ class MainActivity : AppCompatActivity() {
                         etLoginInput?.setSelection(etLoginInput?.text?.length ?: 0)
                         btnSubmit.requestFocus()
                     }
-                    btnSubmit.nextFocusDownId = R.id.btn_use_sim_number
-                    btnDemo.nextFocusUpId = R.id.btn_use_sim_number
                 } else {
                     btnUseSim?.visibility = View.GONE
-                    btnSubmit.nextFocusDownId = R.id.btn_demo_mode
-                    btnDemo.nextFocusUpId = R.id.btn_login_submit
                 }
 
                 if (state.errorMessage != null) {
@@ -959,8 +971,6 @@ class MainActivity : AppCompatActivity() {
                 tvMode?.visibility = View.GONE
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
                 btnUseSim?.visibility = View.GONE
-                btnSubmit.nextFocusDownId = R.id.btn_demo_mode
-                btnDemo.nextFocusUpId = R.id.btn_login_submit
                 tvLabel.text = "Verification Code (5 digits):"
                 etLoginInput?.hint = "12345"
                 btnSubmit.text = "Verify Code"
@@ -978,8 +988,6 @@ class MainActivity : AppCompatActivity() {
                 tvMode?.visibility = View.VISIBLE
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.LOWER)
                 btnUseSim?.visibility = View.GONE
-                btnSubmit.nextFocusDownId = R.id.btn_demo_mode
-                btnDemo.nextFocusUpId = R.id.btn_login_submit
                 tvLabel.text = "2-Step Verification Password:"
                 etLoginInput?.hint = "Cloud Password"
                 btnSubmit.text = "Submit Password"
@@ -995,7 +1003,7 @@ class MainActivity : AppCompatActivity() {
             }
             is AuthState.Error -> {
                 btnUseSim?.visibility = View.GONE
-                btnSubmit.nextFocusDownId = R.id.btn_demo_mode
+btnSubmit.nextFocusDownId = R.id.btn_demo_mode
                 btnDemo.nextFocusUpId = R.id.btn_login_submit
                 val errorMessage = "⚠️ Error: ${state.message}"
                 tvStatus.text = errorMessage
@@ -1042,12 +1050,21 @@ class MainActivity : AppCompatActivity() {
         }
         btnConfig.setOnClickListener { showSettingsScreen() }
 
+        updateLoginConnectionState(telegramManager.connectionState.value)
+        updateLoginProgressState(telegramManager.isAuthQueryInProgress)
+
         softkeyManager.update(
             left = "Config",
             center = "Submit",
             right = "Demo",
             onLeft = { showSettingsScreen() },
-            onCenter = { doSubmit() },
+            onCenter = {
+                if (currentFocus?.id == R.id.btn_retry_connection) {
+                    telegramManager.retryConnection()
+                } else {
+                    doSubmit()
+                }
+            },
             onRight = {
                 telegramManager.enableDemoMode()
                 showChatListScreen()
@@ -1055,6 +1072,81 @@ class MainActivity : AppCompatActivity() {
         )
 
         etLoginInput?.requestFocus()
+    }
+
+    private fun updateLoginConnectionState(status: String) {
+        val btnRetry = findViewById<Button>(R.id.btn_retry_connection) ?: return
+        val tvStatus = findViewById<TextView>(R.id.tv_login_status) ?: return
+
+        if (status == "Init error") {
+            btnRetry.visibility = View.VISIBLE
+            btnRetry.setOnClickListener { telegramManager.retryConnection() }
+            val currentAuth = telegramManager.authState.value
+            val err = when (currentAuth) {
+                is AuthState.WaitPhoneNumber -> currentAuth.errorMessage
+                is AuthState.WaitCode -> currentAuth.errorMessage
+                is AuthState.WaitPassword -> currentAuth.errorMessage
+                is AuthState.Error -> currentAuth.message
+                else -> null
+            }
+            tvStatus.text = err?.let { "⚠️ Error: $it" } ?: "⚠️ Connection Init Error. Native client failed to start."
+            tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
+        } else {
+            btnRetry.visibility = View.GONE
+        }
+        updateLoginFocusChain()
+    }
+
+    private fun updateLoginProgressState(inProgress: Boolean) {
+        val btnSubmit = findViewById<Button>(R.id.btn_login_submit) ?: return
+        val progressLogin = findViewById<View>(R.id.progress_login) ?: return
+
+        if (inProgress) {
+            btnSubmit.isEnabled = false
+            btnSubmit.text = "Sending..."
+            progressLogin.visibility = View.VISIBLE
+        } else {
+            btnSubmit.isEnabled = true
+            progressLogin.visibility = View.GONE
+            val defaultText = when (telegramManager.authState.value) {
+                is AuthState.WaitCode -> "Verify Code"
+                is AuthState.WaitPassword -> "Submit Password"
+                else -> "Send Code"
+            }
+            btnSubmit.text = defaultText
+        }
+    }
+
+    private fun updateLoginFocusChain() {
+        val etInput = etLoginInput ?: return
+        val btnSubmit = findViewById<Button>(R.id.btn_login_submit) ?: return
+        val btnRetry = findViewById<Button>(R.id.btn_retry_connection) ?: return
+        val btnSim = findViewById<Button>(R.id.btn_use_sim_number) ?: return
+        val btnDemo = findViewById<Button>(R.id.btn_demo_mode) ?: return
+        val btnConfig = findViewById<Button>(R.id.btn_config_credentials) ?: return
+
+        etInput.nextFocusDownId = R.id.btn_login_submit
+        btnSubmit.nextFocusUpId = R.id.et_login_input
+
+        var prevId = R.id.btn_login_submit
+
+        if (btnRetry.visibility == View.VISIBLE) {
+            findViewById<View>(prevId)?.nextFocusDownId = R.id.btn_retry_connection
+            btnRetry.nextFocusUpId = prevId
+            prevId = R.id.btn_retry_connection
+        }
+
+        if (btnSim.visibility == View.VISIBLE) {
+            findViewById<View>(prevId)?.nextFocusDownId = R.id.btn_use_sim_number
+            btnSim.nextFocusUpId = prevId
+            prevId = R.id.btn_use_sim_number
+        }
+
+        findViewById<View>(prevId)?.nextFocusDownId = R.id.btn_demo_mode
+        btnDemo.nextFocusUpId = prevId
+
+        btnDemo.nextFocusDownId = R.id.btn_config_credentials
+        btnConfig.nextFocusUpId = R.id.btn_demo_mode
     }
 
     private fun getDevicePhoneNumber(): String? {

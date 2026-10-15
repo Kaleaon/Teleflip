@@ -170,13 +170,37 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     fun start() {
         if (isDemoMode) return
-        try {
-            _connectionState.value = "Connecting..."
-            com.teleflip.app.report.AdbReporter.reportInfo(tag, "Creating TDLib Client...")
-            tdClient = Client.create(this, null, null)
-        } catch (e: Exception) {
-            com.teleflip.app.report.AdbReporter.reportError(tag, "Client creation error: ${e.message}", e)
-            _connectionState.value = "Init error"
+        scope.launch(Dispatchers.IO) {
+            try {
+                _connectionState.value = "Connecting..."
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Creating TDLib Client...")
+                val client = Client.create(this@TelegramManager, null, null)
+                if (client == null) {
+                    _connectionState.value = "Init error"
+                    com.teleflip.app.report.AdbReporter.reportError(tag, "Client.create returned null")
+                } else {
+                    tdClient = client
+                }
+            } catch (e: Throwable) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Client creation error: ${e.message}", e)
+                _connectionState.value = "Init error"
+            }
+        }
+    }
+
+    fun retryConnection() {
+        if (isDemoMode) return
+        clearAuthTimeoutSafeguard()
+        isAuthQueryInProgress = false
+        scope.launch(Dispatchers.IO) {
+            try {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing previous TDLib client instance...")
+                tdClient?.send(TdApi.Close(), this@TelegramManager)
+            } catch (e: Throwable) {
+                Log.w(tag, "Error during native client teardown: ${e.message}")
+            }
+            tdClient = null
+            start()
         }
     }
 
@@ -212,8 +236,54 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         _messages.value = demoMessages
     }
 
-    var isAuthQueryInProgress = false
-        private set
+    private val _isAuthQueryInProgress = MutableStateFlow(false)
+    val isAuthQueryInProgressFlow: StateFlow<Boolean> = _isAuthQueryInProgress.asStateFlow()
+
+    var isAuthQueryInProgress: Boolean
+        get() = _isAuthQueryInProgress.value
+        private set(value) {
+            _isAuthQueryInProgress.value = value
+        }
+
+    private var authTimeoutJob: Job? = null
+
+    private fun startAuthTimeoutSafeguard() {
+        authTimeoutJob?.cancel()
+        authTimeoutJob = scope.launch {
+            delay(15_000L)
+            if (isAuthQueryInProgress) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Auth query timed out after 15 seconds")
+                isAuthQueryInProgress = false
+                val timeoutMsg = "Request timed out after 15 seconds. Please try again."
+                when (val curr = _authState.value) {
+                    is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = timeoutMsg)
+                    is AuthState.WaitCode -> _authState.value = curr.copy(errorMessage = timeoutMsg)
+                    is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = timeoutMsg)
+                    else -> _authState.value = AuthState.Error(timeoutMsg)
+                }
+            }
+        }
+    }
+
+    private fun clearAuthTimeoutSafeguard() {
+        authTimeoutJob?.cancel()
+        authTimeoutJob = null
+    }
+
+    private fun isClientActive(): Boolean {
+        return tdClient != null && _connectionState.value != "Init error"
+    }
+
+    private fun handleClientUnavailable() {
+        com.teleflip.app.report.AdbReporter.reportError(tag, "Authorization submission attempted while TDLib client is unavailable")
+        val msg = "Telegram client unavailable. Please check connection or tap Retry Connection."
+        when (val curr = _authState.value) {
+            is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = msg)
+            is AuthState.WaitCode -> _authState.value = curr.copy(errorMessage = msg)
+            is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = msg)
+            else -> _authState.value = AuthState.WaitPhoneNumber(errorMessage = msg)
+        }
+    }
 
     fun sendPhoneNumber(phone: String) {
         if (isDemoMode) {
@@ -224,7 +294,12 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             com.teleflip.app.report.AdbReporter.reportInfo(tag, "sendPhoneNumber ignored: authorization query already in flight")
             return
         }
+        if (!isClientActive()) {
+            handleClientUnavailable()
+            return
+        }
         isAuthQueryInProgress = true
+        startAuthTimeoutSafeguard()
         val cleanPhone = org.telegram.PhoneFormat.PhoneFormat.stripExceptNumbers(phone, true) ?: phone
         val normalized = if (!cleanPhone.startsWith("+")) "+$cleanPhone" else cleanPhone
         com.teleflip.app.report.AdbReporter.reportInfo(tag, "Submitting phone number: $normalized")
@@ -246,7 +321,12 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             com.teleflip.app.report.AdbReporter.reportInfo(tag, "checkCode ignored: authorization query already in flight")
             return
         }
+        if (!isClientActive()) {
+            handleClientUnavailable()
+            return
+        }
         isAuthQueryInProgress = true
+        startAuthTimeoutSafeguard()
         tdClient?.send(TdApi.CheckAuthenticationCode(code), this)
     }
 
@@ -259,7 +339,12 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             com.teleflip.app.report.AdbReporter.reportInfo(tag, "checkPassword ignored: authorization query already in flight")
             return
         }
+        if (!isClientActive()) {
+            handleClientUnavailable()
+            return
+        }
         isAuthQueryInProgress = true
+        startAuthTimeoutSafeguard()
         tdClient?.send(TdApi.CheckAuthenticationPassword(password), this)
     }
 
@@ -582,6 +667,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 handleFileUpdate(file)
             }
             TdApi.Error.CONSTRUCTOR -> {
+                clearAuthTimeoutSafeguard()
                 isAuthQueryInProgress = false
                 val err = obj as TdApi.Error
                 com.teleflip.app.report.AdbReporter.reportError(tag, "TDLib Server Error [Code: ${err.code}]: ${err.message}")
@@ -596,10 +682,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     }
                 }
             }
+            TdApi.Ok.CONSTRUCTOR -> {
+                clearAuthTimeoutSafeguard()
+            }
         }
     }
 
     private fun handleAuthState(state: TdApi.AuthorizationState) {
+        clearAuthTimeoutSafeguard()
         isAuthQueryInProgress = false
         com.teleflip.app.report.AdbReporter.reportInfo(tag, "Auth state updated: ${state.javaClass.simpleName}")
         when (state.constructor) {

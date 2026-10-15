@@ -3,6 +3,8 @@ package com.teleflip.app.telegram
 import android.content.Context
 import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.ArgumentMatchers.anyInt
@@ -15,48 +17,106 @@ import org.mockito.Mockito.verify
 
 class TelegramManagerTest {
 
-    private lateinit var context: Context
-    private lateinit var prefs: SharedPreferences
-    private lateinit var editor: SharedPreferences.Editor
+    private lateinit var mockContext: Context
+    private lateinit var mockPrefs: SharedPreferences
+    private lateinit var mockEditor: SharedPreferences.Editor
 
     @Before
     fun setUp() {
-        context = mock(Context::class.java)
-        prefs = mock(SharedPreferences::class.java)
-        editor = mock(SharedPreferences.Editor::class.java)
+        mockContext = mock(Context::class.java)
+        mockPrefs = mock(SharedPreferences::class.java)
+        mockEditor = mock(SharedPreferences.Editor::class.java)
 
-        `when`(context.getSharedPreferences(anyString(), anyInt())).thenReturn(prefs)
-        `when`(prefs.edit()).thenReturn(editor)
-        `when`(editor.putLong(anyString(), anyLong())).thenReturn(editor)
+        `when`(mockContext.getSharedPreferences(anyString(), anyInt())).thenReturn(mockPrefs)
+        `when`(mockPrefs.edit()).thenReturn(mockEditor)
+        `when`(mockEditor.putInt(anyString(), anyInt())).thenReturn(mockEditor)
+        `when`(mockEditor.putString(anyString(), anyString())).thenReturn(mockEditor)
+        `when`(mockEditor.putLong(anyString(), anyLong())).thenReturn(mockEditor)
     }
 
     @Test
     fun testKeypadTimeoutMsDefaultValue() {
-        `when`(prefs.getLong(eq("keypad_timeout_ms"), anyLong())).thenReturn(500L)
+        `when`(mockPrefs.getLong(eq("keypad_timeout_ms"), anyLong())).thenReturn(500L)
 
-        val manager = TelegramManager(context)
+        val manager = TelegramManager(mockContext)
         assertEquals(500L, manager.keypadTimeoutMs)
     }
 
     @Test
     fun testKeypadTimeoutMsInvalidFallback() {
-        `when`(prefs.getLong(eq("keypad_timeout_ms"), anyLong())).thenReturn(1200L)
+        `when`(mockPrefs.getLong(eq("keypad_timeout_ms"), anyLong())).thenReturn(1200L)
 
-        val manager = TelegramManager(context)
+        val manager = TelegramManager(mockContext)
         assertEquals(500L, manager.keypadTimeoutMs)
     }
 
     @Test
     fun testKeypadTimeoutMsValidSelections() {
-        val manager = TelegramManager(context)
+        val manager = TelegramManager(mockContext)
 
         manager.keypadTimeoutMs = 300L
-        verify(editor).putLong("keypad_timeout_ms", 300L)
+        verify(mockEditor).putLong("keypad_timeout_ms", 300L)
 
         manager.keypadTimeoutMs = 900L
-        verify(editor).putLong("keypad_timeout_ms", 900L)
+        verify(mockEditor).putLong("keypad_timeout_ms", 900L)
 
         manager.keypadTimeoutMs = 750L // invalid value fallback
-        verify(editor).putLong("keypad_timeout_ms", 500L)
+        verify(mockEditor).putLong("keypad_timeout_ms", 500L)
+    }
+
+    @Test
+    fun testUninitializedClientSubmissionDoesNotLockInFlightState() {
+        val manager = TelegramManager(mockContext)
+
+        assertFalse("Initial in-flight query state should be false", manager.isAuthQueryInProgress)
+
+        // Attempting to send phone number when native client is unavailable (not started or init error)
+        manager.sendPhoneNumber("+15551234567")
+
+        assertFalse("isAuthQueryInProgress must remain false when tdClient is unavailable", manager.isAuthQueryInProgress)
+
+        val authState = manager.authState.value
+        assertTrue("Auth state should be WaitPhoneNumber with error message", authState is AuthState.WaitPhoneNumber)
+        val waitPhoneState = authState as AuthState.WaitPhoneNumber
+        assertTrue("Error message should inform user that client is unavailable", waitPhoneState.errorMessage?.contains("unavailable") == true)
+    }
+
+    @Test
+    fun testUninitializedCodeAndPasswordSubmissionDoNotLockInFlightState() {
+        val manager = TelegramManager(mockContext)
+
+        // Test checkCode when client is unavailable
+        manager.checkCode("12345")
+        assertFalse("isAuthQueryInProgress must remain false for code submission without active client", manager.isAuthQueryInProgress)
+
+        // Test checkPassword when client is unavailable
+        manager.checkPassword("secret")
+        assertFalse("isAuthQueryInProgress must remain false for password submission without active client", manager.isAuthQueryInProgress)
+    }
+
+    @Test
+    fun testDemoModeIsolation() {
+        val manager = TelegramManager(mockContext)
+        manager.enableDemoMode()
+
+        assertTrue("Demo mode should be enabled", manager.isDemoMode)
+        assertEquals("Demo (Offline)", manager.connectionState.value)
+
+        // Demo submissions update auth state directly without touching native client or locking in-flight query
+        manager.sendPhoneNumber("+15559990000")
+        assertFalse("isAuthQueryInProgress must remain false in demo mode", manager.isAuthQueryInProgress)
+        assertTrue("Demo phone submit transitions to WaitCode", manager.authState.value is AuthState.WaitCode)
+
+        manager.checkCode("12345")
+        assertFalse("isAuthQueryInProgress must remain false in demo code check", manager.isAuthQueryInProgress)
+        assertTrue("Demo code check transitions to Ready", manager.authState.value is AuthState.Ready)
+    }
+
+    @Test
+    fun testRetryConnectionResetsInFlightQueryState() {
+        val manager = TelegramManager(mockContext)
+        manager.retryConnection()
+
+        assertFalse("retryConnection must reset isAuthQueryInProgress to false", manager.isAuthQueryInProgress)
     }
 }
