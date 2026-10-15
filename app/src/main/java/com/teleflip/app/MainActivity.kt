@@ -353,6 +353,7 @@ class MainActivity : AppCompatActivity() {
 
         val ivConvAvatar = view.findViewById<ImageView>(R.id.iv_conv_avatar)
         val tvConvAvatar = view.findViewById<TextView>(R.id.tv_conv_avatar)
+        ivConvAvatar?.contentDescription = com.teleflip.app.ui.ContentDescriptionFormatter.getAvatarDescription(this, chat.title)
         if (!chat.avatarPath.isNullOrEmpty() && java.io.File(chat.avatarPath).exists()) {
             try {
                 val bmp = android.graphics.BitmapFactory.decodeFile(chat.avatarPath)

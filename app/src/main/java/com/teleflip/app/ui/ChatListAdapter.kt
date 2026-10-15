@@ -49,6 +49,8 @@ class ChatListAdapter(
         private val tvUnread: TextView = itemView.findViewById(R.id.tv_unread_count)
 
         fun bind(chat: ChatModel, position: Int) {
+            ivAvatar.contentDescription = ContentDescriptionFormatter.getAvatarDescription(itemView.context, chat.title)
+
             // Keypad shortcut 1-9
             if (position < 9) {
                 tvShortcut.visibility = View.VISIBLE
