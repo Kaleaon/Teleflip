@@ -67,6 +67,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     val subscriberCache = java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
     val userSubscriberCache get() = subscriberCache
     val chatIdToUserId = java.util.concurrent.ConcurrentHashMap<Long, Long>()
+    val userPhoneCache = java.util.concurrent.ConcurrentHashMap<Long, String>()
 
     private var tdClient: Client? = null
     var isDemoMode = false
@@ -892,6 +893,88 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    fun getUserPhoneNumber(userId: Long): String? = userPhoneCache[userId]
+
+    fun getDirectChatUserId(chatId: Long): Long? = chatIdToUserId[chatId] ?: if (chatId > 0) chatId else null
+
+    fun forwardMessage(
+        fromChatId: Long,
+        toChatId: Long,
+        messageId: Long,
+        onComplete: ((Boolean) -> Unit)? = null
+    ) {
+        if (isDemoMode) {
+            val sourceList = _messages.value[fromChatId] ?: emptyList()
+            val sourceMsg = sourceList.find { it.id == messageId }
+            if (sourceMsg != null) {
+                val fwdMsg = sourceMsg.copy(
+                    id = System.currentTimeMillis(),
+                    chatId = toChatId,
+                    time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                    isOutbound = true,
+                    status = MessageStatus.SENT,
+                    text = if (sourceMsg.text.isNotBlank()) "↪ Forwarded:\n${sourceMsg.text}" else ""
+                )
+                appendMessage(toChatId, fwdMsg)
+                onComplete?.invoke(true)
+            } else {
+                onComplete?.invoke(false)
+            }
+            return
+        }
+
+        try {
+            val req = TdApi.ForwardMessages().apply {
+                this.chatId = toChatId
+                this.fromChatId = fromChatId
+                this.messageIds = longArrayOf(messageId)
+            }
+            tdClient?.send(req) { result ->
+                val success = result is TdApi.Messages
+                scope.launch(Dispatchers.Main) {
+                    onComplete?.invoke(success)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to forward message: ${e.message}")
+            onComplete?.invoke(false)
+        }
+    }
+
+    fun downloadFilePriority(fileId: Int) {
+        if (isDemoMode || fileId == 0) return
+        try {
+            tdClient?.send(TdApi.DownloadFile(fileId, 32, 0, 0, false), this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to download file priority: ${e.message}")
+        }
+    }
+
+    fun initiateTelegramCall(userId: Long, onResult: ((Boolean, String?) -> Unit)? = null) {
+        if (isDemoMode) {
+            onResult?.invoke(true, "Simulated call connected")
+            return
+        }
+        try {
+            val protocol = TdApi.CallProtocol(true, true, 65, 92, arrayOf("libtgvoip"))
+            val req = TdApi.CreateCall(userId, protocol, false)
+            tdClient?.send(req) { result ->
+                scope.launch(Dispatchers.Main) {
+                    if (result is TdApi.CallId) {
+                        onResult?.invoke(true, "Call initiated (ID: ${result.id})")
+                    } else if (result is TdApi.Error) {
+                        onResult?.invoke(false, result.message)
+                    } else {
+                        onResult?.invoke(false, "Call initiation returned unexpected result")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to create call: ${e.message}")
+            onResult?.invoke(false, e.message)
+        }
+    }
+
     fun logOut() {
         if (isDemoMode) {
             isDemoMode = false
@@ -1070,6 +1153,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     fun updateUserCache(user: TdApi.User) {
         userSubscriberCache[user.id] = user.isPremium
+        if (!user.phoneNumber.isNullOrBlank()) {
+            userPhoneCache[user.id] = user.phoneNumber
+        }
         val list = _chats.value.toMutableList()
         var updated = false
         for (i in list.indices) {
@@ -1098,6 +1184,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     fun handleUserUpdate(user: TdApi.User) {
         subscriberCache[user.id] = user.isPremium
+        if (!user.phoneNumber.isNullOrBlank()) {
+            userPhoneCache[user.id] = user.phoneNumber
+        }
 
         val currentList = _chats.value.toMutableList()
         var updated = false

@@ -9,6 +9,12 @@ import android.os.Build
 import android.os.Bundle
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
+import android.content.Intent
+import android.media.MediaScannerConnection
+import android.net.Uri
+import android.os.Environment
+import android.util.Log
+import java.io.File
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -897,24 +903,172 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
 
     private fun showAttachMenu(chat: ChatModel) {
         commitActiveInputEngines()
-        val options = listOf(
-            MenuOption(1, "🎤 Record Voice Message (Push-to-Talk)") {
-                startVoiceRecordingFlow(chat)
-            },
-            MenuOption(2, "📍 Send Current GPS Location") {
-                sendLocationFlow(chat)
-            },
-            MenuOption(3, "Symbols & Emoji (*)") {
-                showSymbolsDialog { sym -> composeInputEngine?.insertSymbol(sym) }
-            },
-            MenuOption(4, "Quick Replies") {
-                showQuickRepliesMenu(chat)
-            },
-            MenuOption(5, "Chat Info") {
-                showToast("${chat.title} (${chat.chatType})")
-            }
-        )
+        val options = mutableListOf<MenuOption>()
+        if (chat.chatType == ChatType.DIRECT) {
+            options.add(MenuOption(options.size + 1, "📞 Call Contact") {
+                initiateCallFlow(chat)
+            })
+        }
+        options.add(MenuOption(options.size + 1, "🎤 Record Voice Message (Push-to-Talk)") {
+            startVoiceRecordingFlow(chat)
+        })
+        options.add(MenuOption(options.size + 1, "📍 Send Current GPS Location") {
+            sendLocationFlow(chat)
+        })
+        options.add(MenuOption(options.size + 1, "Symbols & Emoji (*)") {
+            showSymbolsDialog { sym -> composeInputEngine?.insertSymbol(sym) }
+        })
+        options.add(MenuOption(options.size + 1, "Quick Replies") {
+            showQuickRepliesMenu(chat)
+        })
+        options.add(MenuOption(options.size + 1, "Chat Info") {
+            showToast("${chat.title} (${chat.chatType})")
+        })
         OptionsMenuDialog(this, "Attach & Actions", options).show()
+    }
+
+    private fun initiateCallFlow(chat: ChatModel) {
+        if (chat.chatType != ChatType.DIRECT) {
+            showToast("Direct voice calling is only available for 1-on-1 chats")
+            return
+        }
+
+        val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+        val phoneNumber = telegramManager.getUserPhoneNumber(userId)
+
+        val options = mutableListOf<MenuOption>()
+
+        if (!phoneNumber.isNullOrBlank()) {
+            options.add(MenuOption(options.size + 1, "📞 Phone Call ($phoneNumber)") {
+                val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phoneNumber"))
+                try {
+                    startActivity(dialIntent)
+                } catch (e: Exception) {
+                    showToast("Could not open phone dialer: ${e.message}", true)
+                }
+            })
+        } else {
+            options.add(MenuOption(options.size + 1, "📞 Cellular Dialer") {
+                val dialIntent = Intent(Intent.ACTION_DIAL)
+                try {
+                    startActivity(dialIntent)
+                } catch (e: Exception) {
+                    showToast("Could not open phone dialer: ${e.message}", true)
+                }
+            })
+        }
+
+        options.add(MenuOption(options.size + 1, "📱 Telegram Voice Call") {
+            showToast("Connecting Telegram Voice Call to ${chat.title}...")
+            telegramManager.initiateTelegramCall(userId) { success, msg ->
+                if (success) {
+                    showToast("Calling ${chat.title}...")
+                } else {
+                    showToast(msg ?: "Telegram call failed", true)
+                }
+            }
+        })
+
+        OptionsMenuDialog(this, "Call ${chat.title}", options).show()
+    }
+
+    private fun showForwardDialog(msg: MessageModel) {
+        val allChats = telegramManager.chats.value
+        val targetChats = allChats.filter { it.id != msg.chatId }
+        if (targetChats.isEmpty()) {
+            showToast("No other chats available to forward to")
+            return
+        }
+
+        val options = targetChats.take(20).mapIndexed { idx, chat ->
+            MenuOption(idx + 1, "↪ ${chat.title} (${chat.chatType})") {
+                telegramManager.forwardMessage(msg.chatId, chat.id, msg.id) { success ->
+                    if (success) {
+                        showToast("Forwarded to ${chat.title}")
+                    } else {
+                        showToast("Failed to forward message", true)
+                    }
+                }
+            }
+        }
+
+        OptionsMenuDialog(this, "Forward Message To...", options).show()
+    }
+
+    private fun saveMessageToDevice(msg: MessageModel) {
+        val path = msg.mediaFilePath
+        if (msg.mediaType != MediaType.NONE && !path.isNullOrBlank() && File(path).exists()) {
+            try {
+                val sourceFile = File(path)
+                val targetDirType = when (msg.mediaType) {
+                    MediaType.PHOTO -> Environment.DIRECTORY_PICTURES
+                    MediaType.VOICE -> Environment.DIRECTORY_MUSIC
+                    MediaType.VIDEO -> Environment.DIRECTORY_MOVIES
+                    else -> Environment.DIRECTORY_DOWNLOADS
+                }
+
+                val publicDir = File(Environment.getExternalStoragePublicDirectory(targetDirType), "TeleFlip")
+                if (!publicDir.exists()) {
+                    publicDir.mkdirs()
+                }
+
+                val extension = sourceFile.extension.ifBlank {
+                    when (msg.mediaType) {
+                        MediaType.PHOTO -> "jpg"
+                        MediaType.VOICE -> "m4a"
+                        MediaType.VIDEO -> "mp4"
+                        else -> "bin"
+                    }
+                }
+
+                val baseName = if (msg.mediaCaption.isNotBlank() && !msg.mediaCaption.contains("\n")) {
+                    msg.mediaCaption.replace(Regex("[^a-zA-Z0-9._-]"), "_").take(30)
+                } else {
+                    "TeleFlip_${msg.id}"
+                }
+                val destFile = File(publicDir, "$baseName.$extension")
+
+                sourceFile.copyTo(destFile, overwrite = true)
+
+                MediaScannerConnection.scanFile(
+                    this,
+                    arrayOf(destFile.absolutePath),
+                    null
+                ) { scannedPath, _ ->
+                    Log.i("TeleFlip", "Media indexed: $scannedPath")
+                }
+
+                showToast("Saved to ${publicDir.name}/${destFile.name}")
+            } catch (e: Exception) {
+                Log.e("TeleFlip", "Failed to save file: ${e.message}", e)
+                showToast("Failed to save file: ${e.message}", true)
+            }
+        } else if (msg.mediaFileId != 0) {
+            telegramManager.downloadFilePriority(msg.mediaFileId)
+            showToast("Downloading media to device... Please retry once complete.")
+        } else if (msg.text.isNotBlank()) {
+            try {
+                val publicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TeleFlip")
+                if (!publicDir.exists()) {
+                    publicDir.mkdirs()
+                }
+                val destFile = File(publicDir, "TeleFlip_Note_${msg.id}.txt")
+                destFile.writeText("Chat: ${activeChat?.title ?: ""}\nSender: ${msg.senderName}\nTime: ${msg.time}\n\n${msg.text}\n")
+
+                MediaScannerConnection.scanFile(
+                    this,
+                    arrayOf(destFile.absolutePath),
+                    null,
+                    null
+                )
+                showToast("Saved note to Downloads/TeleFlip")
+            } catch (e: Exception) {
+                Log.e("TeleFlip", "Failed to save note: ${e.message}", e)
+                showToast("Failed to save note: ${e.message}", true)
+            }
+        } else {
+            showToast("Nothing to save in this message")
+        }
     }
 
     private fun showMessageOptionsMenu(msg: MessageModel) {
@@ -937,6 +1091,20 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
             etComposeInput?.setText("Re: \"${msg.text.take(20)}...\" ")
             etComposeInput?.setSelection(etComposeInput?.text?.length ?: 0)
         })
+
+        options.add(MenuOption(options.size + 1, "↪ Forward Message") {
+            showForwardDialog(msg)
+        })
+
+        if (msg.mediaType != MediaType.NONE) {
+            options.add(MenuOption(options.size + 1, "💾 Save Media to Device") {
+                saveMessageToDevice(msg)
+            })
+        } else if (msg.text.isNotBlank()) {
+            options.add(MenuOption(options.size + 1, "💾 Save Text to File") {
+                saveMessageToDevice(msg)
+            })
+        }
 
         if (msg.mediaType == MediaType.LOCATION) {
             options.add(MenuOption(options.size + 1, "Open in Organic Maps") {
@@ -1561,12 +1729,14 @@ btnSubmit.nextFocusDownId = R.id.btn_demo_mode
             if (softkeyManager.handleKeyEvent(keyCode, event)) return true
         }
 
-        // Dedicated Call button: Start voice note recording or send in conversation
+        // Dedicated Call button: Start call in direct chat or voice note in group/channel
         if (keyCode == KeyEvent.KEYCODE_CALL && event.action == KeyEvent.ACTION_DOWN) {
             if (currentScreen == Screen.CONVERSATION) {
                 activeChat?.let { chat ->
                     if (voiceRecorder.isRecording()) {
                         stopAndSendVoiceRecording(chat)
+                    } else if (chat.chatType == ChatType.DIRECT) {
+                        initiateCallFlow(chat)
                     } else {
                         startVoiceRecordingFlow(chat)
                     }

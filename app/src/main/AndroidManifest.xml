@@ -16,6 +16,7 @@
     <application
         android:name=".TeleFlipApp"
         android:allowBackup="true"
+        android:requestLegacyExternalStorage="true"
         android:icon="@mipmap/ic_launcher"
         android:label="TeleFlip"
         android:roundIcon="@mipmap/ic_launcher_round"
