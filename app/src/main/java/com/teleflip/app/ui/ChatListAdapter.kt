@@ -5,11 +5,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-<<<<<<< HEAD
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
-=======
->>>>>>> origin/stitch/add-image-view-extensions-jm0-10aa97d9-bd9a-46ec-844e-494cfaf3102f
 import androidx.recyclerview.widget.RecyclerView
 import coil.dispose
 import coil.load

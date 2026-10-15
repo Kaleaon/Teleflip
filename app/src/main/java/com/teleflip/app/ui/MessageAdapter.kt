@@ -51,7 +51,7 @@ class MessageAdapter(
     }
 
     fun getPositionForMessageId(messageId: Long): Int {
-        return items.indexOfFirst { it.id == messageId }
+        return currentList.indexOfFirst { it.id == messageId }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
