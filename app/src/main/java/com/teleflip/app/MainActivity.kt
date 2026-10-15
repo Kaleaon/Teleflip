@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() {
     private var currentChatTypeFilter: ChatType? = null
     private var chatListAdapter: ChatListAdapter? = null
     private var rvChats: RecyclerView? = null
+    private var tabDebounceJob: kotlinx.coroutines.Job? = null
 
     // Conversation State
     private var messageAdapter: MessageAdapter? = null
@@ -155,20 +156,23 @@ class MainActivity : AppCompatActivity() {
                     val emptyView = findViewById<View>(R.id.layout_empty_state)
                     val progressView = findViewById<View>(R.id.progress_chats)
 
-                    if (filtered.isEmpty()) {
-                        if (chats.isEmpty() && telegramManager.connectionState.value != "Offline") {
-                            progressView?.visibility = View.VISIBLE
-                            emptyView?.visibility = View.GONE
-                        } else {
-                            progressView?.visibility = View.GONE
-                            emptyView?.visibility = View.VISIBLE
-                        }
-                    } else {
+                    if (filtered.isNotEmpty()) {
+                        tabDebounceJob?.cancel()
                         progressView?.visibility = View.GONE
                         emptyView?.visibility = View.GONE
-                        if (wasEmpty) {
+                        if (wasEmpty && !isTabViewFocused()) {
                             rvChats?.post {
                                 rvChats?.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                            }
+                        }
+                    } else {
+                        if (tabDebounceJob?.isActive != true) {
+                            if (chats.isEmpty() && telegramManager.connectionState.value != "Offline") {
+                                progressView?.visibility = View.VISIBLE
+                                emptyView?.visibility = View.GONE
+                            } else {
+                                progressView?.visibility = View.GONE
+                                emptyView?.visibility = View.VISIBLE
                             }
                         }
                     }
@@ -260,22 +264,59 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val chats = telegramManager.chats.value
-        val filtered = if (currentChatTypeFilter == null) chats else chats.filter { it.chatType == currentChatTypeFilter }
+        applyChatFilterAndDebounce(currentChatTypeFilter)
+    }
+
+    private fun isTabViewFocused(): Boolean {
+        val focusId = currentFocus?.id ?: return false
+        return focusId == R.id.tab_all || focusId == R.id.tab_direct ||
+               focusId == R.id.tab_groups || focusId == R.id.tab_channels
+    }
+
+    private fun applyChatFilterAndDebounce(filter: ChatType?) {
+        tabDebounceJob?.cancel()
+        currentChatTypeFilter = filter
+
+        val tabAll = findViewById<TextView>(R.id.tab_all)
+        val tabDirect = findViewById<TextView>(R.id.tab_direct)
+        val tabGroups = findViewById<TextView>(R.id.tab_groups)
+        val tabChannels = findViewById<TextView>(R.id.tab_channels)
+
+        tabAll?.isSelected = (filter == null)
+        tabDirect?.isSelected = (filter == ChatType.DIRECT)
+        tabGroups?.isSelected = (filter == ChatType.GROUP)
+        tabChannels?.isSelected = (filter == ChatType.CHANNEL)
+
+        val allChats = telegramManager.chats.value
+        val filtered = if (filter == null) allChats else allChats.filter { it.chatType == filter }
         chatListAdapter?.submitList(filtered)
-        val emptyView = view.findViewById<View>(R.id.layout_empty_state)
-        val progressView = view.findViewById<View>(R.id.progress_chats)
-        if (filtered.isEmpty()) {
-            if (chats.isEmpty() && telegramManager.connectionState.value != "Offline") {
-                progressView?.visibility = View.VISIBLE
-                emptyView?.visibility = View.GONE
-            } else {
-                progressView?.visibility = View.GONE
-                emptyView?.visibility = View.VISIBLE
-            }
-        } else {
+
+        val emptyView = findViewById<View>(R.id.layout_empty_state)
+        val progressView = findViewById<View>(R.id.progress_chats)
+
+        if (filtered.isNotEmpty()) {
             progressView?.visibility = View.GONE
             emptyView?.visibility = View.GONE
+        } else {
+            progressView?.visibility = View.VISIBLE
+            emptyView?.visibility = View.GONE
+
+            tabDebounceJob = lifecycleScope.launch {
+                kotlinx.coroutines.delay(200)
+                val reCheckedChats = telegramManager.chats.value
+                val reCheckedFiltered = if (currentChatTypeFilter == null) {
+                    reCheckedChats
+                } else {
+                    reCheckedChats.filter { it.chatType == currentChatTypeFilter }
+                }
+                if (reCheckedFiltered.isEmpty()) {
+                    findViewById<View>(R.id.progress_chats)?.visibility = View.GONE
+                    findViewById<View>(R.id.layout_empty_state)?.visibility = View.VISIBLE
+                } else {
+                    findViewById<View>(R.id.progress_chats)?.visibility = View.GONE
+                    findViewById<View>(R.id.layout_empty_state)?.visibility = View.GONE
+                }
+            }
         }
     }
 
@@ -285,21 +326,19 @@ class MainActivity : AppCompatActivity() {
         val tabGroups = rootView.findViewById<TextView>(R.id.tab_groups)
         val tabChannels = rootView.findViewById<TextView>(R.id.tab_channels)
 
-        val tabs = listOf(tabAll, tabDirect, tabGroups, tabChannels)
-
         fun selectTab(selected: TextView, filter: ChatType?) {
-            tabs.forEach { it.isSelected = (it == selected) }
-            currentChatTypeFilter = filter
-            val allChats = telegramManager.chats.value
-            val filtered = if (filter == null) allChats else allChats.filter { it.chatType == filter }
-            chatListAdapter?.submitList(filtered)
-            rootView.findViewById<View>(R.id.layout_empty_state)?.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
+            applyChatFilterAndDebounce(filter)
         }
 
-        tabAll.setOnClickListener { selectTab(tabAll, null) }
-        tabDirect.setOnClickListener { selectTab(tabDirect, ChatType.DIRECT) }
-        tabGroups.setOnClickListener { selectTab(tabGroups, ChatType.GROUP) }
-        tabChannels.setOnClickListener { selectTab(tabChannels, ChatType.CHANNEL) }
+        tabAll?.setOnClickListener { selectTab(tabAll, null) }
+        tabDirect?.setOnClickListener { selectTab(tabDirect, ChatType.DIRECT) }
+        tabGroups?.setOnClickListener { selectTab(tabGroups, ChatType.GROUP) }
+        tabChannels?.setOnClickListener { selectTab(tabChannels, ChatType.CHANNEL) }
+
+        tabAll?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) selectTab(tabAll, null) }
+        tabDirect?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) selectTab(tabDirect, ChatType.DIRECT) }
+        tabGroups?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) selectTab(tabGroups, ChatType.GROUP) }
+        tabChannels?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) selectTab(tabChannels, ChatType.CHANNEL) }
     }
 
     private fun showToast(msg: String, isError: Boolean = false) {
@@ -1123,14 +1162,55 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Left/Right D-pad keys cycle filter tabs
-            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                cycleTabs(-1)
-                return true
-            }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                cycleTabs(1)
-                return true
+            if (isTabViewFocused()) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    // Suppress cycleTabs to avoid double key activation when tab TextView holds focus
+                    return super.dispatchKeyEvent(event)
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    val itemCount = chatListAdapter?.itemCount ?: 0
+                    if (itemCount > 0) {
+                        rvChats?.scrollToPosition(0)
+                        rvChats?.post {
+                            val vh = rvChats?.findViewHolderForAdapterPosition(0)
+                            if (vh != null) {
+                                vh.itemView.requestFocus()
+                            } else {
+                                rvChats?.requestFocus()
+                            }
+                        }
+                    } else {
+                        findViewById<View>(R.id.tv_softkey_left)?.requestFocus()
+                    }
+                    return true
+                }
+            } else {
+                // Left/Right D-pad keys cycle filter tabs when list is focused
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    cycleTabs(-1)
+                    return true
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    cycleTabs(1)
+                    return true
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    val focusedView = currentFocus
+                    val rv = rvChats
+                    if (focusedView != null && rv != null) {
+                        val itemView = rv.findContainingItemView(focusedView)
+                        if (itemView != null && rv.getChildAdapterPosition(itemView) == 0) {
+                            val targetTabId = when (currentChatTypeFilter) {
+                                ChatType.DIRECT -> R.id.tab_direct
+                                ChatType.GROUP -> R.id.tab_groups
+                                ChatType.CHANNEL -> R.id.tab_channels
+                                else -> R.id.tab_all
+                            }
+                            findViewById<View>(targetTabId)?.requestFocus()
+                            return true
+                        }
+                    }
+                }
             }
         }
 
@@ -1141,22 +1221,7 @@ class MainActivity : AppCompatActivity() {
         val tabOrder = listOf(null, ChatType.DIRECT, ChatType.GROUP, ChatType.CHANNEL)
         val currentIndex = tabOrder.indexOf(currentChatTypeFilter)
         val nextIndex = (currentIndex + direction + tabOrder.size) % tabOrder.size
-        currentChatTypeFilter = tabOrder[nextIndex]
-
-        val allChats = telegramManager.chats.value
-        val filtered = if (currentChatTypeFilter == null) allChats else allChats.filter { it.chatType == currentChatTypeFilter }
-        chatListAdapter?.submitList(filtered)
-        findViewById<View>(R.id.layout_empty_state)?.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
-
-        val tabAll = findViewById<TextView>(R.id.tab_all)
-        val tabDirect = findViewById<TextView>(R.id.tab_direct)
-        val tabGroups = findViewById<TextView>(R.id.tab_groups)
-        val tabChannels = findViewById<TextView>(R.id.tab_channels)
-
-        tabAll?.isSelected = (currentChatTypeFilter == null)
-        tabDirect?.isSelected = (currentChatTypeFilter == ChatType.DIRECT)
-        tabGroups?.isSelected = (currentChatTypeFilter == ChatType.GROUP)
-        tabChannels?.isSelected = (currentChatTypeFilter == ChatType.CHANNEL)
+        applyChatFilterAndDebounce(tabOrder[nextIndex])
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

@@ -72,6 +72,9 @@
                 android:paddingBottom="4dp"
                 android:background="@drawable/bg_tab_indicator"
                 android:focusable="true"
+                android:nextFocusDown="@id/rv_chats"
+                android:nextFocusLeft="@id/tab_channels"
+                android:nextFocusRight="@id/tab_direct"
                 android:layout_marginEnd="6dp" />
 
             <TextView
@@ -87,6 +90,9 @@
                 android:paddingBottom="4dp"
                 android:background="@drawable/bg_tab_indicator"
                 android:focusable="true"
+                android:nextFocusDown="@id/rv_chats"
+                android:nextFocusLeft="@id/tab_all"
+                android:nextFocusRight="@id/tab_groups"
                 android:layout_marginEnd="6dp" />
 
             <TextView
@@ -102,6 +108,9 @@
                 android:paddingBottom="4dp"
                 android:background="@drawable/bg_tab_indicator"
                 android:focusable="true"
+                android:nextFocusDown="@id/rv_chats"
+                android:nextFocusLeft="@id/tab_direct"
+                android:nextFocusRight="@id/tab_channels"
                 android:layout_marginEnd="6dp" />
 
             <TextView
@@ -116,7 +125,10 @@
                 android:paddingTop="4dp"
                 android:paddingBottom="4dp"
                 android:background="@drawable/bg_tab_indicator"
-                android:focusable="true" />
+                android:focusable="true"
+                android:nextFocusDown="@id/rv_chats"
+                android:nextFocusLeft="@id/tab_groups"
+                android:nextFocusRight="@id/tab_all" />
 
         </LinearLayout>
     </HorizontalScrollView>
