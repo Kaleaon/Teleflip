@@ -21,7 +21,14 @@
         android:textSize="14sp"
         android:textStyle="bold"
         android:maxLines="1"
-        android:ellipsize="end" />
+        android:ellipsize="end"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:clickable="true"
+        android:background="@drawable/bg_softkey_selector"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:contentDescription="Options softkey" />
 
     <!-- Center Key (OK / Enter) -->
     <TextView
@@ -35,7 +42,14 @@
         android:textSize="15sp"
         android:textStyle="bold"
         android:maxLines="1"
-        android:ellipsize="end" />
+        android:ellipsize="end"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:clickable="true"
+        android:background="@drawable/bg_softkey_selector"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:contentDescription="Open softkey" />
 
     <!-- Right Soft Key (RSK) -->
     <TextView
@@ -49,6 +63,13 @@
         android:textSize="14sp"
         android:textStyle="bold"
         android:maxLines="1"
-        android:ellipsize="end" />
+        android:ellipsize="end"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:clickable="true"
+        android:background="@drawable/bg_softkey_selector"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:contentDescription="Back softkey" />
 
 </LinearLayout>

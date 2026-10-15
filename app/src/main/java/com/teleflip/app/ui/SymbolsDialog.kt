@@ -54,6 +54,7 @@ class SymbolsDialog(
         override fun onBindViewHolder(holder: SymbolViewHolder, position: Int) {
             val symbol = symbols[position]
             holder.tvSymbol.text = symbol
+            holder.itemView.contentDescription = symbol
             holder.itemView.setOnClickListener {
                 dismiss()
                 onSymbolSelected(symbol)
