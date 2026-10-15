@@ -251,6 +251,10 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
                     if (currentScreen == Screen.CONVERSATION) {
                         val list = map[chat.id] ?: emptyList()
                         messageAdapter?.submitList(list)
+                        val unread = list.filter { !it.isOutbound }.map { it.id }.toLongArray()
+                        if (unread.isNotEmpty()) {
+                            telegramManager.markMessagesAsRead(chat.id, unread)
+                        }
                         val targetId = pendingTargetMessageId
                         if (targetId != null) {
                             val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
@@ -283,6 +287,7 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
     private fun showChatListScreen() {
         commitActiveInputEngines()
         currentScreen = Screen.CHAT_LIST
+        activeChat?.let { telegramManager.closeChat(it.id) }
         activeChat = null
         voicePlayer.stop()
         mainContainer.removeAllViews()
@@ -505,6 +510,10 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
         activeChat = chat
         pendingTargetMessageId = targetMessageId
         currentScreen = Screen.CONVERSATION
+        telegramManager.openChat(chat.id)
+        if (chat.chatType == ChatType.CHANNEL) {
+            telegramManager.loadSponsoredMessages(chat.id)
+        }
         mainContainer.removeAllViews()
 
         val view = LayoutInflater.from(this).inflate(R.layout.view_chat_conversation, mainContainer, true)
@@ -547,6 +556,10 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
 
         val currentMsgs = telegramManager.messages.value[chat.id] ?: emptyList()
         messageAdapter?.submitList(currentMsgs)
+        val unreadInitial = currentMsgs.filter { !it.isOutbound }.map { it.id }.toLongArray()
+        if (unreadInitial.isNotEmpty()) {
+            telegramManager.markMessagesAsRead(chat.id, unreadInitial)
+        }
         if (targetMessageId != null) {
             val pos = messageAdapter?.getPositionForMessageId(targetMessageId) ?: -1
             if (pos != -1) {
@@ -601,6 +614,16 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
         }
 
         btnSend.setOnClickListener { doSend() }
+
+        etComposeInput?.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!s.isNullOrEmpty()) {
+                    telegramManager.sendTypingAction(chat.id)
+                }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
 
         etComposeInput?.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus && !voiceRecorder.isRecording()) {

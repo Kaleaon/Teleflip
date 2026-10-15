@@ -13,14 +13,21 @@
         android:padding="20dp">
 
         <!-- App Logo & Title -->
+        <ImageView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/ic_teleflip_logo"
+            android:contentDescription="TeleFlip Logo"
+            android:layout_marginTop="8dp" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="✈ TeleFlip"
+            android:text="TeleFlip"
             android:textColor="@color/tg_blue"
             android:textSize="24sp"
             android:textStyle="bold"
-            android:layout_marginTop="16dp" />
+            android:layout_marginTop="8dp" />
 
         <TextView
             android:id="@+id/tv_login_subtitle"

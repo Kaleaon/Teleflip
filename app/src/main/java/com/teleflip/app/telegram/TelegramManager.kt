@@ -813,6 +813,65 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    // =========================================================================
+    // Telegram API ToS §1.4 Compliance: Chat open/close lifecycle
+    // Required so that last-seen/online statuses are reported correctly
+    // =========================================================================
+    fun openChat(chatId: Long) {
+        if (isDemoMode) return
+        tdClient?.send(TdApi.OpenChat(chatId), this)
+    }
+
+    fun closeChat(chatId: Long) {
+        if (isDemoMode) return
+        tdClient?.send(TdApi.CloseChat(chatId), this)
+    }
+
+    // =========================================================================
+    // Telegram API ToS §1.4 Compliance: Read receipts
+    // Messages must be marked as read when viewed — no "ghost mode"
+    // =========================================================================
+    fun markMessagesAsRead(chatId: Long, messageIds: LongArray) {
+        if (isDemoMode || messageIds.isEmpty()) return
+        tdClient?.send(TdApi.ViewMessages(chatId, messageIds, null, true), this)
+    }
+
+    // =========================================================================
+    // Telegram API ToS §1.4 Compliance: Typing indicator
+    // Typing status must be sent and displayed correctly
+    // =========================================================================
+    fun sendTypingAction(chatId: Long) {
+        if (isDemoMode) return
+        tdClient?.send(TdApi.SendChatAction(chatId, 0, TdApi.ChatActionTyping()), this)
+    }
+
+    fun cancelTypingAction(chatId: Long) {
+        if (isDemoMode) return
+        tdClient?.send(TdApi.SendChatAction(chatId, 0, TdApi.ChatActionCancel()), this)
+    }
+
+    // =========================================================================
+    // Telegram API ToS §3.3 Compliance: Sponsored messages
+    // If channel content is shown, official sponsored messages must be included
+    // =========================================================================
+    fun loadSponsoredMessages(chatId: Long) {
+        if (isDemoMode) return
+        try {
+            tdClient?.send(TdApi.GetChatSponsoredMessages(chatId), this)
+        } catch (e: Exception) {
+            Log.w(tag, "Sponsored messages not available in this TDLib version: ${e.message}")
+        }
+    }
+
+    fun clickSponsoredMessage(chatId: Long, messageId: Long) {
+        if (isDemoMode) return
+        try {
+            tdClient?.send(TdApi.ClickChatSponsoredMessage(chatId, messageId), this)
+        } catch (e: Exception) {
+            Log.w(tag, "Click sponsored message failed: ${e.message}")
+        }
+    }
+
     fun logOut() {
         if (isDemoMode) {
             isDemoMode = false

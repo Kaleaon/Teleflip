@@ -1,0 +1,463 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background / Shell Gradients -->
+    <linearGradient id="chassisGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#40C2FF"/>
+      <stop offset="40%" stop-color="#1E98D9"/>
+      <stop offset="100%" stop-color="#0A619B"/>
+    </linearGradient>
+
+    <linearGradient id="edgeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#72D5FF"/>
+      <stop offset="50%" stop-color="#1A85C3"/>
+      <stop offset="100%" stop-color="#084E7E"/>
+    </linearGradient>
+
+    <linearGradient id="upperBezelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A3348"/>
+      <stop offset="40%" stop-color="#0E2130"/>
+      <stop offset="100%" stop-color="#07131D"/>
+    </linearGradient>
+
+    <linearGradient id="screenGrad" x1="0%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#3BC7FF"/>
+      <stop offset="50%" stop-color="#229ED9"/>
+      <stop offset="100%" stop-color="#0E78B5"/>
+    </linearGradient>
+
+    <linearGradient id="keypadFaceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="30%" stop-color="#EDF7FD"/>
+      <stop offset="100%" stop-color="#CEE6F7"/>
+    </linearGradient>
+
+    <linearGradient id="buttonGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="70%" stop-color="#E2F0FA"/>
+      <stop offset="100%" stop-color="#BADCF5"/>
+    </linearGradient>
+
+    <linearGradient id="buttonBlueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#46BEF7"/>
+      <stop offset="100%" stop-color="#1C86C4"/>
+    </linearGradient>
+
+    <linearGradient id="metalHingeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E9F5FD"/>
+      <stop offset="25%" stop-color="#A7D2EF"/>
+      <stop offset="50%" stop-color="#F2F9FE"/>
+      <stop offset="75%" stop-color="#80B8DE"/>
+      <stop offset="100%" stop-color="#5599C8"/>
+    </linearGradient>
+
+    <radialGradient id="hingeCenterRadial" cx="45%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="40%" stop-color="#BEE0F6"/>
+      <stop offset="75%" stop-color="#7BB5DE"/>
+      <stop offset="100%" stop-color="#4589B9"/>
+    </radialGradient>
+
+    <linearGradient id="planeFoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D9EDF9"/>
+      <stop offset="100%" stop-color="#B2D8F2"/>
+    </linearGradient>
+
+    <!-- Drop Shadows & Ambient Occlusion -->
+    <filter id="dropShadowApp" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#052840" flood-opacity="0.35"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#001827" flood-opacity="0.25"/>
+    </filter>
+
+    <filter id="screenGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#229ED9" flood-opacity="0.6"/>
+    </filter>
+
+    <filter id="subtleBtnShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2" flood-color="#083B5E" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <!-- Overall Master Group with Shadow -->
+  <g filter="url(#dropShadowApp)">
+
+    <!-- ========================================== -->
+    <!-- 1. HINGE CYLINDER BARREL (Connecting Both) -->
+    <!-- ========================================== -->
+    <g id="hinge-barrel">
+      <!-- Barrel body running behind the hinge -->
+      <path d="M 830 635 L 870 655 L 845 745 L 805 725 Z" fill="#1369A1"/>
+      <path d="M 830 635 L 860 620 C 880 610 905 620 915 640 L 920 670 L 880 685 Z" fill="#1B87C6"/>
+    </g>
+
+    <!-- ========================================== -->
+    <!-- 2. LOWER BASE (KEYPAD HALF)                -->
+    <!-- ========================================== -->
+    <g id="lower-base">
+      
+      <!-- 2A. Lower Base Bottom Thickness / Underbody -->
+      <path d="
+        M 108 865
+        C 95 878 95 898 108 912
+        L 128 928
+        C 140 936 158 936 172 932
+        L 805 788
+        C 825 784 838 770 842 752
+        L 842 730
+        L 142 868
+        Z
+      " fill="#0A4D78"/>
+
+      <!-- 2B. Lower Base Left/Front Thickness Rim -->
+      <path d="
+        M 108 865
+        L 142 868
+        L 842 730
+        L 830 705
+        L 155 838
+        C 135 842 120 850 108 865
+        Z
+      " fill="url(#edgeGrad)"/>
+
+      <!-- Left Side Grip Grooves on Lower Base -->
+      <g stroke="#093E61" stroke-width="3" stroke-linecap="round">
+        <line x1="130" y1="895" x2="140" y2="925"/>
+        <line x1="145" y1="892" x2="155" y2="922"/>
+        <line x1="160" y1="889" x2="170" y2="919"/>
+      </g>
+
+      <!-- 2C. Lower Base Top Surface (Chassis Plate) -->
+      <!-- Perspective Quad: TL(200,670), BL(145,845), BR(815,715), TR(640,575) -->
+      <path d="
+        M 165 840
+        C 140 845 135 830 148 812
+        L 218 692
+        C 226 678 244 670 262 666
+        L 638 578
+        C 652 574 668 580 675 592
+        L 820 698
+        C 832 708 830 724 815 728
+        L 165 840
+        Z
+      " fill="url(#chassisGrad)"/>
+
+      <!-- Chamfer Highlight Ring on Chassis Edge -->
+      <path d="
+        M 152 835
+        L 220 690
+        C 228 676 245 668 262 665
+        L 635 577
+      " fill="none" stroke="#85DBFF" stroke-width="3.5" stroke-linecap="round" opacity="0.8"/>
+
+      <!-- 2D. Inset Keypad Faceplate (Crisp Light-Blue / White Glass) -->
+      <!-- Inset from the chassis edges -->
+      <path d="
+        M 180 822
+        C 165 825 158 816 168 800
+        L 230 696
+        C 236 686 250 680 264 677
+        L 615 596
+        C 628 593 638 598 644 608
+        L 778 698
+        C 788 706 786 716 772 720
+        L 180 822
+        Z
+      " fill="url(#keypadFaceGrad)"/>
+
+      <!-- Inner Shadow / Inset Crease for Faceplate -->
+      <path d="
+        M 180 822
+        L 772 720
+        C 786 716 788 706 778 698
+        L 644 608
+      " fill="none" stroke="#A7D2EF" stroke-width="2" opacity="0.6"/>
+
+      <!-- ========================================== -->
+      <!-- 2E. PROPER TACTILE T9 KEYPAD & D-PAD       -->
+      <!-- ========================================== -->
+      <!-- 
+        Perspective Grid on Lower Base:
+        Hinge side (top of keypad): Navigation & Softkeys
+        Lower side: 3 columns x 4 rows of clean tactile rounded keys
+      -->
+      <g id="tactile-keypad" filter="url(#subtleBtnShadow)">
+
+        <!-- TOP ROW: Softkeys & Call/End Buttons (near the hinge) -->
+        <!-- Left Softkey / Call Key -->
+        <path d="M 545 618 L 610 604 C 616 603 621 606 623 612 L 629 628 C 631 633 628 637 622 638 L 558 652 C 552 653 547 650 545 645 L 539 629 C 538 623 540 619 545 618 Z" fill="url(#buttonBlueGrad)"/>
+        <!-- Call Key Icon Hint (Subtle white bar) -->
+        <line x1="565" y1="632" x2="605" y2="623" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+
+        <!-- Navigation Cluster / D-Pad (Center near top) -->
+        <!-- Center OK Pill -->
+        <ellipse cx="485" cy="648" rx="28" ry="16" transform="rotate(-12 485 648)" fill="#FFFFFF" stroke="#90C8EC" stroke-width="2"/>
+        <ellipse cx="485" cy="648" rx="16" ry="9" transform="rotate(-12 485 648)" fill="#229ED9"/>
+
+        <!-- Right Softkey / End Key -->
+        <path d="M 648 642 L 712 628 C 718 627 723 630 725 636 L 731 652 C 733 657 730 661 724 662 L 660 676 C 654 677 649 674 647 669 L 641 653 C 640 647 643 643 648 642 Z" fill="url(#buttonGrad)"/>
+
+        <!-- T9 NUMERIC MATRIX (3 Columns x 4 Rows in Perspective) -->
+        
+        <!-- ROW 1: Keys [1], [2], [3] -->
+        <!-- Key 1 -->
+        <path d="M 390 668 L 445 656 C 450 655 455 658 457 663 L 464 682 C 466 687 463 691 458 692 L 403 705 C 398 706 393 703 391 698 L 384 679 C 382 674 385 669 390 668 Z" fill="url(#buttonGrad)"/>
+        <!-- Key 2 -->
+        <path d="M 470 675 L 525 663 C 530 662 535 665 537 670 L 544 689 C 546 694 543 698 538 699 L 483 712 C 478 713 473 710 471 705 L 464 686 C 462 681 465 676 470 675 Z" fill="url(#buttonGrad)"/>
+        <!-- Key 3 -->
+        <path d="M 550 682 L 605 670 C 610 669 615 672 617 677 L 624 696 C 626 701 623 705 618 706 L 563 719 C 558 720 553 717 551 712 L 544 693 C 542 688 545 683 550 682 Z" fill="url(#buttonGrad)"/>
+
+        <!-- ROW 2: Keys [4], [5], [6] -->
+        <!-- Key 4 -->
+        <path d="M 330 710 L 385 698 C 390 697 395 700 397 705 L 404 724 C 406 729 403 733 398 734 L 343 747 C 338 748 333 745 331 740 L 324 721 C 322 716 325 711 330 710 Z" fill="url(#buttonGrad)"/>
+        <!-- Key 5 -->
+        <path d="M 410 717 L 465 705 C 470 704 475 707 477 712 L 484 731 C 486 736 483 740 478 741 L 423 754 C 418 755 413 752 411 747 L 404 728 C 402 723 405 718 410 717 Z" fill="url(#buttonGrad)"/>
+        <!-- Key 6 -->
+        <path d="M 490 724 L 545 712 C 550 711 555 714 557 719 L 564 738 C 566 743 563 747 558 748 L 503 761 C 498 762 493 759 491 754 L 484 735 C 482 730 485 725 490 724 Z" fill="url(#buttonGrad)"/>
+
+        <!-- ROW 3: Keys [7], [8], [9] -->
+        <!-- Key 7 -->
+        <path d="M 270 752 L 325 740 C 330 739 335 742 337 747 L 344 766 C 346 771 343 775 338 776 L 283 789 C 278 790 273 787 271 782 L 264 763 C 262 758 265 753 270 752 Z" fill="url(#buttonGrad)"/>
+        <!-- Key 8 -->
+        <path d="M 350 759 L 405 747 C 410 746 415 749 417 754 L 424 773 C 426 778 423 782 418 783 L 363 796 C 358 797 353 794 351 789 L 344 770 C 342 765 345 760 350 759 Z" fill="url(#buttonGrad)"/>
+        <!-- Key 9 -->
+        <path d="M 430 766 L 485 754 C 490 753 495 756 497 761 L 504 780 C 506 785 503 789 498 790 L 443 803 C 438 804 433 801 431 796 L 424 777 C 422 772 425 767 430 766 Z" fill="url(#buttonGrad)"/>
+
+        <!-- ROW 4: Keys [*], [0], [#] -->
+        <!-- Key * -->
+        <path d="M 210 794 L 265 782 C 270 781 275 784 277 789 L 284 808 C 286 813 283 817 278 818 L 223 831 C 218 832 213 829 211 824 L 204 805 C 202 800 205 795 210 794 Z" fill="url(#buttonGrad)"/>
+        <!-- Key 0 -->
+        <path d="M 290 801 L 345 789 C 350 788 355 791 357 796 L 364 815 C 366 820 363 824 358 825 L 303 838 C 298 839 293 836 291 831 L 284 812 C 282 807 285 802 290 801 Z" fill="url(#buttonGrad)"/>
+        <!-- Key # -->
+        <path d="M 370 808 L 425 796 C 430 795 435 798 437 803 L 444 822 C 446 827 443 831 438 832 L 383 845 C 378 846 373 843 371 838 L 364 819 C 362 814 365 809 370 808 Z" fill="url(#buttonGrad)"/>
+
+        <!-- Minimal Dot Labels on Keypads for authentic flip phone look -->
+        <g fill="#1A78B0" opacity="0.6">
+          <circle cx="423" cy="682" r="3"/>
+          <circle cx="503" cy="689" r="3"/>
+          <circle cx="583" cy="696" r="3"/>
+
+          <circle cx="363" cy="724" r="3"/>
+          <circle cx="443" cy="731" r="3"/>
+          <circle cx="523" cy="738" r="3"/>
+
+          <circle cx="303" cy="766" r="3"/>
+          <circle cx="383" cy="773" r="3"/>
+          <circle cx="463" cy="780" r="3"/>
+
+          <circle cx="243" cy="808" r="3"/>
+          <circle cx="323" cy="815" r="3"/>
+          <circle cx="403" cy="822" r="3"/>
+        </g>
+
+      </g>
+    </g>
+
+    <!-- ========================================== -->
+    <!-- 3. UPPER FLAP (SCREEN HALF - ANGLED UP)    -->
+    <!-- ========================================== -->
+    <g id="upper-flap">
+
+      <!-- 3A. Left Side Thickness Rail of Upper Flap -->
+      <!-- Runs from top-left tip down to the hinge -->
+      <path d="
+        M 125 240
+        L 245 105
+        C 255 92 272 88 288 98
+        L 295 103
+        L 175 238
+        C 160 252 145 272 135 292
+        L 605 625
+        L 590 648
+        L 122 295
+        C 112 278 114 255 125 240
+        Z
+      " fill="#0E588A"/>
+
+      <!-- Side Grip Grooves near Top Tip of Flap -->
+      <g stroke="#093E61" stroke-width="3" stroke-linecap="round">
+        <line x1="140" y1="230" x2="160" y2="252"/>
+        <line x1="150" y1="220" x2="170" y2="242"/>
+        <line x1="160" y1="210" x2="180" y2="232"/>
+      </g>
+
+      <!-- 3B. Main Front Face of Upper Flap (Chassis Frame) -->
+      <!-- Perspective: Tip TL(265,92), TR(310,135), BR(900,630), BL(605,625) with curve -->
+      <path d="
+        M 268 95
+        C 285 80 312 85 330 102
+        L 885 605
+        C 904 622 905 648 888 662
+        L 865 680
+        C 850 690 832 688 820 675
+        L 595 625
+        L 165 245
+        C 145 228 148 202 168 185
+        L 268 95
+        Z
+      " fill="url(#chassisGrad)"/>
+
+      <!-- Outer Highlight Rim on Upper Flap -->
+      <path d="
+        M 172 188
+        L 268 95
+        C 285 80 312 85 330 102
+        L 885 605
+      " fill="none" stroke="#8FE0FF" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+
+      <!-- 3C. Inset Dark Bezel (Midnight Glass Plate) -->
+      <path d="
+        M 285 125
+        C 298 114 316 118 328 130
+        L 855 595
+        C 868 607 868 625 855 636
+        L 838 650
+        C 826 658 812 655 802 645
+        L 585 605
+        L 190 235
+        C 176 222 178 205 192 192
+        L 285 125
+        Z
+      " fill="url(#upperBezelGrad)"/>
+
+      <!-- Bezel Inset Stroke -->
+      <path d="
+        M 190 235
+        L 285 125
+        C 298 114 316 118 328 130
+        L 855 595
+      " fill="none" stroke="#2D5575" stroke-width="2" opacity="0.6"/>
+
+      <!-- 3D. Camera Lens / Sensor at Top Tip -->
+      <!-- Matching reference image camera placement! -->
+      <g id="camera-module" transform="translate(265, 175)">
+        <!-- Outer Metallic Bezel Ring -->
+        <circle cx="0" cy="0" r="38" fill="url(#metalHingeGrad)" stroke="#113650" stroke-width="2"/>
+        <!-- Dark Optics Aperture -->
+        <circle cx="0" cy="0" r="30" fill="#08141E"/>
+        <!-- Inner Glass Gradient -->
+        <radialGradient id="lensReflect" cx="35%" cy="35%" r="65%">
+          <stop offset="0%" stop-color="#4AD0FF"/>
+          <stop offset="35%" stop-color="#166CA2"/>
+          <stop offset="70%" stop-color="#0B2A42"/>
+          <stop offset="100%" stop-color="#040D16"/>
+        </radialGradient>
+        <circle cx="0" cy="0" r="24" fill="url(#lensReflect)"/>
+        <!-- Specular Highlight Reflections -->
+        <ellipse cx="-7" cy="-8" rx="8" ry="5" transform="rotate(-30 -7 -8)" fill="#FFFFFF" opacity="0.85"/>
+        <circle cx="8" cy="9" r="3" fill="#66D3FF" opacity="0.6"/>
+      </g>
+
+      <!-- 3E. The Vibrant Glowing LCD Screen with Telegram Airplane -->
+      <g id="main-screen">
+        <!-- Screen Outer Glow & Border Frame -->
+        <path d="
+          M 405 240
+          C 416 230 432 234 442 245
+          L 625 410
+          C 635 420 635 435 624 445
+          L 578 485
+          C 568 495 552 492 542 480
+          L 360 315
+          C 350 305 350 290 361 280
+          Z
+        " fill="#0A3350" stroke="#40BAF2" stroke-width="4" filter="url(#screenGlow)"/>
+
+        <!-- Screen Glass Panel (Electric Telegram Blue Gradient) -->
+        <path d="
+          M 407 242
+          L 623 412
+          L 576 483
+          L 362 313
+          Z
+        " fill="url(#screenGrad)"/>
+
+        <!-- Screen Diagonal Gloss Flare -->
+        <path d="
+          M 407 242
+          L 540 338
+          L 480 430
+          L 362 313
+          Z
+        " fill="#FFFFFF" opacity="0.16"/>
+
+        <!-- ============================================== -->
+        <!-- TELEGRAM PAPER AIRPLANE EMBLEM (ON THE SCREEN) -->
+        <!-- ============================================== -->
+        <!-- 
+          Centered in the screen, soaring up-and-right, matching 
+          Telegram's authentic logo geometry in perspective!
+        -->
+        <g id="telegram-plane-on-screen" filter="url(#subtleBtnShadow)">
+          <!-- Main Left Wing / Fuselage -->
+          <path d="
+            M 565 330
+            L 425 355
+            C 420 356 418 362 422 366
+            L 468 408
+            C 471 411 476 411 479 407
+            L 505 372
+            L 565 330
+            Z
+          " fill="#FFFFFF"/>
+
+          <!-- Fold Shading (Underbelly facet of plane) -->
+          <path d="
+            M 468 408
+            L 505 372
+            L 472 360
+            Z
+          " fill="url(#planeFoldGrad)"/>
+
+          <!-- Right Wing / Trailing Facet -->
+          <path d="
+            M 565 330
+            L 472 360
+            L 535 425
+            C 540 430 550 426 552 418
+            L 572 336
+            C 573 331 569 328 565 330
+            Z
+          " fill="#E6F4FC"/>
+
+          <!-- Crisp Paper Fold Spine Highlight -->
+          <line x1="565" y1="330" x2="472" y2="360" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+        </g>
+      </g>
+
+    </g>
+
+    <!-- ========================================== -->
+    <!-- 4. PRECISION ROTATING HINGE JOINT (RIGHT)  -->
+    <!-- ========================================== -->
+    <!-- 
+      The circular pivot cap on the right side connecting both jaws, 
+      matching the brushed radial metallic dial in the reference image!
+    -->
+    <g id="hinge-pivot" transform="translate(865, 715)">
+      <!-- Outer Cast Blue Housing Extension -->
+      <circle cx="0" cy="0" r="68" fill="#0C4F7C"/>
+      <circle cx="-2" cy="-2" r="64" fill="#1C86C4"/>
+
+      <!-- Chamfer Highlight Ring -->
+      <circle cx="-1" cy="-1" r="58" fill="none" stroke="#75D3FF" stroke-width="3" opacity="0.8"/>
+
+      <!-- Brushed Metal Disc Face -->
+      <circle cx="0" cy="0" r="54" fill="url(#metalHingeGrad)"/>
+
+      <!-- Brushed Metal Radial Light Cones (Simulating Lathe-Spun Aluminum) -->
+      <path d="M 0 0 L 50 -20 A 54 54 0 0 1 20 50 Z" fill="#FFFFFF" opacity="0.35"/>
+      <path d="M 0 0 L -50 20 A 54 54 0 0 1 -20 -50 Z" fill="#FFFFFF" opacity="0.35"/>
+      <path d="M 0 0 L -35 -40 A 54 54 0 0 1 35 -40 Z" fill="#4B92C2" opacity="0.3"/>
+      <path d="M 0 0 L -35 40 A 54 54 0 0 1 35 40 Z" fill="#4B92C2" opacity="0.3"/>
+
+      <!-- Concentric Precision Machining Grooves -->
+      <circle cx="0" cy="0" r="44" fill="none" stroke="#68A9D6" stroke-width="1.2" opacity="0.6"/>
+      <circle cx="0" cy="0" r="32" fill="none" stroke="#FFFFFF" stroke-width="1" opacity="0.5"/>
+      <circle cx="0" cy="0" r="20" fill="none" stroke="#68A9D6" stroke-width="1.2" opacity="0.6"/>
+
+      <!-- Center Stainless Steel Axle Pin -->
+      <circle cx="0" cy="0" r="10" fill="url(#hingeCenterRadial)" stroke="#165B88" stroke-width="1.5"/>
+      <circle cx="-2" cy="-2" r="3" fill="#FFFFFF" opacity="0.9"/>
+    </g>
+
+  </g>
+</svg>

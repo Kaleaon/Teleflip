@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="teleflip-logo.png" width="160" height="160" alt="TeleFlip Logo" />
+</p>
+
 # TeleFlip 📱
 
 A native, lightweight, and responsive Telegram client meticulously engineered for Android flip phones, feature phones, and physical keypad devices (Schok Classic, Cat S22 Flip, Kyocera DuraXV, Sonim XP3/XP5, Xiaomi Qin, and similar Android Go / AOSP devices).
