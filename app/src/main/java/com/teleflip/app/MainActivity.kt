@@ -137,7 +137,9 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             telegramManager.connectionState.collectLatest { status ->
-                findViewById<TextView>(R.id.tv_connection_status)?.text = status
+                val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
+                tvConnectionStatus?.text = status
+                tvConnectionStatus?.announceForAccessibility("Connection status: $status")
             }
         }
 
@@ -572,6 +574,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        layoutVoiceRecording?.announceForAccessibility("Voice recording started")
+
         // Accessible Flip Phone Softkeys: One press of Center/OK to Stop & Send!
         softkeyManager.update(
             left = "Cancel",
@@ -780,8 +784,10 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (state.errorMessage != null) {
-                    tvStatus.text = "⚠️ Error: ${state.errorMessage}"
+                    val errorMessage = "⚠️ Error: ${state.errorMessage}"
+                    tvStatus.text = errorMessage
                     tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
+                    tvStatus.announceForAccessibility(errorMessage)
                 } else if (!detected.isNullOrBlank()) {
                     tvStatus.text = "Detected SIM phone number"
                     tvStatus.setTextColor(ContextCompat.getColor(this, R.color.focus_highlight_gold))
@@ -800,8 +806,10 @@ class MainActivity : AppCompatActivity() {
                 etLoginInput?.hint = "12345"
                 btnSubmit.text = "Verify Code"
                 if (state.errorMessage != null) {
-                    tvStatus.text = "⚠️ Error: ${state.errorMessage}"
+                    val errorMessage = "⚠️ Error: ${state.errorMessage}"
+                    tvStatus.text = errorMessage
                     tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
+                    tvStatus.announceForAccessibility(errorMessage)
                 } else {
                     tvStatus.text = "Enter code sent via Telegram or SMS"
                     tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
@@ -817,8 +825,10 @@ class MainActivity : AppCompatActivity() {
                 etLoginInput?.hint = "Cloud Password"
                 btnSubmit.text = "Submit Password"
                 if (state.errorMessage != null) {
-                    tvStatus.text = "⚠️ Error: ${state.errorMessage}"
+                    val errorMessage = "⚠️ Error: ${state.errorMessage}"
+                    tvStatus.text = errorMessage
                     tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
+                    tvStatus.announceForAccessibility(errorMessage)
                 } else {
                     tvStatus.text = if (state.hint.isNotBlank()) "Hint: ${state.hint}" else "Enter 2-Step Verification Password"
                     tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
@@ -828,8 +838,10 @@ class MainActivity : AppCompatActivity() {
                 btnUseSim?.visibility = View.GONE
                 btnSubmit.nextFocusDownId = R.id.btn_demo_mode
                 btnDemo.nextFocusUpId = R.id.btn_login_submit
-                tvStatus.text = "⚠️ Error: ${state.message}"
+                val errorMessage = "⚠️ Error: ${state.message}"
+                tvStatus.text = errorMessage
                 tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
+                tvStatus.announceForAccessibility(errorMessage)
                 com.teleflip.app.report.AdbReporter.reportError("Auth", state.message)
             }
             else -> {}

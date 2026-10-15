@@ -34,6 +34,7 @@
             android:textColor="@color/online_indicator"
             android:textSize="12sp"
             android:textStyle="bold"
+            android:accessibilityLiveRegion="polite"
             android:paddingStart="6dp"
             android:paddingEnd="6dp"
             android:paddingTop="2dp"
