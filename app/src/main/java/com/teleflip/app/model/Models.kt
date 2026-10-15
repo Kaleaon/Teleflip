@@ -41,3 +41,13 @@ data class MessageModel(
     val latitude: Double = 0.0,
     val longitude: Double = 0.0
 )
+
+data class MessageSearchResult(
+    val messageId: Long,
+    val chatId: Long,
+    val chatTitle: String,
+    val senderName: String,
+    val text: String,
+    val time: String,
+    val dateMillis: Long = 0L
+)

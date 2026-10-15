@@ -7,6 +7,7 @@ import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
+import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.model.MessageStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -366,6 +367,163 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     fun loadMessages(chatId: Long, fromMessageId: Long = 0, limit: Int = 30) {
         if (isDemoMode) return
         tdClient?.send(TdApi.GetChatHistory(chatId, fromMessageId, 0, limit, false), this)
+    }
+
+    fun searchChats(query: String, onResult: (List<ChatModel>) -> Unit) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            onResult(emptyList())
+            return
+        }
+        val lowerQuery = trimmed.lowercase()
+        if (isDemoMode) {
+            val matched = _chats.value.filter {
+                it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery)
+            }
+            onResult(matched)
+            return
+        }
+
+        val localMatched = _chats.value.filter {
+            it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery)
+        }
+        val req = TdApi.SearchChats(trimmed, null, 20)
+        tdClient?.send(req) { obj ->
+            if (obj is TdApi.Chats) {
+                for (id in obj.chatIds) {
+                    tdClient?.send(TdApi.GetChat(id), this)
+                }
+                scope.launch(Dispatchers.Main) {
+                    val updatedList = _chats.value.filter {
+                        it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery)
+                    }
+                    val combined = (localMatched + updatedList).distinctBy { it.id }
+                    onResult(combined.take(50))
+                }
+            } else {
+                scope.launch(Dispatchers.Main) {
+                    onResult(localMatched)
+                }
+            }
+        }
+    }
+
+    fun searchContacts(query: String, onResult: (List<ChatModel>) -> Unit) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            onResult(emptyList())
+            return
+        }
+        val lowerQuery = trimmed.lowercase()
+        if (isDemoMode) {
+            val matched = _chats.value.filter {
+                it.chatType == ChatType.DIRECT && (it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery))
+            }
+            onResult(matched)
+            return
+        }
+
+        val localContacts = _chats.value.filter {
+            it.chatType == ChatType.DIRECT && (it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery))
+        }
+
+        val req = TdApi.SearchContacts(trimmed, 20)
+        tdClient?.send(req) { obj ->
+            if (obj is TdApi.Users) {
+                scope.launch(Dispatchers.Main) {
+                    val combined = localContacts.toMutableList()
+                    onResult(combined.take(50))
+                }
+            } else {
+                scope.launch(Dispatchers.Main) {
+                    onResult(localContacts)
+                }
+            }
+        }
+    }
+
+    fun searchMessages(
+        query: String,
+        offset: String = "",
+        limit: Int = 20,
+        onResult: (totalCount: Int, results: List<MessageSearchResult>, nextOffset: String) -> Unit
+    ) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            onResult(0, emptyList(), "")
+            return
+        }
+
+        if (isDemoMode) {
+            val lowerQuery = trimmed.lowercase()
+            val results = mutableListOf<MessageSearchResult>()
+            for ((cId, msgList) in _messages.value) {
+                val chatTitle = _chats.value.find { it.id == cId }?.title ?: "Chat #$cId"
+                for (msg in msgList) {
+                    if (msg.text.lowercase().contains(lowerQuery) || msg.mediaCaption.lowercase().contains(lowerQuery)) {
+                        results.add(
+                            MessageSearchResult(
+                                messageId = msg.id,
+                                chatId = msg.chatId,
+                                chatTitle = chatTitle,
+                                senderName = msg.senderName,
+                                text = msg.text.ifBlank { msg.mediaCaption },
+                                time = msg.time
+                            )
+                        )
+                    }
+                }
+            }
+            val maxResults = results.take(50)
+            onResult(maxResults.size, maxResults, "")
+            return
+        }
+
+        val req = TdApi.SearchMessages().apply {
+            this.chatList = TdApi.ChatListMain()
+            this.query = trimmed
+            this.offset = offset
+            this.limit = limit.coerceAtMost(50)
+            this.filter = null
+            this.chatTypeFilter = null
+            this.minDate = 0
+            this.maxDate = 0
+        }
+
+        tdClient?.send(req) { obj ->
+            if (obj is TdApi.FoundMessages) {
+                val nextOff = obj.nextOffset
+                val total = obj.totalCount
+                val list = mutableListOf<MessageSearchResult>()
+                for (msg in obj.messages) {
+                    val cId = msg.chatId
+                    val mId = msg.id
+                    val text = extractMessageText(msg.content)
+                    val time = formatTime(msg.date.toLong() * 1000)
+                    val chatTitle = _chats.value.find { it.id == cId }?.title ?: "Chat #$cId"
+                    val sender = if (msg.isOutgoing) "You" else "Contact"
+
+                    list.add(
+                        MessageSearchResult(
+                            messageId = mId,
+                            chatId = cId,
+                            chatTitle = chatTitle,
+                            senderName = sender,
+                            text = text,
+                            time = time,
+                            dateMillis = msg.date.toLong() * 1000
+                        )
+                    )
+                }
+                scope.launch(Dispatchers.Main) {
+                    onResult(total, list.take(50), nextOff)
+                }
+            } else {
+                scope.launch(Dispatchers.Main) {
+                    onResult(0, emptyList(), "")
+                }
+            }
+        }
     }
 
     fun logOut() {

@@ -35,6 +35,10 @@ class MessageAdapter(
         notifyDataSetChanged()
     }
 
+    fun getPositionForMessageId(messageId: Long): Int {
+        return items.indexOfFirst { it.id == messageId }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.view_message_item, parent, false)
         return MessageViewHolder(view)

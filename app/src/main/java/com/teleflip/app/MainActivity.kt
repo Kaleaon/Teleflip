@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
 
     private var currentScreen: Screen = Screen.CHAT_LIST
     private var activeChat: ChatModel? = null
+    private var pendingTargetMessageId: Long? = null
 
     // Chat List State
     private var currentChatTypeFilter: ChatType? = null
@@ -181,7 +182,19 @@ class MainActivity : AppCompatActivity() {
                     if (currentScreen == Screen.CONVERSATION) {
                         val list = map[chat.id] ?: emptyList()
                         messageAdapter?.submitList(list)
-                        if (list.isNotEmpty()) {
+                        val targetId = pendingTargetMessageId
+                        if (targetId != null) {
+                            val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                            if (pos != -1) {
+                                rvMessages?.scrollToPosition(pos)
+                                rvMessages?.post {
+                                    rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+                                }
+                                pendingTargetMessageId = null
+                            } else if (list.isNotEmpty()) {
+                                rvMessages?.scrollToPosition(list.size - 1)
+                            }
+                        } else if (list.isNotEmpty()) {
                             rvMessages?.scrollToPosition(list.size - 1)
                         }
                     }
@@ -308,35 +321,62 @@ class MainActivity : AppCompatActivity() {
 
     private fun showChatListOptionsMenu() {
         val options = listOf(
-            MenuOption(1, "New Chat / Contact") {
+            MenuOption(1, "🔍 Search (Chats, Contacts, Messages)") {
+                showSearchDialog()
+            },
+            MenuOption(2, "New Chat / Contact") {
                 showToast("Enter username or number to start chat")
             },
-            MenuOption(2, "Refresh Chats") {
+            MenuOption(3, "Refresh Chats") {
                 telegramManager.loadChats()
                 showToast("Refreshing chats...")
             },
-            MenuOption(3, "Explore Demo / Offline Chats") {
+            MenuOption(4, "Explore Demo / Offline Chats") {
                 telegramManager.enableDemoMode()
                 showToast("Demo mode active")
             },
-            MenuOption(4, "Diagnostics & Error Log") {
+            MenuOption(5, "Diagnostics & Error Log") {
                 com.teleflip.app.ui.DiagnosticsDialog(this).show()
             },
-            MenuOption(5, "Settings & API") {
+            MenuOption(6, "Settings & API") {
                 showSettingsScreen()
             },
-            MenuOption(6, "Log Out") {
+            MenuOption(7, "Log Out") {
                 telegramManager.logOut()
             }
         )
         OptionsMenuDialog(this, "Chat Options", options).show()
     }
 
+    private fun showSearchDialog() {
+        com.teleflip.app.ui.SearchDialog(
+            context = this,
+            telegramManager = telegramManager,
+            onChatSelected = { chat ->
+                openConversation(chat)
+            },
+            onMessageSelected = { chatId, messageId ->
+                val chat = telegramManager.chats.value.find { it.id == chatId }
+                    ?: ChatModel(
+                        id = chatId,
+                        title = "Chat #$chatId",
+                        lastMessage = "",
+                        time = "",
+                        unreadCount = 0,
+                        chatType = ChatType.DIRECT,
+                        avatarLetters = "TG"
+                    )
+                openConversation(chat, targetMessageId = messageId)
+            }
+        ).show()
+    }
+
     // =========================================================================
     // SCREEN 2: CONVERSATION / CHAT
     // =========================================================================
-    private fun openConversation(chat: ChatModel) {
+    private fun openConversation(chat: ChatModel, targetMessageId: Long? = null) {
         activeChat = chat
+        pendingTargetMessageId = targetMessageId
         currentScreen = Screen.CONVERSATION
         mainContainer.removeAllViews()
 
@@ -399,7 +439,18 @@ class MainActivity : AppCompatActivity() {
 
         val currentMsgs = telegramManager.messages.value[chat.id] ?: emptyList()
         messageAdapter?.submitList(currentMsgs)
-        if (currentMsgs.isNotEmpty()) {
+        if (targetMessageId != null) {
+            val pos = messageAdapter?.getPositionForMessageId(targetMessageId) ?: -1
+            if (pos != -1) {
+                rvMessages?.scrollToPosition(pos)
+                rvMessages?.post {
+                    rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+                }
+                pendingTargetMessageId = null
+            } else if (currentMsgs.isNotEmpty()) {
+                rvMessages?.scrollToPosition(currentMsgs.size - 1)
+            }
+        } else if (currentMsgs.isNotEmpty()) {
             rvMessages?.scrollToPosition(currentMsgs.size - 1)
         }
 
