@@ -30,6 +30,7 @@ import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
+import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.telegram.AuthState
 import com.teleflip.app.telegram.TelegramManager
 import com.teleflip.app.ui.ChatListAdapter
@@ -475,7 +476,41 @@ class MainActivity : AppCompatActivity() {
         etComposeInput?.requestFocus()
     }
 
+    private var lastResendTimestamp = 0L
+
+    private fun handleResendMessage(msg: MessageModel) {
+        val now = System.currentTimeMillis()
+        if (now - lastResendTimestamp < 1000L) {
+            return
+        }
+        lastResendTimestamp = now
+
+        val isOffline = !telegramManager.isDemoMode &&
+            (telegramManager.connectionState.value == "Offline" || telegramManager.connectionState.value == "Waiting for network")
+
+        if (isOffline) {
+            telegramManager.updateMessageStatus(msg.chatId, msg.id, MessageStatus.FAILED)
+            showToast("Offline: Unable to resend message", isError = true)
+            return
+        }
+
+        showToast("Retrying message delivery...")
+        telegramManager.resendMessage(msg.chatId, msg.id)
+    }
+
     private fun updateSoftkeysForFocusedMessage(chat: ChatModel, msg: MessageModel) {
+        if (msg.isOutbound && msg.status == MessageStatus.FAILED) {
+            softkeyManager.update(
+                left = "Options",
+                center = "Retry",
+                right = "Back",
+                onLeft = { showMessageOptionsMenu(msg) },
+                onCenter = { handleResendMessage(msg) },
+                onRight = { showChatListScreen() }
+            )
+            return
+        }
+
         when (msg.mediaType) {
             MediaType.VOICE -> {
                 val isPlaying = msg.mediaFilePath != null && voicePlayer.isPlayingPath(msg.mediaFilePath)
@@ -698,22 +733,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun showMessageOptionsMenu(msg: MessageModel) {
         val options = mutableListOf<MenuOption>()
-        options.add(MenuOption(1, "Copy Text") {
+
+        if (msg.status == MessageStatus.FAILED) {
+            options.add(MenuOption(options.size + 1, "Resend Message") {
+                handleResendMessage(msg)
+            })
+        }
+
+        options.add(MenuOption(options.size + 1, "Copy Text") {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText("Telegram Message", msg.text))
             showToast("Copied to clipboard")
         })
-        options.add(MenuOption(2, "Reply") {
+        options.add(MenuOption(options.size + 1, "Reply") {
             etComposeInput?.requestFocus()
             etComposeInput?.setText("Re: \"${msg.text.take(20)}...\" ")
             etComposeInput?.setSelection(etComposeInput?.text?.length ?: 0)
         })
 
         if (msg.mediaType == MediaType.LOCATION) {
-            options.add(MenuOption(3, "Open in Organic Maps") {
+            options.add(MenuOption(options.size + 1, "Open in Organic Maps") {
                 LocationHelper.openInOrganicMaps(this, msg.latitude, msg.longitude)
             })
-            options.add(MenuOption(4, "Copy Google Maps Link") {
+            options.add(MenuOption(options.size + 1, "Copy Google Maps Link") {
                 LocationHelper.copyGoogleMapsLink(this, msg.latitude, msg.longitude)
             })
         }

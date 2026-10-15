@@ -339,6 +339,68 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    fun updateMessageStatus(chatId: Long, messageId: Long, newStatus: MessageStatus) {
+        val currentMap = _messages.value.toMutableMap()
+        val chatMsgs = (currentMap[chatId] ?: emptyList()).toMutableList()
+        val index = chatMsgs.indexOfFirst { it.id == messageId }
+        if (index >= 0) {
+            val oldMsg = chatMsgs[index]
+            chatMsgs[index] = oldMsg.copy(status = newStatus)
+            currentMap[chatId] = chatMsgs
+            _messages.value = currentMap
+        }
+    }
+
+    fun resendMessage(chatId: Long, messageId: Long) {
+        val currentMap = _messages.value.toMutableMap()
+        val chatMsgs = (currentMap[chatId] ?: emptyList()).toMutableList()
+        val msg = chatMsgs.find { it.id == messageId } ?: return
+
+        updateMessageStatus(chatId, messageId, MessageStatus.SENDING)
+
+        if (!isDemoMode && (_connectionState.value == "Offline" || _connectionState.value == "Waiting for network")) {
+            updateMessageStatus(chatId, messageId, MessageStatus.FAILED)
+            return
+        }
+
+        if (isDemoMode) {
+            scope.launch {
+                delay(1000)
+                updateMessageStatus(chatId, messageId, MessageStatus.SENT)
+                if (msg.text.isNotBlank()) {
+                    val replyTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+                    val replyMsg = MessageModel(
+                        id = System.currentTimeMillis(),
+                        chatId = chatId,
+                        senderName = _chats.value.find { it.id == chatId }?.title ?: "Friend",
+                        text = "Got your resent message: \"${msg.text}\"!",
+                        time = replyTime,
+                        isOutbound = false,
+                        status = MessageStatus.READ
+                    )
+                    appendMessage(chatId, replyMsg)
+                }
+            }
+            return
+        }
+
+        // Live TDLib resend message
+        try {
+            val resendReq = TdApi.ResendMessages().apply {
+                this.chatId = chatId
+                this.messageIds = longArrayOf(messageId)
+            }
+            tdClient?.send(resendReq, this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to resend message via TDLib: ${e.message}")
+            if (msg.text.isNotBlank()) {
+                sendMessage(chatId, msg.text)
+            } else {
+                updateMessageStatus(chatId, messageId, MessageStatus.FAILED)
+            }
+        }
+    }
+
     private fun appendMessage(chatId: Long, message: MessageModel) {
         val currentMap = _messages.value.toMutableMap()
         val chatMsgs = (currentMap[chatId] ?: emptyList()).toMutableList()
@@ -403,6 +465,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.UpdateNewMessage.CONSTRUCTOR -> {
                 val updateMsg = obj as TdApi.UpdateNewMessage
                 handleIncomingMessage(updateMsg.message)
+            }
+            TdApi.UpdateMessageSendSucceeded.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateMessageSendSucceeded
+                updateMessageStatus(update.message.chatId, update.oldMessageId, MessageStatus.SENT)
+                updateMessageStatus(update.message.chatId, update.message.id, MessageStatus.SENT)
+            }
+            TdApi.UpdateMessageSendFailed.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateMessageSendFailed
+                updateMessageStatus(update.message.chatId, update.oldMessageId, MessageStatus.FAILED)
+                updateMessageStatus(update.message.chatId, update.message.id, MessageStatus.FAILED)
             }
             TdApi.Chats.CONSTRUCTOR -> {
                 val chatIds = (obj as TdApi.Chats).chatIds
