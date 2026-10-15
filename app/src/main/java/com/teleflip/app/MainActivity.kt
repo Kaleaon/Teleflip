@@ -5,7 +5,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.telephony.SubscriptionManager
+import android.telephony.TelephonyManager
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -89,6 +92,13 @@ class MainActivity : AppCompatActivity() {
         private const val REQ_AUDIO_PERM = 1001
         private const val REQ_LOC_PERM = 1002
         private const val REQ_PHONE_PERM = 1003
+
+        internal fun cleanAndFormatPhoneNumber(raw: String?): String? {
+            if (raw.isNullOrBlank()) return null
+            val clean = org.telegram.PhoneFormat.PhoneFormat.stripExceptNumbers(raw, true)
+            if (clean.isNullOrBlank()) return null
+            return if (clean.startsWith("+")) clean else "+$clean"
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -97,8 +107,16 @@ class MainActivity : AppCompatActivity() {
 
         com.teleflip.app.report.AdbReporter.init(this)
 
+        val phonePerms = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_PHONE_STATE), REQ_PHONE_PERM)
+            phonePerms.add(Manifest.permission.READ_PHONE_STATE)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED) {
+            phonePerms.add(Manifest.permission.READ_PHONE_NUMBERS)
+        }
+        if (phonePerms.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, phonePerms.toTypedArray(), REQ_PHONE_PERM)
         }
 
         mainContainer = findViewById(R.id.main_container)
@@ -1262,6 +1280,7 @@ btnSubmit.nextFocusDownId = R.id.btn_demo_mode
 
         btnDemo.nextFocusDownId = R.id.btn_config_credentials
         btnConfig.nextFocusUpId = R.id.btn_demo_mode
+    }
 
     private fun showAccountResetConfirmationDialog() {
         androidx.appcompat.app.AlertDialog.Builder(this)
@@ -1275,41 +1294,148 @@ btnSubmit.nextFocusDownId = R.id.btn_demo_mode
                 dialog.dismiss()
             }
             .show()
+    }
 
+    private fun hasTelephonyPermission(): Boolean {
+        val hasPhoneState = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
+        val hasPhoneNumbers = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED
+        } else {
+            false
+        }
+        return hasPhoneState || hasPhoneNumbers
     }
 
     private fun getDevicePhoneNumber(): String? {
-        try {
-            val tm = getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
-            val hasPerm = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED ||
-                          (android.os.Build.VERSION.SDK_INT >= 26 && ContextCompat.checkSelfPermission(this, "android.permission.READ_PHONE_NUMBERS") == PackageManager.PERMISSION_GRANTED)
-            if (hasPerm && tm != null) {
-                @Suppress("MissingPermission")
-                val raw = tm.line1Number
-                if (!raw.isNullOrBlank()) {
-                    val clean = org.telegram.PhoneFormat.PhoneFormat.stripExceptNumbers(raw, true)
-                    if (!clean.isNullOrBlank()) {
-                        return if (clean.startsWith("+")) clean else "+$clean"
+        if (!hasTelephonyPermission()) {
+            return null
+        }
+
+        val sdkInt = Build.VERSION.SDK_INT
+
+        // Branch 1: API Level 33 and newer (Android 13+ / TIRAMISU+)
+        if (sdkInt >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                val sm = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                if (sm != null) {
+                    try {
+                        @Suppress("MissingPermission")
+                        val activeList = sm.activeSubscriptionInfoList
+                        if (!activeList.isNullOrEmpty()) {
+                            for (sub in activeList) {
+                                try {
+                                    @Suppress("MissingPermission")
+                                    val raw = sm.getPhoneNumber(sub.subscriptionId)
+                                    val formatted = cleanAndFormatPhoneNumber(raw)
+                                    if (formatted != null) return formatted
+                                } catch (e: SecurityException) {
+                                    org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ sub SecurityException: ${e.message}")
+                                } catch (e: Throwable) {
+                                    org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ sub getPhoneNumber failed: ${e.message}")
+                                }
+                            }
+                        }
+                    } catch (e: SecurityException) {
+                        org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ activeSubscriptionInfoList SecurityException: ${e.message}")
+                    } catch (e: Throwable) {
+                        org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ activeSubscriptionInfoList failed: ${e.message}")
+                    }
+
+                    // Fallback to DEFAULT_SUBSCRIPTION_ID on API 33+
+                    try {
+                        @Suppress("MissingPermission")
+                        val raw = sm.getPhoneNumber(SubscriptionManager.DEFAULT_SUBSCRIPTION_ID)
+                        val formatted = cleanAndFormatPhoneNumber(raw)
+                        if (formatted != null) return formatted
+                    } catch (e: SecurityException) {
+                        org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ DEFAULT_SUBSCRIPTION_ID SecurityException: ${e.message}")
+                    } catch (e: Throwable) {
+                        org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ DEFAULT_SUBSCRIPTION_ID failed: ${e.message}")
                     }
                 }
+            } catch (e: SecurityException) {
+                org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ SubscriptionManager SecurityException: ${e.message}")
+            } catch (e: Throwable) {
+                org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ failed: ${e.message}")
             }
+            return null
+        }
 
-            if (hasPerm && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
-                val sm = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? android.telephony.SubscriptionManager
-                @Suppress("MissingPermission")
-                sm?.activeSubscriptionInfoList?.forEach { sub ->
-                    val num = sub.number
-                    if (!num.isNullOrBlank()) {
-                        val clean = org.telegram.PhoneFormat.PhoneFormat.stripExceptNumbers(num, true)
-                        if (!clean.isNullOrBlank()) {
-                            return if (clean.startsWith("+")) clean else "+$clean"
+        // Branch 2: API Level 30 to 32 (Android 11 to Android 12L / R..S_V2)
+        if (sdkInt >= Build.VERSION_CODES.R) {
+            try {
+                val sm = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                if (sm != null) {
+                    @Suppress("MissingPermission", "DEPRECATION")
+                    val activeList = sm.activeSubscriptionInfoList
+                    if (!activeList.isNullOrEmpty()) {
+                        for (sub in activeList) {
+                            @Suppress("DEPRECATION")
+                            val raw = sub.number
+                            val formatted = cleanAndFormatPhoneNumber(raw)
+                            if (formatted != null) return formatted
                         }
                     }
                 }
+            } catch (e: SecurityException) {
+                org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 30-32 SubscriptionManager SecurityException: ${e.message}")
+            } catch (e: Throwable) {
+                org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 30-32 SubscriptionManager failed: ${e.message}")
             }
-        } catch (e: Throwable) {
-            org.telegram.messenger.FileLog.e("getDevicePhoneNumber failed: ${e.message}")
+
+            // Fallback to TelephonyManager for API 30-32
+            try {
+                val tm = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+                if (tm != null) {
+                    @Suppress("MissingPermission", "DEPRECATION")
+                    val raw = tm.line1Number
+                    val formatted = cleanAndFormatPhoneNumber(raw)
+                    if (formatted != null) return formatted
+                }
+            } catch (e: SecurityException) {
+                org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 30-32 TelephonyManager SecurityException: ${e.message}")
+            } catch (e: Throwable) {
+                org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 30-32 TelephonyManager failed: ${e.message}")
+            }
+
+            return null
         }
+
+        // Branch 3: API Level below 30 (Legacy API levels < 30)
+        try {
+            val tm = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+            if (tm != null) {
+                @Suppress("MissingPermission", "DEPRECATION")
+                val raw = tm.line1Number
+                val formatted = cleanAndFormatPhoneNumber(raw)
+                if (formatted != null) return formatted
+            }
+        } catch (e: SecurityException) {
+            org.telegram.messenger.FileLog.e("getDevicePhoneNumber legacy TelephonyManager SecurityException: ${e.message}")
+        } catch (e: Throwable) {
+            org.telegram.messenger.FileLog.e("getDevicePhoneNumber legacy TelephonyManager failed: ${e.message}")
+        }
+
+        try {
+            val sm = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+            if (sm != null) {
+                @Suppress("MissingPermission", "DEPRECATION")
+                val activeList = sm.activeSubscriptionInfoList
+                if (!activeList.isNullOrEmpty()) {
+                    for (sub in activeList) {
+                        @Suppress("DEPRECATION")
+                        val raw = sub.number
+                        val formatted = cleanAndFormatPhoneNumber(raw)
+                        if (formatted != null) return formatted
+                    }
+                }
+            }
+        } catch (e: SecurityException) {
+            org.telegram.messenger.FileLog.e("getDevicePhoneNumber legacy SubscriptionManager SecurityException: ${e.message}")
+        } catch (e: Throwable) {
+            org.telegram.messenger.FileLog.e("getDevicePhoneNumber legacy SubscriptionManager failed: ${e.message}")
+        }
+
         return null
     }
 
