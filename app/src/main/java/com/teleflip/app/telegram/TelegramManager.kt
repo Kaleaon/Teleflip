@@ -16,7 +16,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import java.io.File
@@ -54,6 +57,70 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     private var tdClient: Client? = null
     var isDemoMode = false
         private set
+
+    var chatBatchSize: Int = DEFAULT_CHAT_BATCH_SIZE
+
+    companion object {
+        const val DEFAULT_CHAT_BATCH_SIZE = 10
+    }
+
+    private suspend fun sendQuery(query: TdApi.Function<*>): TdApi.Object = suspendCancellableCoroutine { continuation ->
+        val client = tdClient
+        if (client == null) {
+            continuation.resumeWith(Result.failure(IllegalStateException("TDLib client is null")))
+            return@suspendCancellableCoroutine
+        }
+        try {
+            client.send(query) { obj ->
+                if (continuation.isActive) {
+                    if (obj is TdApi.Error) {
+                        continuation.resumeWith(Result.failure(Exception("TDLib Error [${obj.code}]: ${obj.message}")))
+                    } else if (obj != null) {
+                        continuation.resumeWith(Result.success(obj))
+                    } else {
+                        continuation.resumeWith(Result.failure(NullPointerException("Received null result from TDLib")))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            if (continuation.isActive) {
+                continuation.resumeWith(Result.failure(e))
+            }
+        }
+    }
+
+    fun dispatchChatBatches(chatIds: LongArray, batchSize: Int = chatBatchSize) {
+        if (chatIds.isEmpty()) return
+        scope.launch {
+            val chunks = chatIds.toList().chunked(batchSize)
+            for (chunk in chunks) {
+                coroutineScope {
+                    for (id in chunk) {
+                        launch {
+                            try {
+                                val result = withTimeoutOrNull(10000L) {
+                                    sendQuery(TdApi.GetChat(id))
+                                }
+                                if (result is TdApi.Chat) {
+                                    addOrUpdateChat(result)
+                                } else if (result == null) {
+                                    com.teleflip.app.report.AdbReporter.reportError(
+                                        tag,
+                                        "Timeout fetching chat $id in batch chunk"
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                com.teleflip.app.report.AdbReporter.reportError(
+                                    tag,
+                                    "Failed to fetch chat $id in batch chunk: ${e.message}"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Telegram API credentials
     var apiId: Int
@@ -478,9 +545,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             }
             TdApi.Chats.CONSTRUCTOR -> {
                 val chatIds = (obj as TdApi.Chats).chatIds
-                for (id in chatIds) {
-                    tdClient?.send(TdApi.GetChat(id), this)
-                }
+                dispatchChatBatches(chatIds)
             }
             TdApi.Chat.CONSTRUCTOR -> {
                 addOrUpdateChat(obj as TdApi.Chat)
@@ -624,22 +689,25 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         if (batchJob?.isActive != true) {
             batchJob = scope.launch {
-                delay(120)
-                val currentList = _chats.value.toMutableList()
-                val updates: List<ChatModel>
-                synchronized(pendingChats) {
-                    updates = pendingChats.values.toList()
-                    pendingChats.clear()
-                }
-                for (model in updates) {
-                    val idx = currentList.indexOfFirst { it.id == model.id }
-                    if (idx >= 0) {
-                        currentList[idx] = model
-                    } else {
-                        currentList.add(model)
+                while (true) {
+                    delay(120)
+                    val updates: List<ChatModel>
+                    synchronized(pendingChats) {
+                        if (pendingChats.isEmpty()) return@launch
+                        updates = pendingChats.values.toList()
+                        pendingChats.clear()
                     }
+                    val currentList = _chats.value.toMutableList()
+                    for (model in updates) {
+                        val idx = currentList.indexOfFirst { it.id == model.id }
+                        if (idx >= 0) {
+                            currentList[idx] = model
+                        } else {
+                            currentList.add(model)
+                        }
+                    }
+                    _chats.value = currentList
                 }
-                _chats.value = currentList
             }
         }
     }
