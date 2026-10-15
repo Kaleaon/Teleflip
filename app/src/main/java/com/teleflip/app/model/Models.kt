@@ -1,7 +1,10 @@
 package com.teleflip.app.model
 
 enum class ChatType {
-    DIRECT, GROUP, CHANNEL, BOT
+    DIRECT,
+    GROUP,
+    CHANNEL,
+    BOT,
 }
 
 data class ChatModel(
@@ -14,15 +17,24 @@ data class ChatModel(
     val avatarLetters: String,
     val isPinned: Boolean = false,
     val avatarPath: String? = null,
-    val avatarFileId: Int = 0
+    val avatarFileId: Int = 0,
 )
 
 enum class MessageStatus {
-    SENDING, SENT, READ, FAILED
+    SENDING,
+    SENT,
+    READ,
+    FAILED,
 }
 
 enum class MediaType {
-    NONE, PHOTO, VOICE, LOCATION, DOCUMENT, STICKER, VIDEO
+    NONE,
+    PHOTO,
+    VOICE,
+    LOCATION,
+    DOCUMENT,
+    STICKER,
+    VIDEO,
 }
 
 data class MessageModel(
@@ -39,5 +51,5 @@ data class MessageModel(
     val mediaFileId: Int = 0,
     val durationSeconds: Int = 0,
     val latitude: Double = 0.0,
-    val longitude: Double = 0.0
+    val longitude: Double = 0.0,
 )

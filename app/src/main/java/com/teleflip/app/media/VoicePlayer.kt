@@ -15,44 +15,45 @@ class VoicePlayer(private val context: Context) {
     fun play(
         path: String,
         onError: (() -> Unit)? = null,
-        onCompletion: () -> Unit
+        onCompletion: () -> Unit,
     ): Boolean {
         try {
             stop()
             val file = File(path)
-            val player = MediaPlayer().apply {
-                if (file.exists()) {
-                    setDataSource(context, Uri.fromFile(file))
-                } else {
-                    setDataSource(path)
-                }
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .build()
-                )
-                setOnPreparedListener { mp ->
-                    try {
-                        mp.start()
-                    } catch (e: Exception) {
-                        Log.e(tag, "Failed to start playback after prepare: ${e.message}")
+            val player =
+                MediaPlayer().apply {
+                    if (file.exists()) {
+                        setDataSource(context, Uri.fromFile(file))
+                    } else {
+                        setDataSource(path)
+                    }
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build(),
+                    )
+                    setOnPreparedListener { mp ->
+                        try {
+                            mp.start()
+                        } catch (e: Exception) {
+                            Log.e(tag, "Failed to start playback after prepare: ${e.message}")
+                            stop()
+                            onError?.invoke()
+                        }
+                    }
+                    setOnCompletionListener {
+                        currentPlayingPath = null
+                        onCompletion()
+                    }
+                    setOnErrorListener { _, what, extra ->
+                        Log.e(tag, "MediaPlayer error: what=$what, extra=$extra")
                         stop()
                         onError?.invoke()
+                        true
                     }
+                    prepareAsync()
                 }
-                setOnCompletionListener {
-                    currentPlayingPath = null
-                    onCompletion()
-                }
-                setOnErrorListener { _, what, extra ->
-                    Log.e(tag, "MediaPlayer error: what=$what, extra=$extra")
-                    stop()
-                    onError?.invoke()
-                    true
-                }
-                prepareAsync()
-            }
 
             mediaPlayer = player
             currentPlayingPath = path

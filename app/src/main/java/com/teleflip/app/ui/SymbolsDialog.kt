@@ -14,15 +14,15 @@ import com.teleflip.app.R
 
 class SymbolsDialog(
     context: Context,
-    private val onSymbolSelected: (String) -> Unit
+    private val onSymbolSelected: (String) -> Unit,
 ) : Dialog(context, R.style.Theme_TeleFlip) {
-
-    private val symbols = listOf(
-        "?", "!", "@", "#", "$", "%", "&", "*",
-        "(", ")", "-", "+", "=", "/", ":", ";",
-        "\"", "'", "<", ">", ",", ".", "~", "_",
-        "😊", "😂", "👍", "❤️", "🔥", "🎉", "👏", "🙏"
-    )
+    private val symbols =
+        listOf(
+            "?", "!", "@", "#", "$", "%", "&", "*",
+            "(", ")", "-", "+", "=", "/", ":", ";",
+            "\"", "'", "<", ">", ",", ".", "~", "_",
+            "😊", "😂", "👍", "❤️", "🔥", "🎉", "👏", "🙏",
+        )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,7 +37,10 @@ class SymbolsDialog(
         }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
             dismiss()
             return true
@@ -46,12 +49,18 @@ class SymbolsDialog(
     }
 
     inner class SymbolAdapter : RecyclerView.Adapter<SymbolAdapter.SymbolViewHolder>() {
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SymbolViewHolder {
+        override fun onCreateViewHolder(
+            parent: ViewGroup,
+            viewType: Int,
+        ): SymbolViewHolder {
             val view = LayoutInflater.from(parent.context).inflate(R.layout.dialog_symbol_item, parent, false)
             return SymbolViewHolder(view)
         }
 
-        override fun onBindViewHolder(holder: SymbolViewHolder, position: Int) {
+        override fun onBindViewHolder(
+            holder: SymbolViewHolder,
+            position: Int,
+        ) {
             val symbol = symbols[position]
             holder.tvSymbol.text = symbol
             holder.itemView.setOnClickListener {

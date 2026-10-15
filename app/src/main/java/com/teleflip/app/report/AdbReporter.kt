@@ -31,7 +31,11 @@ object AdbReporter {
         }
     }
 
-    fun reportPopup(source: String, message: String, isError: Boolean = false) {
+    fun reportPopup(
+        source: String,
+        message: String,
+        isError: Boolean = false,
+    ) {
         val level = if (isError) "ERROR_POPUP" else "INFO_POPUP"
         val timestamp = dateFormat.format(Date())
         val logLine = "[$timestamp] [$level] [$source] $message"
@@ -45,7 +49,11 @@ object AdbReporter {
         writeToFile("$logLine\n")
     }
 
-    fun reportError(component: String, message: String, throwable: Throwable? = null) {
+    fun reportError(
+        component: String,
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         val timestamp = dateFormat.format(Date())
         val logLine = "[$timestamp] [ERROR] [$component] $message"
         Log.e(TAG, "==================================================")
@@ -58,21 +66,30 @@ object AdbReporter {
         writeToFile("$logLine\n${throwable?.let { Log.getStackTraceString(it) } ?: ""}\n")
     }
 
-    fun reportWarning(component: String, message: String) {
+    fun reportWarning(
+        component: String,
+        message: String,
+    ) {
         val timestamp = dateFormat.format(Date())
         val logLine = "[$timestamp] [WARN] [$component] $message"
         Log.w(TAG, logLine)
         writeToFile("$logLine\n")
     }
 
-    fun reportInfo(component: String, message: String) {
+    fun reportInfo(
+        component: String,
+        message: String,
+    ) {
         val timestamp = dateFormat.format(Date())
         val logLine = "[$timestamp] [INFO] [$component] $message"
         Log.i(TAG, logLine)
         writeToFile("$logLine\n")
     }
 
-    fun reportCrash(contextInfo: String, throwable: Throwable) {
+    fun reportCrash(
+        contextInfo: String,
+        throwable: Throwable,
+    ) {
         val timestamp = dateFormat.format(Date())
         val logLine = "[$timestamp] [FATAL CRASH] [$contextInfo] ${throwable.message}"
         Log.e(TAG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")

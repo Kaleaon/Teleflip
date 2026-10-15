@@ -13,9 +13,8 @@ import com.teleflip.app.model.ChatModel
 import java.io.File
 
 class ChatListAdapter(
-    private val onChatSelected: (ChatModel) -> Unit
+    private val onChatSelected: (ChatModel) -> Unit,
 ) : RecyclerView.Adapter<ChatListAdapter.ChatViewHolder>() {
-
     private val items = mutableListOf<ChatModel>()
 
     fun submitList(newItems: List<ChatModel>) {
@@ -28,12 +27,18 @@ class ChatListAdapter(
         return if (position in 0 until items.size) items[position] else null
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): ChatViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.view_chat_item, parent, false)
         return ChatViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: ChatViewHolder,
+        position: Int,
+    ) {
         holder.bind(items[position], position)
     }
 
@@ -48,7 +53,10 @@ class ChatListAdapter(
         private val tvLastMsg: TextView = itemView.findViewById(R.id.tv_last_message)
         private val tvUnread: TextView = itemView.findViewById(R.id.tv_unread_count)
 
-        fun bind(chat: ChatModel, position: Int) {
+        fun bind(
+            chat: ChatModel,
+            position: Int,
+        ) {
             // Keypad shortcut 1-9
             if (position < 9) {
                 tvShortcut.visibility = View.VISIBLE
@@ -62,9 +70,10 @@ class ChatListAdapter(
                 try {
                     val bitmap = BitmapFactory.decodeFile(chat.avatarPath)
                     if (bitmap != null) {
-                        val circularDrawable = RoundedBitmapDrawableFactory.create(itemView.resources, bitmap).apply {
-                            isCircular = true
-                        }
+                        val circularDrawable =
+                            RoundedBitmapDrawableFactory.create(itemView.resources, bitmap).apply {
+                                isCircular = true
+                            }
                         ivAvatar.setImageDrawable(circularDrawable)
                         ivAvatar.visibility = View.VISIBLE
                         tvAvatar.visibility = View.GONE

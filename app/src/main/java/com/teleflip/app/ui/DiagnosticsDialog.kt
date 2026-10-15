@@ -10,7 +10,6 @@ import com.teleflip.app.R
 import com.teleflip.app.report.AdbReporter
 
 class DiagnosticsDialog(context: Context) : Dialog(context, R.style.Theme_TeleFlip) {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_diagnostics)
@@ -28,7 +27,10 @@ class DiagnosticsDialog(context: Context) : Dialog(context, R.style.Theme_TeleFl
         btnClose?.requestFocus()
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
             dismiss()
             return true

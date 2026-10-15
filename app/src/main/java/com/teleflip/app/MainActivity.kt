@@ -42,11 +42,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 enum class Screen {
-    LOGIN, CHAT_LIST, CONVERSATION, SETTINGS
+    LOGIN,
+    CHAT_LIST,
+    CONVERSATION,
+    SETTINGS,
 }
 
 class MainActivity : AppCompatActivity() {
-
     private lateinit var mainContainer: FrameLayout
     private lateinit var softkeyManager: SoftkeyManager
     private lateinit var telegramManager: TelegramManager
@@ -144,11 +146,12 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             telegramManager.chats.collectLatest { chats ->
                 if (currentScreen == Screen.CHAT_LIST) {
-                    val filtered = if (currentChatTypeFilter == null) {
-                        chats
-                    } else {
-                        chats.filter { it.chatType == currentChatTypeFilter }
-                    }
+                    val filtered =
+                        if (currentChatTypeFilter == null) {
+                            chats
+                        } else {
+                            chats.filter { it.chatType == currentChatTypeFilter }
+                        }
                     val wasEmpty = (chatListAdapter?.itemCount ?: 0) == 0
                     chatListAdapter?.submitList(filtered)
                     val emptyView = findViewById<View>(R.id.layout_empty_state)
@@ -204,25 +207,32 @@ class MainActivity : AppCompatActivity() {
 
         rvChats = view.findViewById(R.id.rv_chats)
         rvChats?.layoutManager = LinearLayoutManager(this)
-        chatListAdapter = ChatListAdapter { chat ->
-            openConversation(chat)
-        }
+        chatListAdapter =
+            ChatListAdapter { chat ->
+                openConversation(chat)
+            }
         rvChats?.adapter = chatListAdapter
 
         // Lazy loading / pagination on scroll
-        rvChats?.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (dy > 0) {
-                    val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
-                    val visibleItemCount = lm.childCount
-                    val totalItemCount = lm.itemCount
-                    val firstVisibleItem = lm.findFirstVisibleItemPosition()
-                    if ((visibleItemCount + firstVisibleItem) >= totalItemCount - 2 && totalItemCount >= 10) {
-                        telegramManager.loadMoreChats()
+        rvChats?.addOnScrollListener(
+            object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(
+                    recyclerView: RecyclerView,
+                    dx: Int,
+                    dy: Int,
+                ) {
+                    if (dy > 0) {
+                        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                        val visibleItemCount = lm.childCount
+                        val totalItemCount = lm.itemCount
+                        val firstVisibleItem = lm.findFirstVisibleItemPosition()
+                        if ((visibleItemCount + firstVisibleItem) >= totalItemCount - 2 && totalItemCount >= 10) {
+                            telegramManager.loadMoreChats()
+                        }
                     }
                 }
-            }
-        })
+            },
+        )
 
         setupTabs(view)
 
@@ -248,7 +258,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             },
-            onRight = { finish() }
+            onRight = { finish() },
         )
 
         rvChats?.post {
@@ -286,7 +296,10 @@ class MainActivity : AppCompatActivity() {
 
         val tabs = listOf(tabAll, tabDirect, tabGroups, tabChannels)
 
-        fun selectTab(selected: TextView, filter: ChatType?) {
+        fun selectTab(
+            selected: TextView,
+            filter: ChatType?,
+        ) {
             tabs.forEach { it.isSelected = (it == selected) }
             currentChatTypeFilter = filter
             val allChats = telegramManager.chats.value
@@ -301,34 +314,38 @@ class MainActivity : AppCompatActivity() {
         tabChannels.setOnClickListener { selectTab(tabChannels, ChatType.CHANNEL) }
     }
 
-    private fun showToast(msg: String, isError: Boolean = false) {
+    private fun showToast(
+        msg: String,
+        isError: Boolean = false,
+    ) {
         com.teleflip.app.report.AdbReporter.reportPopup("UI_Popup", msg, isError)
         Toast.makeText(this, msg, if (isError) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
     }
 
     private fun showChatListOptionsMenu() {
-        val options = listOf(
-            MenuOption(1, "New Chat / Contact") {
-                showToast("Enter username or number to start chat")
-            },
-            MenuOption(2, "Refresh Chats") {
-                telegramManager.loadChats()
-                showToast("Refreshing chats...")
-            },
-            MenuOption(3, "Explore Demo / Offline Chats") {
-                telegramManager.enableDemoMode()
-                showToast("Demo mode active")
-            },
-            MenuOption(4, "Diagnostics & Error Log") {
-                com.teleflip.app.ui.DiagnosticsDialog(this).show()
-            },
-            MenuOption(5, "Settings & API") {
-                showSettingsScreen()
-            },
-            MenuOption(6, "Log Out") {
-                telegramManager.logOut()
-            }
-        )
+        val options =
+            listOf(
+                MenuOption(1, "New Chat / Contact") {
+                    showToast("Enter username or number to start chat")
+                },
+                MenuOption(2, "Refresh Chats") {
+                    telegramManager.loadChats()
+                    showToast("Refreshing chats...")
+                },
+                MenuOption(3, "Explore Demo / Offline Chats") {
+                    telegramManager.enableDemoMode()
+                    showToast("Demo mode active")
+                },
+                MenuOption(4, "Diagnostics & Error Log") {
+                    com.teleflip.app.ui.DiagnosticsDialog(this).show()
+                },
+                MenuOption(5, "Settings & API") {
+                    showSettingsScreen()
+                },
+                MenuOption(6, "Log Out") {
+                    telegramManager.logOut()
+                },
+            )
         OptionsMenuDialog(this, "Chat Options", options).show()
     }
 
@@ -344,12 +361,13 @@ class MainActivity : AppCompatActivity() {
 
         view.findViewById<TextView>(R.id.tv_conv_title).text = chat.title
         val subtitle = view.findViewById<TextView>(R.id.tv_conv_subtitle)
-        subtitle.text = when (chat.chatType) {
-            ChatType.CHANNEL -> "Channel"
-            ChatType.GROUP -> "Group"
-            ChatType.BOT -> "Bot"
-            ChatType.DIRECT -> "online"
-        }
+        subtitle.text =
+            when (chat.chatType) {
+                ChatType.CHANNEL -> "Channel"
+                ChatType.GROUP -> "Group"
+                ChatType.BOT -> "Bot"
+                ChatType.DIRECT -> "online"
+            }
 
         val ivConvAvatar = view.findViewById<ImageView>(R.id.iv_conv_avatar)
         val tvConvAvatar = view.findViewById<TextView>(R.id.tv_conv_avatar)
@@ -357,7 +375,11 @@ class MainActivity : AppCompatActivity() {
             try {
                 val bmp = android.graphics.BitmapFactory.decodeFile(chat.avatarPath)
                 if (bmp != null) {
-                    val circ = androidx.core.graphics.drawable.RoundedBitmapDrawableFactory.create(resources, bmp).apply { isCircular = true }
+                    val circ =
+                        androidx.core.graphics.drawable.RoundedBitmapDrawableFactory.create(
+                            resources,
+                            bmp,
+                        ).apply { isCircular = true }
                     ivConvAvatar?.setImageDrawable(circ)
                     ivConvAvatar?.visibility = View.VISIBLE
                     tvConvAvatar?.visibility = View.GONE
@@ -378,23 +400,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         rvMessages = view.findViewById(R.id.rv_messages)
-        val layoutManager = LinearLayoutManager(this).apply {
-            stackFromEnd = true
-        }
+        val layoutManager =
+            LinearLayoutManager(this).apply {
+                stackFromEnd = true
+            }
         rvMessages?.layoutManager = layoutManager
 
         layoutVoiceRecording = view.findViewById(R.id.layout_voice_recording)
         layoutCompose = view.findViewById(R.id.layout_compose)
         tvRecordTimer = view.findViewById(R.id.tv_record_timer)
 
-        messageAdapter = MessageAdapter(
-            onMessageFocused = { focusedMsg ->
-                updateSoftkeysForFocusedMessage(chat, focusedMsg)
-            },
-            onMessageAction = { clickedMsg ->
-                handleMessageActionClick(clickedMsg)
-            }
-        )
+        messageAdapter =
+            MessageAdapter(
+                onMessageFocused = { focusedMsg ->
+                    updateSoftkeysForFocusedMessage(chat, focusedMsg)
+                },
+                onMessageAction = { clickedMsg ->
+                    handleMessageActionClick(clickedMsg)
+                },
+            )
         rvMessages?.adapter = messageAdapter
 
         val currentMsgs = telegramManager.messages.value[chat.id] ?: emptyList()
@@ -407,30 +431,37 @@ class MainActivity : AppCompatActivity() {
         telegramManager.loadMessages(chat.id)
 
         // Lazy load older messages when scrolling up to the top
-        rvMessages?.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (dy < 0) {
-                    val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
-                    val firstVisible = lm.findFirstVisibleItemPosition()
-                    if (firstVisible <= 1) {
-                        val msgs = telegramManager.messages.value[chat.id] ?: emptyList()
-                        if (msgs.isNotEmpty()) {
-                            telegramManager.loadMessages(chat.id, fromMessageId = msgs.first().id)
+        rvMessages?.addOnScrollListener(
+            object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(
+                    recyclerView: RecyclerView,
+                    dx: Int,
+                    dy: Int,
+                ) {
+                    if (dy < 0) {
+                        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                        val firstVisible = lm.findFirstVisibleItemPosition()
+                        if (firstVisible <= 1) {
+                            val msgs = telegramManager.messages.value[chat.id] ?: emptyList()
+                            if (msgs.isNotEmpty()) {
+                                telegramManager.loadMessages(chat.id, fromMessageId = msgs.first().id)
+                            }
                         }
                     }
                 }
-            }
-        })
+            },
+        )
 
         etComposeInput = view.findViewById(R.id.et_message_input)
         val tvMode = view.findViewById<TextView>(R.id.tv_input_mode)
         val btnSend = view.findViewById<Button>(R.id.btn_send)
 
-        composeInputEngine = KeypadInputEngine(
-            editText = etComposeInput!!,
-            modeIndicator = tvMode,
-            onSymbolRequested = { showSymbolsDialog { symbol -> composeInputEngine?.insertSymbol(symbol) } }
-        )
+        composeInputEngine =
+            KeypadInputEngine(
+                editText = etComposeInput!!,
+                modeIndicator = tvMode,
+                onSymbolRequested = { showSymbolsDialog { symbol -> composeInputEngine?.insertSymbol(symbol) } },
+            )
 
         val doSend = {
             val text = etComposeInput?.text?.toString()?.trim() ?: ""
@@ -450,7 +481,7 @@ class MainActivity : AppCompatActivity() {
                     right = "Back",
                     onLeft = { showAttachMenu(chat) },
                     onCenter = { doSend() },
-                    onRight = { showChatListScreen() }
+                    onRight = { showChatListScreen() },
                 )
             }
         }
@@ -468,13 +499,16 @@ class MainActivity : AppCompatActivity() {
                     etComposeInput?.requestFocus()
                 }
             },
-            onRight = { showChatListScreen() }
+            onRight = { showChatListScreen() },
         )
 
         etComposeInput?.requestFocus()
     }
 
-    private fun updateSoftkeysForFocusedMessage(chat: ChatModel, msg: MessageModel) {
+    private fun updateSoftkeysForFocusedMessage(
+        chat: ChatModel,
+        msg: MessageModel,
+    ) {
         when (msg.mediaType) {
             MediaType.VOICE -> {
                 val isPlaying = msg.mediaFilePath != null && voicePlayer.isPlayingPath(msg.mediaFilePath)
@@ -484,7 +518,7 @@ class MainActivity : AppCompatActivity() {
                     right = "Back",
                     onLeft = { showMessageOptionsMenu(msg) },
                     onCenter = { handlePlayVoiceMessage(msg) },
-                    onRight = { showChatListScreen() }
+                    onRight = { showChatListScreen() },
                 )
             }
             MediaType.LOCATION -> {
@@ -494,7 +528,7 @@ class MainActivity : AppCompatActivity() {
                     right = "Back",
                     onLeft = { LocationHelper.copyGoogleMapsLink(this, msg.latitude, msg.longitude) },
                     onCenter = { LocationHelper.openInOrganicMaps(this, msg.latitude, msg.longitude) },
-                    onRight = { showChatListScreen() }
+                    onRight = { showChatListScreen() },
                 )
             }
             else -> {
@@ -504,7 +538,7 @@ class MainActivity : AppCompatActivity() {
                     right = "Back",
                     onLeft = { showMessageOptionsMenu(msg) },
                     onCenter = { etComposeInput?.requestFocus() },
-                    onRight = { showChatListScreen() }
+                    onRight = { showChatListScreen() },
                 )
             }
         }
@@ -530,16 +564,17 @@ class MainActivity : AppCompatActivity() {
             messageAdapter?.setPlayingMessageId(null)
         } else {
             messageAdapter?.setPlayingMessageId(msg.id)
-            val success = voicePlayer.play(
-                path = path,
-                onError = {
-                    messageAdapter?.setPlayingMessageId(null)
-                    showToast("Unable to play audio recording", true)
-                },
-                onCompletion = {
-                    messageAdapter?.setPlayingMessageId(null)
-                }
-            )
+            val success =
+                voicePlayer.play(
+                    path = path,
+                    onError = {
+                        messageAdapter?.setPlayingMessageId(null)
+                        showToast("Unable to play audio recording", true)
+                    },
+                    onCompletion = {
+                        messageAdapter?.setPlayingMessageId(null)
+                    },
+                )
             if (!success) {
                 messageAdapter?.setPlayingMessageId(null)
                 showToast("Unable to play audio recording", true)
@@ -560,11 +595,12 @@ class MainActivity : AppCompatActivity() {
         layoutVoiceRecording?.visibility = View.VISIBLE
         tvRecordTimer?.text = "00:00"
 
-        val started = voiceRecorder.startRecording { elapsedSec ->
-            val min = elapsedSec / 60
-            val sec = elapsedSec % 60
-            tvRecordTimer?.text = String.format("%02d:%02d", min, sec)
-        }
+        val started =
+            voiceRecorder.startRecording { elapsedSec ->
+                val min = elapsedSec / 60
+                val sec = elapsedSec % 60
+                tvRecordTimer?.text = String.format("%02d:%02d", min, sec)
+            }
 
         if (!started) {
             cancelVoiceRecordingUI(chat)
@@ -579,7 +615,7 @@ class MainActivity : AppCompatActivity() {
             right = "Discard",
             onLeft = { cancelVoiceRecordingUI(chat) },
             onCenter = { stopAndSendVoiceRecording(chat) },
-            onRight = { cancelVoiceRecordingUI(chat) }
+            onRight = { cancelVoiceRecordingUI(chat) },
         )
     }
 
@@ -621,7 +657,7 @@ class MainActivity : AppCompatActivity() {
                     etComposeInput?.requestFocus()
                 }
             },
-            onRight = { showChatListScreen() }
+            onRight = { showChatListScreen() },
         )
         etComposeInput?.requestFocus()
     }
@@ -634,7 +670,7 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                REQ_LOC_PERM
+                REQ_LOC_PERM,
             )
             return
         }
@@ -648,78 +684,96 @@ class MainActivity : AppCompatActivity() {
             },
             onError = { errMsg ->
                 showToast(errMsg, true)
-            }
+            },
         )
     }
 
     private fun showAttachMenu(chat: ChatModel) {
-        val options = listOf(
-            MenuOption(1, "🎤 Record Voice Message (Push-to-Talk)") {
-                startVoiceRecordingFlow(chat)
-            },
-            MenuOption(2, "📍 Send Current GPS Location") {
-                sendLocationFlow(chat)
-            },
-            MenuOption(3, "Symbols & Emoji (*)") {
-                showSymbolsDialog { sym -> composeInputEngine?.insertSymbol(sym) }
-            },
-            MenuOption(4, "Quick Replies") {
-                showQuickRepliesMenu(chat)
-            },
-            MenuOption(5, "Chat Info") {
-                showToast("${chat.title} (${chat.chatType})")
-            }
-        )
+        val options =
+            listOf(
+                MenuOption(1, "🎤 Record Voice Message (Push-to-Talk)") {
+                    startVoiceRecordingFlow(chat)
+                },
+                MenuOption(2, "📍 Send Current GPS Location") {
+                    sendLocationFlow(chat)
+                },
+                MenuOption(3, "Symbols & Emoji (*)") {
+                    showSymbolsDialog { sym -> composeInputEngine?.insertSymbol(sym) }
+                },
+                MenuOption(4, "Quick Replies") {
+                    showQuickRepliesMenu(chat)
+                },
+                MenuOption(5, "Chat Info") {
+                    showToast("${chat.title} (${chat.chatType})")
+                },
+            )
         OptionsMenuDialog(this, "Attach & Actions", options).show()
     }
 
     private fun showMessageOptionsMenu(msg: MessageModel) {
         val options = mutableListOf<MenuOption>()
-        options.add(MenuOption(1, "Copy Text") {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("Telegram Message", msg.text))
-            showToast("Copied to clipboard")
-        })
-        options.add(MenuOption(2, "Reply") {
-            etComposeInput?.requestFocus()
-            etComposeInput?.setText("Re: \"${msg.text.take(20)}...\" ")
-            etComposeInput?.setSelection(etComposeInput?.text?.length ?: 0)
-        })
+        options.add(
+            MenuOption(1, "Copy Text") {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Telegram Message", msg.text))
+                showToast("Copied to clipboard")
+            },
+        )
+        options.add(
+            MenuOption(2, "Reply") {
+                etComposeInput?.requestFocus()
+                etComposeInput?.setText("Re: \"${msg.text.take(20)}...\" ")
+                etComposeInput?.setSelection(etComposeInput?.text?.length ?: 0)
+            },
+        )
 
         if (msg.mediaType == MediaType.LOCATION) {
-            options.add(MenuOption(3, "Open in Organic Maps") {
-                LocationHelper.openInOrganicMaps(this, msg.latitude, msg.longitude)
-            })
-            options.add(MenuOption(4, "Copy Google Maps Link") {
-                LocationHelper.copyGoogleMapsLink(this, msg.latitude, msg.longitude)
-            })
+            options.add(
+                MenuOption(3, "Open in Organic Maps") {
+                    LocationHelper.openInOrganicMaps(this, msg.latitude, msg.longitude)
+                },
+            )
+            options.add(
+                MenuOption(4, "Copy Google Maps Link") {
+                    LocationHelper.copyGoogleMapsLink(this, msg.latitude, msg.longitude)
+                },
+            )
         }
 
         if (msg.mediaType == MediaType.VOICE) {
-            options.add(MenuOption(options.size + 1, "Play Voice Note") {
-                handlePlayVoiceMessage(msg)
-            })
+            options.add(
+                MenuOption(options.size + 1, "Play Voice Note") {
+                    handlePlayVoiceMessage(msg)
+                },
+            )
         }
 
-        options.add(MenuOption(options.size + 1, "Delete Message") {
-            telegramManager.deleteMessage(msg.chatId, msg.id)
-            showToast("Message deleted")
-        })
+        options.add(
+            MenuOption(options.size + 1, "Delete Message") {
+                telegramManager.deleteMessage(msg.chatId, msg.id)
+                showToast("Message deleted")
+            },
+        )
 
         OptionsMenuDialog(this, "Message Actions", options).show()
     }
 
     private fun showQuickRepliesMenu(chat: ChatModel) {
-        val quicks = listOf(
-            "OK! 👍", "On my way! 🚗", "Call you in a few minutes.",
-            "Sounds good!", "Can't talk right now, will reply later.",
-            "Sent from my Android Flip Phone 📱"
-        )
-        val options = quicks.mapIndexed { index, text ->
-            MenuOption(index + 1, text) {
-                telegramManager.sendMessage(chat.id, text)
+        val quicks =
+            listOf(
+                "OK! 👍",
+                "On my way! 🚗",
+                "Call you in a few minutes.",
+                "Sounds good!",
+                "Can't talk right now, will reply later.",
+                "Sent from my Android Flip Phone 📱",
+            )
+        val options =
+            quicks.mapIndexed { index, text ->
+                MenuOption(index + 1, text) {
+                    telegramManager.sendMessage(chat.id, text)
+                }
             }
-        }
         OptionsMenuDialog(this, "Quick Replies", options).show()
     }
 
@@ -745,9 +799,10 @@ class MainActivity : AppCompatActivity() {
         val btnDemo = view.findViewById<Button>(R.id.btn_demo_mode)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
 
-        loginInputEngine = KeypadInputEngine(etLoginInput!!, tvMode) {
-            showSymbolsDialog { symbol -> loginInputEngine?.insertSymbol(symbol) }
-        }
+        loginInputEngine =
+            KeypadInputEngine(etLoginInput!!, tvMode) {
+                showSymbolsDialog { symbol -> loginInputEngine?.insertSymbol(symbol) }
+            }
 
         when (state) {
             is AuthState.WaitPhoneNumber -> {
@@ -880,7 +935,7 @@ class MainActivity : AppCompatActivity() {
             onRight = {
                 telegramManager.enableDemoMode()
                 showChatListScreen()
-            }
+            },
         )
 
         etLoginInput?.requestFocus()
@@ -889,8 +944,15 @@ class MainActivity : AppCompatActivity() {
     private fun getDevicePhoneNumber(): String? {
         try {
             val tm = getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
-            val hasPerm = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED ||
-                          (android.os.Build.VERSION.SDK_INT >= 26 && ContextCompat.checkSelfPermission(this, "android.permission.READ_PHONE_NUMBERS") == PackageManager.PERMISSION_GRANTED)
+            val permState =
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.READ_PHONE_STATE,
+                ) == PackageManager.PERMISSION_GRANTED
+            val permNum =
+                android.os.Build.VERSION.SDK_INT >= 26 &&
+                    ContextCompat.checkSelfPermission(this, "android.permission.READ_PHONE_NUMBERS") == PackageManager.PERMISSION_GRANTED
+            val hasPerm = permState || permNum
             if (hasPerm && tm != null) {
                 @Suppress("MissingPermission")
                 val raw = tm.line1Number
@@ -976,7 +1038,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     showLoginScreen(telegramManager.authState.value)
                 }
-            }
+            },
         )
 
         etId.requestFocus()
@@ -990,13 +1052,17 @@ class MainActivity : AppCompatActivity() {
 
         // Top Left hardware softkey always triggers softkey action
         if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT || keyCode == KeyEvent.KEYCODE_MENU ||
-            keyCode == 132 /* F2 */ || keyCode == 60 || keyCode == 228) {
+            keyCode == 132 || keyCode == 60 || keyCode == 228
+        ) {
             if (softkeyManager.handleKeyEvent(keyCode, event)) return true
         }
 
         // Back key and Top Right hardware softkey handling
-        if ((keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT ||
-                keyCode == 229 || keyCode == 230 || keyCode == 61 || keyCode == 158) && event.action == KeyEvent.ACTION_DOWN) {
+        if ((
+                keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT ||
+                    keyCode == 229 || keyCode == 230 || keyCode == 61 || keyCode == 158
+            ) && event.action == KeyEvent.ACTION_DOWN
+        ) {
             if (voiceRecorder.isRecording()) {
                 activeChat?.let { cancelVoiceRecordingUI(it) }
                 return true
@@ -1059,10 +1125,11 @@ class MainActivity : AppCompatActivity() {
 
         // In Login: Route keypad keys to login input engine
         if (currentScreen == Screen.LOGIN) {
-            val isInputKey = (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
-                             keyCode == KeyEvent.KEYCODE_STAR ||
-                             keyCode == KeyEvent.KEYCODE_POUND ||
-                             keyCode == KeyEvent.KEYCODE_DEL
+            val isInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL
             if (isInputKey) {
                 if (etLoginInput?.hasFocus() != true) {
                     etLoginInput?.requestFocus()
@@ -1120,7 +1187,11 @@ class MainActivity : AppCompatActivity() {
         tabChannels?.isSelected = (currentChatTypeFilter == ChatType.CHANNEL)
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_AUDIO_PERM && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             activeChat?.let { startVoiceRecordingFlow(it) }

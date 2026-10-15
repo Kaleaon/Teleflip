@@ -6,7 +6,7 @@ import android.widget.TextView
 class SoftkeyManager(
     private val tvLeft: TextView,
     private val tvCenter: TextView,
-    private val tvRight: TextView
+    private val tvRight: TextView,
 ) {
     private var onLeftClick: (() -> Unit)? = null
     private var onCenterClick: (() -> Unit)? = null
@@ -24,7 +24,7 @@ class SoftkeyManager(
         right: String = "",
         onLeft: (() -> Unit)? = null,
         onCenter: (() -> Unit)? = null,
-        onRight: (() -> Unit)? = null
+        onRight: (() -> Unit)? = null,
     ) {
         tvLeft.text = left
         tvCenter.text = center
@@ -35,12 +35,16 @@ class SoftkeyManager(
         this.onRightClick = onRight
     }
 
-    fun handleKeyEvent(keyCode: Int, event: KeyEvent): Boolean {
+    fun handleKeyEvent(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN) return false
 
         // Top Left Button (Soft Left)
         if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT || keyCode == KeyEvent.KEYCODE_MENU ||
-            keyCode == 132 /* KEYCODE_F2 */ || keyCode == 60 || keyCode == 228) {
+            keyCode == 132 || keyCode == 60 || keyCode == 228
+        ) {
             onLeftClick?.let {
                 it.invoke()
                 return true
@@ -49,7 +53,8 @@ class SoftkeyManager(
 
         // Top Right Button (Soft Right)
         if (keyCode == KeyEvent.KEYCODE_SOFT_RIGHT || keyCode == 229 || keyCode == 230 ||
-            keyCode == 61 || keyCode == 158) {
+            keyCode == 61 || keyCode == 158
+        ) {
             onRightClick?.let {
                 it.invoke()
                 return true

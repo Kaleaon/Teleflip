@@ -18,9 +18,8 @@ import java.io.File
 
 class MessageAdapter(
     private val onMessageFocused: ((MessageModel) -> Unit)? = null,
-    private val onMessageAction: ((MessageModel) -> Unit)? = null
+    private val onMessageAction: ((MessageModel) -> Unit)? = null,
 ) : RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
-
     private val items = mutableListOf<MessageModel>()
     private var playingMessageId: Long? = null
 
@@ -35,12 +34,18 @@ class MessageAdapter(
         notifyDataSetChanged()
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): MessageViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.view_message_item, parent, false)
         return MessageViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: MessageViewHolder,
+        position: Int,
+    ) {
         holder.bind(items[position])
     }
 
@@ -64,21 +69,23 @@ class MessageAdapter(
                 bubbleLayout.background = ContextCompat.getDrawable(context, R.drawable.bg_outbound_bubble)
                 tvSender.visibility = View.GONE
                 tvStatus.visibility = View.VISIBLE
-                tvStatus.text = when (message.status) {
-                    MessageStatus.SENDING -> " ⏱"
-                    MessageStatus.SENT -> " ✓"
-                    MessageStatus.READ -> " ✓✓"
-                    MessageStatus.FAILED -> " ⚠"
-                }
+                tvStatus.text =
+                    when (message.status) {
+                        MessageStatus.SENDING -> " ⏱"
+                        MessageStatus.SENT -> " ✓"
+                        MessageStatus.READ -> " ✓✓"
+                        MessageStatus.FAILED -> " ⚠"
+                    }
             } else {
                 rootLayout.gravity = Gravity.START
                 bubbleLayout.background = ContextCompat.getDrawable(context, R.drawable.bg_inbound_bubble)
-                tvSender.visibility = if (message.senderName.isNotBlank() && message.senderName != "You") {
-                    tvSender.text = message.senderName
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
+                tvSender.visibility =
+                    if (message.senderName.isNotBlank() && message.senderName != "You") {
+                        tvSender.text = message.senderName
+                        View.VISIBLE
+                    } else {
+                        View.GONE
+                    }
                 tvStatus.visibility = View.GONE
             }
 

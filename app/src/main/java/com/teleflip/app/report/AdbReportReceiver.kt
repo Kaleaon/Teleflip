@@ -6,7 +6,10 @@ import android.content.Intent
 import android.util.Log
 
 class AdbReportReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         val action = intent.action ?: return
         when (action) {
             "com.teleflip.app.REPORT_STATUS" -> {

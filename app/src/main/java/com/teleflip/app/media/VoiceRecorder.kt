@@ -9,7 +9,7 @@ import java.io.File
 
 data class VoiceRecording(
     val file: File,
-    val durationSeconds: Int
+    val durationSeconds: Int,
 )
 
 class VoiceRecorder(private val context: Context) {
@@ -22,15 +22,16 @@ class VoiceRecorder(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     private var onTickListener: ((Int) -> Unit)? = null
 
-    private val tickerRunnable = object : Runnable {
-        override fun run() {
-            if (isRecording) {
-                val elapsed = ((System.currentTimeMillis() - startTimeMillis) / 1000).toInt()
-                onTickListener?.invoke(elapsed)
-                handler.postDelayed(this, 500)
+    private val tickerRunnable =
+        object : Runnable {
+            override fun run() {
+                if (isRecording) {
+                    val elapsed = ((System.currentTimeMillis() - startTimeMillis) / 1000).toInt()
+                    onTickListener?.invoke(elapsed)
+                    handler.postDelayed(this, 500)
+                }
             }
         }
-    }
 
     fun startRecording(onTick: (Int) -> Unit): Boolean {
         if (isRecording) return false
@@ -42,16 +43,17 @@ class VoiceRecorder(private val context: Context) {
             val file = File(audioDir, "voice_${System.currentTimeMillis()}.m4a")
             currentFile = file
 
-            recorder = MediaRecorder().apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioEncodingBitRate(32000)
-                setAudioSamplingRate(44100)
-                setOutputFile(file.absolutePath)
-                prepare()
-                start()
-            }
+            recorder =
+                MediaRecorder().apply {
+                    setAudioSource(MediaRecorder.AudioSource.MIC)
+                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                    setAudioEncodingBitRate(32000)
+                    setAudioSamplingRate(44100)
+                    setOutputFile(file.absolutePath)
+                    prepare()
+                    start()
+                }
 
             isRecording = true
             startTimeMillis = System.currentTimeMillis()
