@@ -32,7 +32,16 @@ sealed class AuthState {
     object WaitParameters : AuthState()
     data class WaitPhoneNumber(val errorMessage: String? = null) : AuthState()
     data class WaitCode(val info: String = "", val errorMessage: String? = null) : AuthState()
-    data class WaitPassword(val hint: String = "", val errorMessage: String? = null) : AuthState()
+    data class WaitPassword(
+        val hint: String = "",
+        val hasRecoveryEmailAddress: Boolean = false,
+        val recoveryEmailAddressPattern: String = "",
+        val errorMessage: String? = null
+    ) : AuthState()
+    data class WaitPasswordRecoveryCode(
+        val recoveryEmailPattern: String = "",
+        val errorMessage: String? = null
+    ) : AuthState()
     object Ready : AuthState()
     data class Error(val message: String) : AuthState()
 }
@@ -350,6 +359,46 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         isAuthQueryInProgress = true
         startAuthTimeoutSafeguard()
         tdClient?.send(TdApi.CheckAuthenticationPassword(password), this)
+    }
+
+    fun requestPasswordRecovery() {
+        if (isDemoMode) {
+            val pattern = (authState.value as? AuthState.WaitPassword)?.recoveryEmailAddressPattern?.ifBlank { "d***o@example.com" } ?: "d***o@example.com"
+            _authState.value = AuthState.WaitPasswordRecoveryCode(recoveryEmailPattern = pattern)
+            return
+        }
+        if (isAuthQueryInProgress) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "requestPasswordRecovery ignored: authorization query already in flight")
+            return
+        }
+        isAuthQueryInProgress = true
+        tdClient?.send(TdApi.RequestAuthenticationPasswordRecovery(), this)
+    }
+
+    fun recoverPassword(code: String) {
+        if (isDemoMode) {
+            _authState.value = AuthState.Ready
+            return
+        }
+        if (isAuthQueryInProgress) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "recoverPassword ignored: authorization query already in flight")
+            return
+        }
+        isAuthQueryInProgress = true
+        tdClient?.send(TdApi.RecoverAuthenticationPassword(code, "", ""), this)
+    }
+
+    fun resetAccount() {
+        if (isDemoMode) {
+            _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Demo account reset successfully.")
+            return
+        }
+        if (isAuthQueryInProgress) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "resetAccount ignored: authorization query already in flight")
+            return
+        }
+        isAuthQueryInProgress = true
+        tdClient?.send(TdApi.DeleteAccount("Account reset requested from login view", ""), this)
     }
 
     fun sendMessage(chatId: Long, text: String) {
@@ -678,6 +727,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 val file = obj as TdApi.File
                 handleFileUpdate(file)
             }
+            TdApi.EmailAddressAuthenticationCodeInfo.CONSTRUCTOR -> {
+                isAuthQueryInProgress = false
+                val info = obj as TdApi.EmailAddressAuthenticationCodeInfo
+                _authState.value = AuthState.WaitPasswordRecoveryCode(recoveryEmailPattern = info.emailAddressPattern ?: "")
+            }
+            TdApi.Ok.CONSTRUCTOR -> {
+                isAuthQueryInProgress = false
+            }
             TdApi.Error.CONSTRUCTOR -> {
                 clearAuthTimeoutSafeguard()
                 isAuthQueryInProgress = false
@@ -687,6 +744,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitCode -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = err.message)
+                    is AuthState.WaitPasswordRecoveryCode -> _authState.value = curr.copy(errorMessage = err.message)
                     else -> {
                         if (_authState.value !is AuthState.Ready) {
                             _authState.value = AuthState.WaitPhoneNumber(errorMessage = err.message)
@@ -731,8 +789,15 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 _authState.value = AuthState.WaitCode()
             }
             TdApi.AuthorizationStateWaitPassword.CONSTRUCTOR -> {
-                val hint = (state as TdApi.AuthorizationStateWaitPassword).passwordHint
-                _authState.value = AuthState.WaitPassword(hint)
+                val waitPass = state as TdApi.AuthorizationStateWaitPassword
+                val hint = waitPass.passwordHint ?: ""
+                val hasEmail = waitPass.hasRecoveryEmailAddress
+                val pattern = waitPass.recoveryEmailAddressPattern ?: ""
+                _authState.value = AuthState.WaitPassword(
+                    hint = hint,
+                    hasRecoveryEmailAddress = hasEmail,
+                    recoveryEmailAddressPattern = pattern
+                )
             }
             TdApi.AuthorizationStateReady.CONSTRUCTOR -> {
                 _authState.value = AuthState.Ready

@@ -149,7 +149,7 @@ class MainActivity : AppCompatActivity() {
             telegramManager.authState.collectLatest { state ->
                 when (state) {
                     is AuthState.Initial, is AuthState.WaitParameters -> {}
-                    is AuthState.WaitPhoneNumber, is AuthState.WaitCode, is AuthState.WaitPassword, is AuthState.Error -> {
+                    is AuthState.WaitPhoneNumber, is AuthState.WaitCode, is AuthState.WaitPassword, is AuthState.WaitPasswordRecoveryCode, is AuthState.Error -> {
                         if (currentScreen != Screen.SETTINGS && !telegramManager.isDemoMode) {
                             showLoginScreen(state)
                         }
@@ -920,7 +920,10 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
         val tvMode = view.findViewById<TextView>(R.id.tv_login_input_mode)
         etLoginInput = view.findViewById(R.id.et_login_input)
         val btnSubmit = view.findViewById<Button>(R.id.btn_login_submit)
+
         val btnRetry = view.findViewById<Button>(R.id.btn_retry_connection)
+        val btnForgotPassword = view.findViewById<Button>(R.id.btn_forgot_password)
+        val btnResetAccount = view.findViewById<Button>(R.id.btn_reset_account)
         val btnUseSim = view.findViewById<Button>(R.id.btn_use_sim_number)
         val btnDemo = view.findViewById<Button>(R.id.btn_demo_mode)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
@@ -933,9 +936,11 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
             showSymbolsDialog { symbol -> loginInputEngine?.insertSymbol(symbol) }
         }
 
-        btnRetry?.setOnClickListener {
+btnRetry?.setOnClickListener {
             telegramManager.retryConnection()
         }
+        btnForgotPassword?.visibility = View.GONE
+        btnResetAccount?.visibility = View.GONE
 
         when (state) {
             is AuthState.WaitPhoneNumber -> {
@@ -997,6 +1002,22 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
                 tvMode?.visibility = View.VISIBLE
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.LOWER)
                 btnUseSim?.visibility = View.GONE
+btnForgotPassword?.visibility = View.VISIBLE
+                btnResetAccount?.visibility = View.VISIBLE
+
+                btnSubmit.nextFocusDownId = R.id.btn_forgot_password
+                btnForgotPassword?.nextFocusUpId = R.id.btn_login_submit
+                btnForgotPassword?.nextFocusDownId = R.id.btn_reset_account
+                btnResetAccount?.nextFocusUpId = R.id.btn_forgot_password
+                btnResetAccount?.nextFocusDownId = R.id.btn_demo_mode
+                btnDemo.nextFocusUpId = R.id.btn_reset_account
+
+                btnForgotPassword?.setOnClickListener {
+                    telegramManager.requestPasswordRecovery()
+                }
+                btnResetAccount?.setOnClickListener {
+                    showAccountResetConfirmationDialog()
+                }
                 tvLabel.text = "2-Step Verification Password:"
                 etLoginInput?.hint = "Cloud Password"
                 btnSubmit.text = "Submit Password"
@@ -1006,7 +1027,40 @@ val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
                     tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
                     tvStatus.announceForAccessibility(errorMessage)
                 } else {
-                    tvStatus.text = if (state.hint.isNotBlank()) "Hint: ${state.hint}" else "Enter 2-Step Verification Password"
+                    val statusText = buildString {
+                        if (state.hint.isNotBlank()) append("Hint: ${state.hint}") else append("Enter 2-Step Verification Password")
+                        if (state.hasRecoveryEmailAddress && state.recoveryEmailAddressPattern.isNotBlank()) {
+                            append(" • Email: ${state.recoveryEmailAddressPattern}")
+                        }
+                    }
+                    tvStatus.text = statusText
+                    tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+                }
+            }
+            is AuthState.WaitPasswordRecoveryCode -> {
+                tvMode?.visibility = View.GONE
+                loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
+                btnUseSim?.visibility = View.GONE
+                btnForgotPassword?.visibility = View.GONE
+                btnResetAccount?.visibility = View.GONE
+
+                btnSubmit.nextFocusDownId = R.id.btn_demo_mode
+                btnDemo.nextFocusUpId = R.id.btn_login_submit
+
+                tvLabel.text = "Email Recovery Code (6 digits):"
+                etLoginInput?.hint = "123456"
+                etLoginInput?.setText("")
+                btnSubmit.text = "Submit Recovery Code"
+
+                if (state.errorMessage != null) {
+                    tvStatus.text = "⚠️ Error: ${state.errorMessage}"
+                    tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
+                } else {
+                    tvStatus.text = if (state.recoveryEmailPattern.isNotBlank()) {
+                        "Code sent to ${state.recoveryEmailPattern}"
+                    } else {
+                        "Enter code sent to recovery email"
+                    }
                     tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
                 }
             }
@@ -1041,6 +1095,7 @@ btnSubmit.nextFocusDownId = R.id.btn_demo_mode
                         is AuthState.WaitPhoneNumber -> telegramManager.sendPhoneNumber(text)
                         is AuthState.WaitCode -> telegramManager.checkCode(text)
                         is AuthState.WaitPassword -> telegramManager.checkPassword(text)
+                        is AuthState.WaitPasswordRecoveryCode -> telegramManager.recoverPassword(text)
                         else -> {
                             btnSubmit.isEnabled = true
                             progressLogin?.visibility = View.GONE
@@ -1156,6 +1211,20 @@ btnSubmit.nextFocusDownId = R.id.btn_demo_mode
 
         btnDemo.nextFocusDownId = R.id.btn_config_credentials
         btnConfig.nextFocusUpId = R.id.btn_demo_mode
+
+    private fun showAccountResetConfirmationDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Reset Account?")
+            .setMessage("Warning: Resetting your account will permanently delete your session and cloud messages for this account. This action cannot be undone. Are you sure you want to reset your account?")
+            .setPositiveButton("Reset Account") { dialog, _ ->
+                dialog.dismiss()
+                telegramManager.resetAccount()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+
     }
 
     private fun getDevicePhoneNumber(): String? {

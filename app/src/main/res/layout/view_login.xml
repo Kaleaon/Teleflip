@@ -128,6 +128,38 @@
             android:focusable="true"
             android:visibility="gone"
             android:nextFocusUp="@+id/btn_login_submit"
+            android:nextFocusDown="@+id/btn_forgot_password"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Forgot Password Button -->
+        <Button
+            android:id="@+id/btn_forgot_password"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:text="Forgot Password"
+            android:textColor="@color/tg_blue"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:visibility="gone"
+            android:nextFocusUp="@+id/btn_retry_connection"
+            android:nextFocusDown="@+id/btn_reset_account"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Reset Account Button -->
+        <Button
+            android:id="@+id/btn_reset_account"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:text="Reset Account"
+            android:textColor="@color/text_error"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:visibility="gone"
+            android:nextFocusUp="@+id/btn_forgot_password"
             android:nextFocusDown="@+id/btn_use_sim_number"
             android:layout_marginBottom="12dp" />
 
