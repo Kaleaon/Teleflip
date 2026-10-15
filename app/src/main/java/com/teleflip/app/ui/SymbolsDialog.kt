@@ -3,7 +3,6 @@ package com.teleflip.app.ui
 import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
-import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -27,6 +26,7 @@ class SymbolsDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_symbols)
+        setupDismissKeys()
 
         val rv = findViewById<RecyclerView>(R.id.rv_symbols_grid)
         rv?.layoutManager = GridLayoutManager(context, 4)
@@ -35,14 +35,6 @@ class SymbolsDialog(
         rv?.post {
             rv.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
         }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (SoftkeyUtils.isBackOrSoftRightKey(keyCode)) {
-            dismiss()
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
     }
 
     inner class SymbolAdapter : RecyclerView.Adapter<SymbolAdapter.SymbolViewHolder>() {
