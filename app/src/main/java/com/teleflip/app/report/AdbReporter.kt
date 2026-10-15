@@ -58,13 +58,6 @@ object AdbReporter {
         writeToFile("$logLine\n${throwable?.let { Log.getStackTraceString(it) } ?: ""}\n")
     }
 
-    fun reportWarning(component: String, message: String) {
-        val timestamp = dateFormat.format(Date())
-        val logLine = "[$timestamp] [WARN] [$component] $message"
-        Log.w(TAG, logLine)
-        writeToFile("$logLine\n")
-    }
-
     fun reportInfo(component: String, message: String) {
         val timestamp = dateFormat.format(Date())
         val logLine = "[$timestamp] [INFO] [$component] $message"
