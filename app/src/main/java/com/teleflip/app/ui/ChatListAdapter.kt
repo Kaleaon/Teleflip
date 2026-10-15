@@ -1,31 +1,30 @@
 package com.teleflip.app.ui
 
-import android.graphics.BitmapFactory
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import coil.dispose
+import coil.load
+import coil.transform.CircleCropTransformation
 import com.teleflip.app.R
 import com.teleflip.app.model.ChatModel
 import java.io.File
 
 class ChatListAdapter(
     private val onChatSelected: (ChatModel) -> Unit
-) : RecyclerView.Adapter<ChatListAdapter.ChatViewHolder>() {
+) : ListAdapter<ChatModel, ChatListAdapter.ChatViewHolder>(ChatDiffCallback()) {
 
-    private val items = mutableListOf<ChatModel>()
-
-    fun submitList(newItems: List<ChatModel>) {
-        items.clear()
-        items.addAll(newItems)
-        notifyDataSetChanged()
+    override fun submitList(newItems: List<ChatModel>?) {
+        super.submitList(if (newItems != null) ArrayList(newItems) else null)
     }
 
     fun getItemAt(position: Int): ChatModel? {
-        return if (position in 0 until items.size) items[position] else null
+        return if (position in 0 until currentList.size) getItem(position) else null
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
@@ -34,10 +33,13 @@ class ChatListAdapter(
     }
 
     override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
-        holder.bind(items[position], position)
+        holder.bind(getItem(position), position)
     }
 
-    override fun getItemCount(): Int = items.size
+    override fun onViewRecycled(holder: ChatViewHolder) {
+        super.onViewRecycled(holder)
+        holder.clearImage()
+    }
 
     inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvShortcut: TextView = itemView.findViewById(R.id.tv_shortcut_num)
@@ -59,22 +61,18 @@ class ChatListAdapter(
                 tvShortcut.visibility = View.INVISIBLE
             }
 
-            // Render photo avatar or fallback to colored letter initials
-            if (!chat.avatarPath.isNullOrEmpty() && File(chat.avatarPath).exists()) {
-                try {
-                    val bitmap = BitmapFactory.decodeFile(chat.avatarPath)
-                    if (bitmap != null) {
-                        val circularDrawable = RoundedBitmapDrawableFactory.create(itemView.resources, bitmap).apply {
-                            isCircular = true
+            // Render photo avatar using Coil with CircleCropTransformation or fallback to letter initials
+            if (!chat.avatarPath.isNullOrEmpty()) {
+                ivAvatar.visibility = View.VISIBLE
+                tvAvatar.visibility = View.GONE
+                ivAvatar.load(File(chat.avatarPath)) {
+                    crossfade(true)
+                    transformations(CircleCropTransformation())
+                    listener(
+                        onError = { _, _ ->
+                            showLetterFallback(chat)
                         }
-                        ivAvatar.setImageDrawable(circularDrawable)
-                        ivAvatar.visibility = View.VISIBLE
-                        tvAvatar.visibility = View.GONE
-                    } else {
-                        showLetterFallback(chat)
-                    }
-                } catch (e: Exception) {
-                    showLetterFallback(chat)
+                    )
                 }
             } else {
                 showLetterFallback(chat)
@@ -96,10 +94,25 @@ class ChatListAdapter(
             }
         }
 
+        fun clearImage() {
+            ivAvatar.dispose()
+        }
+
         private fun showLetterFallback(chat: ChatModel) {
+            ivAvatar.dispose()
             ivAvatar.visibility = View.GONE
             tvAvatar.visibility = View.VISIBLE
             tvAvatar.text = chat.avatarLetters
+        }
+    }
+
+    class ChatDiffCallback : DiffUtil.ItemCallback<ChatModel>() {
+        override fun areItemsTheSame(oldItem: ChatModel, newItem: ChatModel): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: ChatModel, newItem: ChatModel): Boolean {
+            return oldItem == newItem
         }
     }
 }
