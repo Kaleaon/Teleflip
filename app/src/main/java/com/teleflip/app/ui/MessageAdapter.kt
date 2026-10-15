@@ -1,6 +1,5 @@
 package com.teleflip.app.ui
 
-import android.graphics.BitmapFactory
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -9,7 +8,11 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import coil.dispose
+import coil.load
 import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
@@ -20,27 +23,32 @@ import java.util.Locale
 class MessageAdapter(
     private val onMessageFocused: ((MessageModel) -> Unit)? = null,
     private val onMessageAction: ((MessageModel) -> Unit)? = null
-) : RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
+) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
 
-    private val items = mutableListOf<MessageModel>()
     private var playingMessageId: Long? = null
     private var currentSpeed: Float = 1.0f
 
-    fun submitList(newItems: List<MessageModel>) {
-        items.clear()
-        items.addAll(newItems)
-        notifyDataSetChanged()
+    override fun submitList(newItems: List<MessageModel>?) {
+        super.submitList(if (newItems != null) ArrayList(newItems) else null)
     }
 
     fun setPlayingMessageId(id: Long?, speed: Float = currentSpeed) {
         playingMessageId = id
         currentSpeed = speed
-        notifyDataSetChanged()
+        if (currentList.isNotEmpty()) {
+            notifyItemRangeChanged(0, currentList.size)
+        }
     }
 
     fun setPlaybackSpeed(speed: Float) {
         currentSpeed = speed
-        notifyDataSetChanged()
+        if (currentList.isNotEmpty()) {
+            notifyItemRangeChanged(0, currentList.size)
+        }
+    }
+
+    fun getItemAt(position: Int): MessageModel? {
+        return if (position in 0 until currentList.size) getItem(position) else null
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
@@ -49,10 +57,13 @@ class MessageAdapter(
     }
 
     override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
-        holder.bind(items[position])
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount(): Int = items.size
+    override fun onViewRecycled(holder: MessageViewHolder) {
+        super.onViewRecycled(holder)
+        holder.clearImage()
+    }
 
     inner class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val rootLayout: LinearLayout = itemView.findViewById(R.id.layout_message_root)
@@ -124,20 +135,21 @@ class MessageAdapter(
                 }
             }
 
-            // Photo image display if downloaded
-            if (message.mediaType == MediaType.PHOTO && !message.mediaFilePath.isNullOrEmpty() && File(message.mediaFilePath).exists()) {
-                try {
-                    val bmp = BitmapFactory.decodeFile(message.mediaFilePath)
-                    if (bmp != null) {
-                        ivPhoto.setImageBitmap(bmp)
-                        ivPhoto.visibility = View.VISIBLE
-                    } else {
-                        ivPhoto.visibility = View.GONE
-                    }
-                } catch (e: Exception) {
-                    ivPhoto.visibility = View.GONE
+            // Photo image display using Coil with placeholder and error fallbacks
+            if (message.mediaType == MediaType.PHOTO && !message.mediaFilePath.isNullOrEmpty()) {
+                ivPhoto.visibility = View.VISIBLE
+                ivPhoto.load(File(message.mediaFilePath)) {
+                    crossfade(true)
+                    placeholder(R.drawable.bg_item_selector)
+                    error(R.drawable.bg_item_selector)
+                    listener(
+                        onError = { _, _ ->
+                            ivPhoto.visibility = View.GONE
+                        }
+                    )
                 }
             } else {
+                ivPhoto.dispose()
                 ivPhoto.visibility = View.GONE
             }
 
@@ -154,6 +166,20 @@ class MessageAdapter(
             itemView.setOnClickListener {
                 onMessageAction?.invoke(message)
             }
+        }
+
+        fun clearImage() {
+            ivPhoto.dispose()
+        }
+    }
+
+    class MessageDiffCallback : DiffUtil.ItemCallback<MessageModel>() {
+        override fun areItemsTheSame(oldItem: MessageModel, newItem: MessageModel): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: MessageModel, newItem: MessageModel): Boolean {
+            return oldItem == newItem
         }
     }
 }
