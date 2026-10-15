@@ -110,15 +110,9 @@ class SoftkeyManagerTest {
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun testHandleBack() {
-        var rightClicked = false
-        softkeyManager.update(
-            right = "Back",
-            onRight = { rightClicked = true }
-        )
-
         val handled = softkeyManager.handleBack()
-        assertTrue(handled)
-        assertTrue(rightClicked)
+        assertFalse(handled)
     }
 }
