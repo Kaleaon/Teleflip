@@ -22,7 +22,7 @@ class OptionsMenuDialog(
     context: Context,
     private val title: String,
     private val options: List<MenuOption>
-) : Dialog(context, R.style.Theme_TeleFlip) {
+) : BaseDialog(context) {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +41,10 @@ class OptionsMenuDialog(
         }
     }
 
+    override fun onBackPressed() {
+        dismiss()
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         // Direct number selection (1-9)
         if (keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9) {
@@ -52,7 +56,11 @@ class OptionsMenuDialog(
             }
         }
 
-
+        // Back or Soft Right closes menu
+        if (isBackOrRightSoftKey(keyCode)) {
+            dismiss()
+            return true
+        }
         return super.onKeyDown(keyCode, event)
     }
 

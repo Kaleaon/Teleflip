@@ -1,13 +1,21 @@
 package com.teleflip.app.ui
 
 import android.view.KeyEvent
+import android.view.View
 import android.widget.TextView
 
 class SoftkeyManager(
+    private val softkeyBar: View? = null,
     private val tvLeft: TextView,
     private val tvCenter: TextView,
     private val tvRight: TextView
 ) {
+    constructor(
+        tvLeft: TextView,
+        tvCenter: TextView,
+        tvRight: TextView
+    ) : this(null, tvLeft, tvCenter, tvRight)
+
     private var onLeftClick: (() -> Unit)? = null
     private var onCenterClick: (() -> Unit)? = null
     private var onRightClick: (() -> Unit)? = null
@@ -16,6 +24,10 @@ class SoftkeyManager(
         tvLeft.setOnClickListener { onLeftClick?.invoke() }
         tvCenter.setOnClickListener { onCenterClick?.invoke() }
         tvRight.setOnClickListener { onRightClick?.invoke() }
+    }
+
+    fun setSoftkeyBarVisible(visible: Boolean) {
+        softkeyBar?.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
     fun update(
@@ -77,11 +89,8 @@ class SoftkeyManager(
         return false
     }
 
+    @Deprecated("Back press is handled via OnBackPressedDispatcher, bypassing softkeys.")
     fun handleBack(): Boolean {
-        if (onRightClick != null) {
-            onRightClick?.invoke()
-            return true
-        }
         return false
     }
 }

@@ -3,6 +3,7 @@ package com.teleflip.app.ui
 import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,7 +15,7 @@ import com.teleflip.app.R
 class SymbolsDialog(
     context: Context,
     private val onSymbolSelected: (String) -> Unit
-) : Dialog(context, R.style.Theme_TeleFlip) {
+) : BaseDialog(context) {
 
     private val symbols = listOf(
         "?", "!", "@", "#", "$", "%", "&", "*",
@@ -35,6 +36,18 @@ class SymbolsDialog(
         rv?.post {
             rv.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
         }
+    }
+
+    override fun onBackPressed() {
+        dismiss()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (isBackOrRightSoftKey(keyCode)) {
+            dismiss()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     inner class SymbolAdapter : RecyclerView.Adapter<SymbolAdapter.SymbolViewHolder>() {

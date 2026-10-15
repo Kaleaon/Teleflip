@@ -3,12 +3,13 @@ package com.teleflip.app.ui
 import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
+import android.view.KeyEvent
 import android.widget.Button
 import android.widget.TextView
 import com.teleflip.app.R
 import com.teleflip.app.report.AdbReporter
 
-class DiagnosticsDialog(context: Context) : Dialog(context, R.style.Theme_TeleFlip) {
+class DiagnosticsDialog(context: Context) : BaseDialog(context) {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +27,18 @@ class DiagnosticsDialog(context: Context) : Dialog(context, R.style.Theme_TeleFl
         }
 
         btnClose?.requestFocus()
+    }
+
+    override fun onBackPressed() {
+        dismiss()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (isBackOrRightSoftKey(keyCode)) {
+            dismiss()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 }
 
