@@ -18,7 +18,6 @@ class PhoneFormatTest {
     fun testStripExceptNumbersWithoutPlus() {
         val input = "+1 (555) 123-4567"
         val expected = "15551234567"
-        assertEquals(expected, PhoneFormat.stripExceptNumbers(input))
         assertEquals(expected, PhoneFormat.stripExceptNumbers(input, false))
     }
 
@@ -31,6 +30,6 @@ class PhoneFormatTest {
 
     @Test
     fun testStripExceptNumbersNull() {
-        assertNull(PhoneFormat.stripExceptNumbers(null))
+        assertNull(PhoneFormat.stripExceptNumbers(null, false))
     }
 }
