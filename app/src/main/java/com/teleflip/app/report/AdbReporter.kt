@@ -81,10 +81,6 @@ object AdbReporter {
         writeLog("ERROR", component, message, throwable = throwable, bannerChar = '=')
     }
 
-    fun reportWarning(component: String, message: String) {
-        writeLog("WARN", component, message)
-    }
-
     fun reportInfo(component: String, message: String) {
         writeLog("INFO", component, message)
     }
