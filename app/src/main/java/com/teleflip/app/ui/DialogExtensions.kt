@@ -9,7 +9,7 @@ import android.view.KeyEvent
  */
 fun Dialog.setupDismissKeys() {
     setOnKeyListener { _, keyCode, event ->
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
+        if (SoftkeyUtils.isBackOrSoftRightKey(keyCode)) {
             if (event.action == KeyEvent.ACTION_DOWN) {
                 dismiss()
             }
