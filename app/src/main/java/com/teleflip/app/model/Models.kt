@@ -14,7 +14,8 @@ data class ChatModel(
     val avatarLetters: String,
     val isPinned: Boolean = false,
     val avatarPath: String? = null,
-    val avatarFileId: Int = 0
+    val avatarFileId: Int = 0,
+    val isPremium: Boolean = false
 )
 
 enum class MessageStatus {
@@ -39,5 +40,7 @@ data class MessageModel(
     val mediaFileId: Int = 0,
     val durationSeconds: Int = 0,
     val latitude: Double = 0.0,
-    val longitude: Double = 0.0
+    val longitude: Double = 0.0,
+    val stickerEmoji: String = "",
+    val isPremiumSticker: Boolean = false
 )

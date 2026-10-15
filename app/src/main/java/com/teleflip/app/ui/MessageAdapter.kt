@@ -104,7 +104,11 @@ class MessageAdapter(
                 }
                 MediaType.STICKER -> {
                     tvMedia.visibility = View.VISIBLE
-                    tvMedia.text = "🎨 [Sticker]"
+                    if (message.stickerEmoji.isNotBlank()) {
+                        tvMedia.text = "🎨 [Sticker ${message.stickerEmoji}]"
+                    } else {
+                        tvMedia.text = "🎨 [Sticker]"
+                    }
                 }
                 MediaType.VIDEO -> {
                     tvMedia.visibility = View.VISIBLE

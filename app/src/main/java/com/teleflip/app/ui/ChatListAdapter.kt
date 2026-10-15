@@ -44,6 +44,7 @@ class ChatListAdapter(
         private val ivAvatar: ImageView = itemView.findViewById(R.id.iv_avatar)
         private val tvAvatar: TextView = itemView.findViewById(R.id.tv_avatar)
         private val tvTitle: TextView = itemView.findViewById(R.id.tv_chat_title)
+        private val tvStarBadge: TextView = itemView.findViewById(R.id.tv_star_badge)
         private val tvTime: TextView = itemView.findViewById(R.id.tv_chat_time)
         private val tvLastMsg: TextView = itemView.findViewById(R.id.tv_last_message)
         private val tvUnread: TextView = itemView.findViewById(R.id.tv_unread_count)
@@ -79,6 +80,7 @@ class ChatListAdapter(
             }
 
             tvTitle.text = chat.title
+            tvStarBadge.visibility = if (chat.isPremium) View.VISIBLE else View.GONE
             tvTime.text = chat.time
             tvLastMsg.text = chat.lastMessage
 
