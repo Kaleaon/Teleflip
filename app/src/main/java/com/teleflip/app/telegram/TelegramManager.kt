@@ -64,7 +64,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     private val _messages = MutableStateFlow<Map<Long, List<MessageModel>>>(emptyMap())
     val messages: StateFlow<Map<Long, List<MessageModel>>> = _messages.asStateFlow()
 
-    val userSubscriberCache = java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
+    val subscriberCache = java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
+    val userSubscriberCache get() = subscriberCache
     val chatIdToUserId = java.util.concurrent.ConcurrentHashMap<Long, Long>()
 
     private var tdClient: Client? = null
@@ -223,8 +224,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         _authState.value = AuthState.Ready
 
         val demoChats = listOf(
-            ChatModel(1L, "Telegram News", "Welcome to TeleFlip on your flip phone!", "12:00", 1, ChatType.CHANNEL, "TN", true),
-            ChatModel(2L, "Alice Smith", "Hey, does your flip phone have Telegram now?", "12:35", 2, ChatType.DIRECT, "AS", isPremium = true),
+            ChatModel(1L, "Telegram News", "Welcome to TeleFlip on your flip phone!", "12:00", 1, ChatType.CHANNEL, "TN", isPinned = true, isPremium = true),
+            ChatModel(2L, "Alice Smith", "Check out this sticker!", "12:37", 2, ChatType.DIRECT, "AS", isPremium = true),
             ChatModel(3L, "Family Group", "Dinner tonight at 7 PM", "11:15", 0, ChatType.GROUP, "FG"),
             ChatModel(4L, "Tech & Gadgets", "Physical keypads are having a huge comeback!", "Yesterday", 0, ChatType.GROUP, "TG"),
             ChatModel(5L, "Bob Jones", "Sent photo of the classic phone", "Oct 14", 0, ChatType.DIRECT, "BJ")
@@ -238,7 +239,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         demoMessages[2L] = listOf(
             MessageModel(201L, 2L, "Alice Smith", "Hey, does your flip phone have Telegram now?", "12:35", false, MessageStatus.READ),
             MessageModel(202L, 2L, "Alice Smith", "How is typing with the 9-key keypad?", "12:36", false, MessageStatus.READ),
-            MessageModel(203L, 2L, "Alice Smith", "", "12:37", false, MessageStatus.READ, MediaType.STICKER, stickerEmoji = "🎉", isPremiumSticker = true)
+            MessageModel(203L, 2L, "Alice Smith", "Check out this sticker!", "12:37", false, MessageStatus.READ, mediaType = MediaType.STICKER, stickerEmoji = "🎉", isPremiumSticker = true)
         )
         demoMessages[3L] = listOf(
             MessageModel(301L, 3L, "Mom", "Don't forget family dinner tonight at 7!", "11:00", false, MessageStatus.READ),
@@ -885,6 +886,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 val file = obj as TdApi.File
                 handleFileUpdate(file)
             }
+            TdApi.UpdateUser.CONSTRUCTOR -> {
+                val updateUser = obj as TdApi.UpdateUser
+                handleUserUpdate(updateUser.user)
+            }
+            TdApi.User.CONSTRUCTOR -> {
+                val user = obj as TdApi.User
+                handleUserUpdate(user)
+            }
             TdApi.EmailAddressAuthenticationCodeInfo.CONSTRUCTOR -> {
                 isAuthQueryInProgress = false
                 val info = obj as TdApi.EmailAddressAuthenticationCodeInfo
@@ -1008,6 +1017,32 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     private val pendingChats = mutableMapOf<Long, ChatModel>()
     private var batchJob: Job? = null
 
+    fun handleUserUpdate(user: TdApi.User) {
+        subscriberCache[user.id] = user.isPremium
+
+        val currentList = _chats.value.toMutableList()
+        var updated = false
+        for (i in currentList.indices) {
+            val chat = currentList[i]
+            if (chat.chatType == ChatType.DIRECT && chat.id == user.id) {
+                if (chat.isPremium != user.isPremium) {
+                    currentList[i] = chat.copy(isPremium = user.isPremium)
+                    updated = true
+                }
+            }
+        }
+        if (updated) {
+            _chats.value = currentList
+        }
+
+        synchronized(pendingChats) {
+            val pendingModel = pendingChats[user.id]
+            if (pendingModel != null) {
+                pendingChats[user.id] = pendingModel.copy(isPremium = user.isPremium)
+            }
+        }
+    }
+
     private fun addOrUpdateChat(chat: TdApi.Chat) {
         val title = chat.title.ifBlank { "Chat #${chat.id}" }
         val lastMsg = chat.lastMessage
@@ -1024,7 +1059,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         if (chat.type.constructor == TdApi.ChatTypePrivate.CONSTRUCTOR) {
             val privateUserId = (chat.type as TdApi.ChatTypePrivate).userId
             chatIdToUserId[chat.id] = privateUserId
-            val cachedPremium = userSubscriberCache[privateUserId]
+            val cachedPremium = subscriberCache[privateUserId]
             if (cachedPremium != null) {
                 isPremium = cachedPremium
             } else {
@@ -1106,16 +1141,34 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    private fun extractStickerInfo(content: TdApi.MessageContent?): Pair<String, Boolean> {
+        if (content == null) return Pair("", false)
+        if (content.constructor == TdApi.MessageSticker.CONSTRUCTOR) {
+            val sticker = (content as TdApi.MessageSticker).sticker
+            if (sticker != null) {
+                val emoji = sticker.emoji ?: ""
+                val isPremium = try {
+                    val field = sticker.javaClass.getField("isPremium")
+                    field.getBoolean(sticker)
+                } catch (e: Throwable) {
+                    try {
+                        val fullTypeField = sticker.javaClass.getField("fullType")
+                        val fullTypeObj = fullTypeField.get(sticker)
+                        fullTypeObj != null && fullTypeObj.javaClass.simpleName.contains("Premium")
+                    } catch (ex: Throwable) {
+                        false
+                    }
+                }
+                return Pair(emoji, isPremium)
+            }
+        }
+        return Pair("", false)
+    }
+
     private fun handleIncomingMessage(msg: TdApi.Message) {
         val mediaType = extractMediaType(msg.content)
         val mediaInfo = extractMediaFileInfo(msg.content)
-        var stickerEmoji = ""
-        var isPremiumSticker = false
-        if (msg.content is TdApi.MessageSticker) {
-            val stickerMsg = msg.content as TdApi.MessageSticker
-            stickerEmoji = stickerMsg.sticker?.emoji ?: ""
-            isPremiumSticker = stickerMsg.isPremium
-        }
+        val stickerInfo = extractStickerInfo(msg.content)
         val model = MessageModel(
             id = msg.id,
             chatId = msg.chatId,
@@ -1128,8 +1181,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             mediaCaption = extractMediaCaption(msg.content),
             mediaFilePath = mediaInfo.second,
             mediaFileId = mediaInfo.first,
-            stickerEmoji = stickerEmoji,
-            isPremiumSticker = isPremiumSticker
+            stickerEmoji = stickerInfo.first,
+            isPremiumSticker = stickerInfo.second
         )
 
         appendMessage(msg.chatId, model)
@@ -1140,13 +1193,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val chatId = msgs.first().chatId
         val list = msgs.reversed().map { msg ->
             val mediaInfo = extractMediaFileInfo(msg.content)
-            var stickerEmoji = ""
-            var isPremiumSticker = false
-            if (msg.content is TdApi.MessageSticker) {
-                val stickerMsg = msg.content as TdApi.MessageSticker
-                stickerEmoji = stickerMsg.sticker?.emoji ?: ""
-                isPremiumSticker = stickerMsg.isPremium
-            }
+            val stickerInfo = extractStickerInfo(msg.content)
             MessageModel(
                 id = msg.id,
                 chatId = msg.chatId,
@@ -1159,8 +1206,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 mediaCaption = extractMediaCaption(msg.content),
                 mediaFilePath = mediaInfo.second,
                 mediaFileId = mediaInfo.first,
-                stickerEmoji = stickerEmoji,
-                isPremiumSticker = isPremiumSticker
+                stickerEmoji = stickerInfo.first,
+                isPremiumSticker = stickerInfo.second
             )
         }
         val currentMap = _messages.value.toMutableMap()
