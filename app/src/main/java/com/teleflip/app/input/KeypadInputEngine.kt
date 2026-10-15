@@ -3,6 +3,8 @@ package com.teleflip.app.input
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
+import android.view.View
+import android.view.accessibility.AccessibilityEvent
 import android.widget.EditText
 import android.widget.TextView
 
@@ -31,6 +33,7 @@ class KeypadInputEngine(
     private var lastKeyCode = -1
     private var charIndex = 0
     private var lastKeyTime = 0L
+    private var expectedSelection = -1
     private val timeoutMs = 900L
     private val handler = Handler(Looper.getMainLooper())
     private val commitRunnable = Runnable { commitCurrentChar() }
@@ -50,6 +53,38 @@ class KeypadInputEngine(
 
     init {
         updateModeIndicator()
+
+        val externalFocusListener = editText.onFocusChangeListener
+        editText.onFocusChangeListener = View.OnFocusChangeListener { v, hasFocus ->
+            if (!hasFocus) {
+                commitCurrentChar()
+            }
+            externalFocusListener?.onFocusChange(v, hasFocus)
+        }
+
+        editText.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) {}
+            override fun onViewDetachedFromWindow(v: View) {
+                commitCurrentChar()
+            }
+        })
+
+        val externalAccessibilityDelegate = editText.accessibilityDelegate
+        editText.accessibilityDelegate = object : View.AccessibilityDelegate() {
+            override fun sendAccessibilityEvent(host: View, eventType: Int) {
+                super.sendAccessibilityEvent(host, eventType)
+                externalAccessibilityDelegate?.sendAccessibilityEvent(host, eventType)
+                if (eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
+                    if (lastKeyCode != -1) {
+                        val curStart = editText.selectionStart
+                        val curEnd = editText.selectionEnd
+                        if (curStart != expectedSelection || curEnd != curStart) {
+                            commitCurrentChar()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun setMode(mode: InputMode) {
@@ -59,6 +94,19 @@ class KeypadInputEngine(
     }
 
     fun handleKeyEvent(keyCode: Int, event: KeyEvent): Boolean {
+        if (lastKeyCode != -1) {
+            val curStart = editText.selectionStart
+            val curEnd = editText.selectionEnd
+            if (curStart != expectedSelection || curEnd != curStart) {
+                commitCurrentChar()
+            }
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
+            keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            commitCurrentChar()
+        }
+
         val isHandledKey = keyCode in keyMap.keys ||
                            keyCode == KeyEvent.KEYCODE_STAR ||
                            keyCode == KeyEvent.KEYCODE_POUND ||
@@ -157,7 +205,19 @@ class KeypadInputEngine(
     fun commitCurrentChar() {
         lastKeyCode = -1
         charIndex = 0
+        expectedSelection = -1
         handler.removeCallbacks(commitRunnable)
+    }
+
+    private fun isSentenceBoundary(text: CharSequence, targetIndex: Int): Boolean {
+        if (targetIndex <= 0) return true
+        var idx = targetIndex - 1
+        while (idx >= 0 && text[idx] == ' ') {
+            idx--
+        }
+        if (idx < 0) return true
+        val c = text[idx]
+        return c == '.' || c == '?' || c == '!' || c == '\n'
     }
 
     private fun formatChar(charStr: String, isReplacement: Boolean): String {
@@ -165,16 +225,15 @@ class KeypadInputEngine(
             InputMode.UPPER -> charStr.uppercase()
             InputMode.LOWER -> charStr.lowercase()
             InputMode.CAP_FIRST -> {
-                val targetIndex = if (isReplacement) editText.selectionStart - 1 else editText.selectionStart
-                if (targetIndex <= 0) {
-                    charStr.uppercase()
-                } else {
-                    val prevChar = editText.text.getOrNull(targetIndex - 1)
-                    if (prevChar == ' ' || prevChar == '.' || prevChar == '\n' || prevChar == null) {
+                if (charIndex == 0) {
+                    val targetIndex = if (isReplacement) editText.selectionStart - 1 else editText.selectionStart
+                    if (isSentenceBoundary(editText.text, targetIndex)) {
                         charStr.uppercase()
                     } else {
                         charStr.lowercase()
                     }
+                } else {
+                    charStr.lowercase()
                 }
             }
             InputMode.NUMERIC -> charStr
@@ -184,13 +243,16 @@ class KeypadInputEngine(
     private fun insertString(str: String) {
         val start = Math.max(editText.selectionStart, 0)
         val end = Math.max(editText.selectionEnd, 0)
+        val newPos = Math.min(start, end) + str.length
+        expectedSelection = newPos
         editText.text.replace(Math.min(start, end), Math.max(start, end), str, 0, str.length)
-        editText.setSelection(Math.min(start, end) + str.length)
+        editText.setSelection(newPos)
     }
 
     private fun replaceLastChar(newChar: String) {
         val pos = editText.selectionStart
         if (pos > 0) {
+            expectedSelection = pos
             editText.text.replace(pos - 1, pos, newChar)
             editText.setSelection(pos)
         } else {

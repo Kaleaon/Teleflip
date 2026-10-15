@@ -191,10 +191,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun commitActiveInputEngines() {
+        composeInputEngine?.commitCurrentChar()
+        loginInputEngine?.commitCurrentChar()
+    }
+
     // =========================================================================
     // SCREEN 1: CHAT LIST
     // =========================================================================
     private fun showChatListScreen() {
+        commitActiveInputEngines()
         currentScreen = Screen.CHAT_LIST
         activeChat = null
         voicePlayer.stop()
@@ -308,6 +314,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showChatListOptionsMenu() {
+        commitActiveInputEngines()
         val options = listOf(
             MenuOption(1, "New Chat / Contact") {
                 showToast("Enter username or number to start chat")
@@ -337,6 +344,7 @@ class MainActivity : AppCompatActivity() {
     // SCREEN 2: CONVERSATION / CHAT
     // =========================================================================
     private fun openConversation(chat: ChatModel) {
+        commitActiveInputEngines()
         activeChat = chat
         currentScreen = Screen.CONVERSATION
         mainContainer.removeAllViews()
@@ -453,6 +461,8 @@ class MainActivity : AppCompatActivity() {
                     onCenter = { doSend() },
                     onRight = { showChatListScreen() }
                 )
+            } else if (!hasFocus) {
+                composeInputEngine?.commitCurrentChar()
             }
         }
 
@@ -676,6 +686,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAttachMenu(chat: ChatModel) {
+        commitActiveInputEngines()
         val options = listOf(
             MenuOption(1, "🎤 Record Voice Message (Push-to-Talk)") {
                 startVoiceRecordingFlow(chat)
@@ -697,6 +708,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMessageOptionsMenu(msg: MessageModel) {
+        commitActiveInputEngines()
         val options = mutableListOf<MenuOption>()
         options.add(MenuOption(1, "Copy Text") {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -749,6 +761,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showQuickRepliesMenu(chat: ChatModel) {
+        commitActiveInputEngines()
         val quicks = listOf(
             "OK! 👍", "On my way! 🚗", "Call you in a few minutes.",
             "Sounds good!", "Can't talk right now, will reply later.",
@@ -763,6 +776,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSymbolsDialog(onSelected: (String) -> Unit) {
+        commitActiveInputEngines()
         SymbolsDialog(this, onSelected).show()
     }
 
@@ -770,6 +784,7 @@ class MainActivity : AppCompatActivity() {
     // SCREEN 3: LOGIN
     // =========================================================================
     private fun showLoginScreen(state: AuthState) {
+        commitActiveInputEngines()
         currentScreen = Screen.LOGIN
         mainContainer.removeAllViews()
 
@@ -964,6 +979,7 @@ class MainActivity : AppCompatActivity() {
     // SCREEN 4: SETTINGS & CONFIGURATION
     // =========================================================================
     private fun showSettingsScreen() {
+        commitActiveInputEngines()
         currentScreen = Screen.SETTINGS
         mainContainer.removeAllViews()
 
