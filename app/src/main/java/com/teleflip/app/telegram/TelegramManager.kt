@@ -842,12 +842,28 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     // =========================================================================
     fun sendTypingAction(chatId: Long) {
         if (isDemoMode) return
-        tdClient?.send(TdApi.SendChatAction(chatId, 0, TdApi.ChatActionTyping()), this)
+        try {
+            val req = TdApi.SendChatAction().apply {
+                this.chatId = chatId
+                this.action = TdApi.ChatActionTyping()
+            }
+            tdClient?.send(req, this)
+        } catch (e: Exception) {
+            Log.w(tag, "sendTypingAction failed: ${e.message}")
+        }
     }
 
     fun cancelTypingAction(chatId: Long) {
         if (isDemoMode) return
-        tdClient?.send(TdApi.SendChatAction(chatId, 0, TdApi.ChatActionCancel()), this)
+        try {
+            val req = TdApi.SendChatAction().apply {
+                this.chatId = chatId
+                this.action = TdApi.ChatActionCancel()
+            }
+            tdClient?.send(req, this)
+        } catch (e: Exception) {
+            Log.w(tag, "cancelTypingAction failed: ${e.message}")
+        }
     }
 
     // =========================================================================
@@ -866,7 +882,11 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     fun clickSponsoredMessage(chatId: Long, messageId: Long) {
         if (isDemoMode) return
         try {
-            tdClient?.send(TdApi.ClickChatSponsoredMessage(chatId, messageId), this)
+            val req = TdApi.ClickChatSponsoredMessage().apply {
+                this.chatId = chatId
+                this.messageId = messageId
+            }
+            tdClient?.send(req, this)
         } catch (e: Exception) {
             Log.w(tag, "Click sponsored message failed: ${e.message}")
         }
