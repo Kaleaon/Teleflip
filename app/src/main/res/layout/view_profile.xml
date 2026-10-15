@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Top Profile Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <FrameLayout
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginBottom="10dp">
+
+                <ImageView
+                    android:id="@+id/iv_profile_avatar"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_teleflip_logo"
+                    android:contentDescription="Profile Picture" />
+
+                <TextView
+                    android:id="@+id/tv_profile_avatar"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:gravity="center"
+                    android:textColor="@color/text_primary"
+                    android:textSize="26sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tv_profile_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Contact Name"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:gravity="center" />
+
+                <TextView
+                    android:id="@+id/tv_profile_premium"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=" ★"
+                    android:textColor="@color/tg_blue"
+                    android:textSize="16sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_profile_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="online"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <!-- Information Sections (Focusable Items for Flip Navigation) -->
+        <LinearLayout
+            android:id="@+id/layout_profile_phone_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_item_selector"
+            android:padding="10dp"
+            android:focusable="true"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Phone Number"
+                android:textColor="@color/tg_blue"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_profile_phone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+1 234 567 890"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_profile_username_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_item_selector"
+            android:padding="10dp"
+            android:focusable="true"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Username"
+                android:textColor="@color/tg_blue"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_profile_username"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@username"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_profile_bio_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_item_selector"
+            android:padding="10dp"
+            android:focusable="true"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:id="@+id/tv_profile_bio_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Bio / Description"
+                android:textColor="@color/tg_blue"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_profile_bio"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No bio provided."
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <!-- Actions Divider -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Actions"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_profile_tg_call"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="📞 Call via Telegram"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_profile_cell_call"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="📱 Call Cellular Phone"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_profile_send_msg"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="💬 Open Conversation"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_profile_toggle_mute"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="🔔 Notifications: Sound"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_profile_search"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="🔍 Search Messages"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="12dp" />
+
+    </LinearLayout>
+</ScrollView>

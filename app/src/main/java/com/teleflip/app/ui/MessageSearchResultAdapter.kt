@@ -9,9 +9,8 @@ import com.teleflip.app.R
 import com.teleflip.app.model.MessageSearchResult
 
 class MessageSearchResultAdapter(
-    private val onItemClick: (MessageSearchResult) -> Unit
+    private val onItemClick: (MessageSearchResult) -> Unit,
 ) : RecyclerView.Adapter<MessageSearchResultAdapter.ViewHolder>() {
-
     private val items = mutableListOf<MessageSearchResult>()
 
     fun submitList(newItems: List<MessageSearchResult>) {
@@ -30,12 +29,18 @@ class MessageSearchResultAdapter(
         return items.getOrNull(position)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.view_search_message_item, parent, false)
         return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: ViewHolder,
+        position: Int,
+    ) {
         val item = items[position]
         holder.bind(item)
     }
@@ -48,11 +53,12 @@ class MessageSearchResultAdapter(
         private val tvSnippet: TextView = itemView.findViewById(R.id.tv_search_message_snippet)
 
         fun bind(item: MessageSearchResult) {
-            val titleText = if (item.senderName.isNotBlank() && item.senderName != "You" && item.senderName != "Contact") {
-                "${item.chatTitle} (${item.senderName})"
-            } else {
-                item.chatTitle
-            }
+            val titleText =
+                if (item.senderName.isNotBlank() && item.senderName != "You" && item.senderName != "Contact") {
+                    "${item.chatTitle} (${item.senderName})"
+                } else {
+                    item.chatTitle
+                }
             tvTitle.text = titleText
             tvTime.text = item.time
             tvSnippet.text = item.text

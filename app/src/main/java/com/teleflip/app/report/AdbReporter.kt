@@ -27,9 +27,10 @@ object AdbReporter {
     private val fileLock = Any()
     private var writer: BufferedWriter? = null
 
-    private val workerExecutor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "AdbReporter-Worker").apply { isDaemon = true }
-    }
+    private val workerExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "AdbReporter-Worker").apply { isDaemon = true }
+        }
     private val workerScope = CoroutineScope(workerExecutor.asCoroutineDispatcher() + SupervisorJob())
 
     init {
@@ -67,10 +68,15 @@ object AdbReporter {
         }
     }
 
-    private fun formatLogLine(level: String, component: String, message: String): String {
-        val timestamp = synchronized(dateFormat) {
-            dateFormat.format(Date())
-        }
+    private fun formatLogLine(
+        level: String,
+        component: String,
+        message: String,
+    ): String {
+        val timestamp =
+            synchronized(dateFormat) {
+                dateFormat.format(Date())
+            }
         return "[$timestamp] [$level] [$component] $message"
     }
 
@@ -80,7 +86,7 @@ object AdbReporter {
         message: String,
         throwable: Throwable? = null,
         bannerChar: Char? = null,
-        syncFlush: Boolean = false
+        syncFlush: Boolean = false,
     ) {
         val logLine = formatLogLine(level, component, message)
 
@@ -100,18 +106,23 @@ object AdbReporter {
             }
         }
 
-        val fileContent = if (throwable != null) {
-            val stackTrace = getStackTraceString(throwable)
-            if (stackTrace.isNotEmpty()) "$logLine\n$stackTrace\n" else "$logLine\n"
-        } else {
-            "$logLine\n"
-        }
+        val fileContent =
+            if (throwable != null) {
+                val stackTrace = getStackTraceString(throwable)
+                if (stackTrace.isNotEmpty()) "$logLine\n$stackTrace\n" else "$logLine\n"
+            } else {
+                "$logLine\n"
+            }
         writeToFile(fileContent, syncFlush = syncFlush)
     }
 
     @JvmStatic
     @JvmOverloads
-    fun reportPopup(source: String, message: String, isError: Boolean = false) {
+    fun reportPopup(
+        source: String,
+        message: String,
+        isError: Boolean = false,
+    ) {
         val level = if (isError) "ERROR_POPUP" else "INFO_POPUP"
         val bannerChar = if (isError) '-' else null
         writeLog(level, source, message, bannerChar = bannerChar, syncFlush = isError)
@@ -119,22 +130,35 @@ object AdbReporter {
 
     @JvmStatic
     @JvmOverloads
-    fun reportError(component: String, message: String, throwable: Throwable? = null) {
+    fun reportError(
+        component: String,
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         writeLog("ERROR", component, message, throwable = throwable, bannerChar = '=', syncFlush = true)
     }
 
     @JvmStatic
-    fun reportWarning(component: String, message: String) {
+    fun reportWarning(
+        component: String,
+        message: String,
+    ) {
         writeLog("WARN", component, message)
     }
 
     @JvmStatic
-    fun reportInfo(component: String, message: String) {
+    fun reportInfo(
+        component: String,
+        message: String,
+    ) {
         writeLog("INFO", component, message)
     }
 
     @JvmStatic
-    fun reportCrash(contextInfo: String, throwable: Throwable) {
+    fun reportCrash(
+        contextInfo: String,
+        throwable: Throwable,
+    ) {
         writeLog("FATAL CRASH", contextInfo, throwable.message ?: "null", throwable = throwable, bannerChar = '!', syncFlush = true)
     }
 
@@ -171,7 +195,10 @@ object AdbReporter {
         }
     }
 
-    private fun writeToFile(text: String, syncFlush: Boolean = false) {
+    private fun writeToFile(
+        text: String,
+        syncFlush: Boolean = false,
+    ) {
         if (syncFlush) {
             flushSync(text)
         } else {
@@ -236,16 +263,18 @@ object AdbReporter {
     private fun closeWriterQuietly() {
         try {
             writer?.close()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         writer = null
     }
 
     private fun getStackTraceString(throwable: Throwable): String {
-        val str: String? = try {
-            Log.getStackTraceString(throwable)
-        } catch (_: Throwable) {
-            null
-        }
+        val str: String? =
+            try {
+                Log.getStackTraceString(throwable)
+            } catch (_: Throwable) {
+                null
+            }
         return if (!str.isNullOrEmpty()) str else throwable.stackTraceToString()
     }
 }

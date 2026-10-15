@@ -8,16 +8,12 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import coil.dispose
-import coil.load
-import coil.transform.CircleCropTransformation
 import com.teleflip.app.R
 import com.teleflip.app.model.ChatModel
 
 class ChatListAdapter(
-    private val onChatSelected: (ChatModel) -> Unit
+    private val onChatSelected: (ChatModel) -> Unit,
 ) : ListAdapter<ChatModel, ChatListAdapter.ChatViewHolder>(ChatDiffCallback()) {
-
     override fun submitList(newItems: List<ChatModel>?) {
         super.submitList(if (newItems != null) ArrayList(newItems) else null)
     }
@@ -26,12 +22,18 @@ class ChatListAdapter(
         return if (position in 0 until currentList.size) getItem(position) else null
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): ChatViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.view_chat_item, parent, false)
         return ChatViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: ChatViewHolder,
+        position: Int,
+    ) {
         holder.bind(getItem(position), position)
     }
 
@@ -50,7 +52,10 @@ class ChatListAdapter(
         private val tvLastMsg: TextView = itemView.findViewById(R.id.tv_last_message)
         private val tvUnread: TextView = itemView.findViewById(R.id.tv_unread_count)
 
-        fun bind(chat: ChatModel, position: Int) {
+        fun bind(
+            chat: ChatModel,
+            position: Int,
+        ) {
             ivAvatar.contentDescription = ContentDescriptionFormatter.getAvatarDescription(itemView.context, chat.title)
 
             // Keypad shortcut 1-9
@@ -87,11 +92,17 @@ class ChatListAdapter(
     }
 
     class ChatDiffCallback : DiffUtil.ItemCallback<ChatModel>() {
-        override fun areItemsTheSame(oldItem: ChatModel, newItem: ChatModel): Boolean {
+        override fun areItemsTheSame(
+            oldItem: ChatModel,
+            newItem: ChatModel,
+        ): Boolean {
             return oldItem.id == newItem.id
         }
 
-        override fun areContentsTheSame(oldItem: ChatModel, newItem: ChatModel): Boolean {
+        override fun areContentsTheSame(
+            oldItem: ChatModel,
+            newItem: ChatModel,
+        ): Boolean {
             return oldItem == newItem
         }
     }

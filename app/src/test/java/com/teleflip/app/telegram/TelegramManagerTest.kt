@@ -11,12 +11,11 @@ import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.eq
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 
 class TelegramManagerTest {
-
     private lateinit var mockContext: Context
     private lateinit var mockPrefs: SharedPreferences
     private lateinit var mockEditor: SharedPreferences.Editor
@@ -78,7 +77,10 @@ class TelegramManagerTest {
         val authState = manager.authState.value
         assertTrue("Auth state should be WaitPhoneNumber with error message", authState is AuthState.WaitPhoneNumber)
         val waitPhoneState = authState as AuthState.WaitPhoneNumber
-        assertTrue("Error message should inform user that client is unavailable", waitPhoneState.errorMessage?.contains("unavailable") == true)
+        assertTrue(
+            "Error message should inform user that client is unavailable",
+            waitPhoneState.errorMessage?.contains("unavailable") == true,
+        )
     }
 
     @Test

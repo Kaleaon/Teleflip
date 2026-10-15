@@ -1,6 +1,5 @@
 package com.teleflip.app.ui
 
-import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
 import android.view.KeyEvent
@@ -15,15 +14,14 @@ import com.teleflip.app.R
 data class MenuOption(
     val id: Int,
     val title: String,
-    val action: () -> Unit
+    val action: () -> Unit,
 )
 
 class OptionsMenuDialog(
     context: Context,
     private val title: String,
-    private val options: List<MenuOption>
+    private val options: List<MenuOption>,
 ) : BaseDialog(context) {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_options_menu)
@@ -45,7 +43,10 @@ class OptionsMenuDialog(
         dismiss()
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         // Direct number selection (1-9)
         if (keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9) {
             val index = keyCode - KeyEvent.KEYCODE_1
@@ -65,12 +66,18 @@ class OptionsMenuDialog(
     }
 
     inner class MenuAdapter : RecyclerView.Adapter<MenuAdapter.OptionViewHolder>() {
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): OptionViewHolder {
+        override fun onCreateViewHolder(
+            parent: ViewGroup,
+            viewType: Int,
+        ): OptionViewHolder {
             val view = LayoutInflater.from(parent.context).inflate(R.layout.dialog_option_item, parent, false)
             return OptionViewHolder(view)
         }
 
-        override fun onBindViewHolder(holder: OptionViewHolder, position: Int) {
+        override fun onBindViewHolder(
+            holder: OptionViewHolder,
+            position: Int,
+        ) {
             val opt = options[position]
             holder.tvShortcut.text = "${position + 1}."
             holder.tvLabel.text = opt.title

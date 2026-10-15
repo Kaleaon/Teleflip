@@ -15,18 +15,18 @@ import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.model.ChatModel
-import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.telegram.TelegramManager
 
 class SearchDialog(
     context: Context,
     private val telegramManager: TelegramManager,
     private val onChatSelected: (ChatModel) -> Unit,
-    private val onMessageSelected: (chatId: Long, messageId: Long) -> Unit
+    private val onMessageSelected: (chatId: Long, messageId: Long) -> Unit,
 ) : Dialog(context, R.style.Theme_TeleFlip) {
-
     enum class SearchTab {
-        CHATS, CONTACTS, MESSAGES
+        CHATS,
+        CONTACTS,
+        MESSAGES,
     }
 
     private var currentTab: SearchTab = SearchTab.CHATS
@@ -57,7 +57,7 @@ class SearchDialog(
 
         window?.setLayout(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
         )
 
         etSearchInput = findViewById(R.id.et_search_input)
@@ -70,25 +70,28 @@ class SearchDialog(
         tvEmptyTitle = findViewById(R.id.tv_search_empty_title)
         progressBar = findViewById(R.id.progress_search)
 
-        keypadEngine = KeypadInputEngine(
-            editText = etSearchInput,
-            modeIndicator = tvInputMode,
-            onSymbolRequested = {
-                SymbolsDialog(context) { sym -> keypadEngine?.insertSymbol(sym) }.show()
-            }
-        )
+        keypadEngine =
+            KeypadInputEngine(
+                editText = etSearchInput,
+                modeIndicator = tvInputMode,
+                onSymbolRequested = {
+                    SymbolsDialog(context) { sym -> keypadEngine?.insertSymbol(sym) }.show()
+                },
+            )
 
         rvResults.layoutManager = LinearLayoutManager(context)
 
-        chatAdapter = ChatListAdapter { chat ->
-            dismiss()
-            onChatSelected(chat)
-        }
+        chatAdapter =
+            ChatListAdapter { chat ->
+                dismiss()
+                onChatSelected(chat)
+            }
 
-        messageSearchAdapter = MessageSearchResultAdapter { result ->
-            dismiss()
-            onMessageSelected(result.chatId, result.messageId)
-        }
+        messageSearchAdapter =
+            MessageSearchResultAdapter { result ->
+                dismiss()
+                onMessageSelected(result.chatId, result.messageId)
+            }
 
         setupTabs()
         setupSearchInput()
@@ -124,36 +127,56 @@ class SearchDialog(
     }
 
     private fun setupSearchInput() {
-        etSearchInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val text = s?.toString() ?: ""
-                if (text != currentQuery) {
-                    currentQuery = text
-                    performSearch(text)
+        etSearchInput.addTextChangedListener(
+            object : TextWatcher {
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int,
+                ) {}
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int,
+                ) {
+                    val text = s?.toString() ?: ""
+                    if (text != currentQuery) {
+                        currentQuery = text
+                        performSearch(text)
+                    }
                 }
-            }
-            override fun afterTextChanged(s: Editable?) {}
-        })
+
+                override fun afterTextChanged(s: Editable?) {}
+            },
+        )
     }
 
     private fun setupPagination() {
-        rvResults.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (dy > 0 && currentTab == SearchTab.MESSAGES) {
-                    val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
-                    val visibleItemCount = lm.childCount
-                    val totalItemCount = lm.itemCount
-                    val firstVisibleItem = lm.findFirstVisibleItemPosition()
+        rvResults.addOnScrollListener(
+            object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(
+                    recyclerView: RecyclerView,
+                    dx: Int,
+                    dy: Int,
+                ) {
+                    if (dy > 0 && currentTab == SearchTab.MESSAGES) {
+                        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                        val visibleItemCount = lm.childCount
+                        val totalItemCount = lm.itemCount
+                        val firstVisibleItem = lm.findFirstVisibleItemPosition()
 
-                    if (!isMessageLoading && messageNextOffset.isNotEmpty() && totalItemCount < maxResultsLimit) {
-                        if (visibleItemCount + firstVisibleItem >= totalItemCount - 2) {
-                            loadMoreMessageResults()
+                        if (!isMessageLoading && messageNextOffset.isNotEmpty() && totalItemCount < maxResultsLimit) {
+                            if (visibleItemCount + firstVisibleItem >= totalItemCount - 2) {
+                                loadMoreMessageResults()
+                            }
                         }
                     }
                 }
-            }
-        })
+            },
+        )
     }
 
     private fun performSearch(query: String) {
@@ -234,7 +257,10 @@ class SearchDialog(
         }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
             dismiss()
             return true
@@ -258,10 +284,11 @@ class SearchDialog(
             return true
         }
 
-        val isInputKey = (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
-                         keyCode == KeyEvent.KEYCODE_STAR ||
-                         keyCode == KeyEvent.KEYCODE_POUND ||
-                         keyCode == KeyEvent.KEYCODE_DEL
+        val isInputKey =
+            (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                keyCode == KeyEvent.KEYCODE_STAR ||
+                keyCode == KeyEvent.KEYCODE_POUND ||
+                keyCode == KeyEvent.KEYCODE_DEL
         if (isInputKey && etSearchInput.hasFocus()) {
             if (keypadEngine?.handleKeyEvent(keyCode, event) == true) {
                 return true

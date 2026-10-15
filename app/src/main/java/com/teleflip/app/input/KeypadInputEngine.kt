@@ -12,21 +12,23 @@ enum class InputMode(val label: String) {
     CAP_FIRST("Abc"),
     LOWER("abc"),
     UPPER("ABC"),
-    NUMERIC("123");
+    NUMERIC("123"),
+    ;
 
-    fun next(): InputMode = when (this) {
-        CAP_FIRST -> LOWER
-        LOWER -> UPPER
-        UPPER -> NUMERIC
-        NUMERIC -> CAP_FIRST
-    }
+    fun next(): InputMode =
+        when (this) {
+            CAP_FIRST -> LOWER
+            LOWER -> UPPER
+            UPPER -> NUMERIC
+            NUMERIC -> CAP_FIRST
+        }
 }
 
 class KeypadInputEngine(
     private val editText: EditText,
     private val modeIndicator: TextView? = null,
     var timeoutMs: Long = 500L,
-    private val onSymbolRequested: (() -> Unit)? = null
+    private val onSymbolRequested: (() -> Unit)? = null,
 ) {
     var currentMode = InputMode.CAP_FIRST
         private set
@@ -38,53 +40,62 @@ class KeypadInputEngine(
     private val handler = Handler(Looper.getMainLooper())
     private val commitRunnable = Runnable { commitCurrentChar() }
 
-    private val keyMap = mapOf(
-        KeyEvent.KEYCODE_1 to listOf(".", ",", "?", "!", "@", "-", "_", "/", ":", ";", "'", "\"", "+", "=", "1"),
-        KeyEvent.KEYCODE_2 to listOf("a", "b", "c", "2"),
-        KeyEvent.KEYCODE_3 to listOf("d", "e", "f", "3"),
-        KeyEvent.KEYCODE_4 to listOf("g", "h", "i", "4"),
-        KeyEvent.KEYCODE_5 to listOf("j", "k", "l", "5"),
-        KeyEvent.KEYCODE_6 to listOf("m", "n", "o", "6"),
-        KeyEvent.KEYCODE_7 to listOf("p", "q", "r", "s", "7"),
-        KeyEvent.KEYCODE_8 to listOf("t", "u", "v", "8"),
-        KeyEvent.KEYCODE_9 to listOf("w", "x", "y", "z", "9"),
-        KeyEvent.KEYCODE_0 to listOf(" ", "0", "+")
-    )
+    private val keyMap =
+        mapOf(
+            KeyEvent.KEYCODE_1 to listOf(".", ",", "?", "!", "@", "-", "_", "/", ":", ";", "'", "\"", "+", "=", "1"),
+            KeyEvent.KEYCODE_2 to listOf("a", "b", "c", "2"),
+            KeyEvent.KEYCODE_3 to listOf("d", "e", "f", "3"),
+            KeyEvent.KEYCODE_4 to listOf("g", "h", "i", "4"),
+            KeyEvent.KEYCODE_5 to listOf("j", "k", "l", "5"),
+            KeyEvent.KEYCODE_6 to listOf("m", "n", "o", "6"),
+            KeyEvent.KEYCODE_7 to listOf("p", "q", "r", "s", "7"),
+            KeyEvent.KEYCODE_8 to listOf("t", "u", "v", "8"),
+            KeyEvent.KEYCODE_9 to listOf("w", "x", "y", "z", "9"),
+            KeyEvent.KEYCODE_0 to listOf(" ", "0", "+"),
+        )
 
     init {
         updateModeIndicator()
 
         val externalFocusListener = editText.onFocusChangeListener
-        editText.onFocusChangeListener = View.OnFocusChangeListener { v, hasFocus ->
-            if (!hasFocus) {
-                commitCurrentChar()
+        editText.onFocusChangeListener =
+            View.OnFocusChangeListener { v, hasFocus ->
+                if (!hasFocus) {
+                    commitCurrentChar()
+                }
+                externalFocusListener?.onFocusChange(v, hasFocus)
             }
-            externalFocusListener?.onFocusChange(v, hasFocus)
-        }
 
-        editText.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-            override fun onViewAttachedToWindow(v: View) {}
-            override fun onViewDetachedFromWindow(v: View) {
-                commitCurrentChar()
-            }
-        })
+        editText.addOnAttachStateChangeListener(
+            object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {}
+
+                override fun onViewDetachedFromWindow(v: View) {
+                    commitCurrentChar()
+                }
+            },
+        )
 
         val externalAccessibilityDelegate = editText.accessibilityDelegate
-        editText.accessibilityDelegate = object : View.AccessibilityDelegate() {
-            override fun sendAccessibilityEvent(host: View, eventType: Int) {
-                super.sendAccessibilityEvent(host, eventType)
-                externalAccessibilityDelegate?.sendAccessibilityEvent(host, eventType)
-                if (eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
-                    if (lastKeyCode != -1) {
-                        val curStart = editText.selectionStart
-                        val curEnd = editText.selectionEnd
-                        if (curStart != expectedSelection || curEnd != curStart) {
-                            commitCurrentChar()
+        editText.accessibilityDelegate =
+            object : View.AccessibilityDelegate() {
+                override fun sendAccessibilityEvent(
+                    host: View,
+                    eventType: Int,
+                ) {
+                    super.sendAccessibilityEvent(host, eventType)
+                    externalAccessibilityDelegate?.sendAccessibilityEvent(host, eventType)
+                    if (eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
+                        if (lastKeyCode != -1) {
+                            val curStart = editText.selectionStart
+                            val curEnd = editText.selectionEnd
+                            if (curStart != expectedSelection || curEnd != curStart) {
+                                commitCurrentChar()
+                            }
                         }
                     }
                 }
             }
-        }
     }
 
     fun setMode(mode: InputMode) {
@@ -93,7 +104,10 @@ class KeypadInputEngine(
         updateModeIndicator()
     }
 
-    fun handleKeyEvent(keyCode: Int, event: KeyEvent): Boolean {
+    fun handleKeyEvent(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (lastKeyCode != -1) {
             val curStart = editText.selectionStart
             val curEnd = editText.selectionEnd
@@ -103,15 +117,17 @@ class KeypadInputEngine(
         }
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
-            keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+        ) {
             commitCurrentChar()
         }
 
-        val isHandledKey = keyCode in keyMap.keys ||
-                           keyCode == KeyEvent.KEYCODE_STAR ||
-                           keyCode == KeyEvent.KEYCODE_POUND ||
-                           keyCode == KeyEvent.KEYCODE_DEL ||
-                           keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+        val isHandledKey =
+            keyCode in keyMap.keys ||
+                keyCode == KeyEvent.KEYCODE_STAR ||
+                keyCode == KeyEvent.KEYCODE_POUND ||
+                keyCode == KeyEvent.KEYCODE_DEL ||
+                keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
 
         if (!isHandledKey) return false
 
@@ -163,19 +179,20 @@ class KeypadInputEngine(
         // Multi-tap for 0-9
         if (keyCode in keyMap.keys) {
             if (currentMode == InputMode.NUMERIC) {
-                val numChar = when (keyCode) {
-                    KeyEvent.KEYCODE_0 -> "0"
-                    KeyEvent.KEYCODE_1 -> "1"
-                    KeyEvent.KEYCODE_2 -> "2"
-                    KeyEvent.KEYCODE_3 -> "3"
-                    KeyEvent.KEYCODE_4 -> "4"
-                    KeyEvent.KEYCODE_5 -> "5"
-                    KeyEvent.KEYCODE_6 -> "6"
-                    KeyEvent.KEYCODE_7 -> "7"
-                    KeyEvent.KEYCODE_8 -> "8"
-                    KeyEvent.KEYCODE_9 -> "9"
-                    else -> ""
-                }
+                val numChar =
+                    when (keyCode) {
+                        KeyEvent.KEYCODE_0 -> "0"
+                        KeyEvent.KEYCODE_1 -> "1"
+                        KeyEvent.KEYCODE_2 -> "2"
+                        KeyEvent.KEYCODE_3 -> "3"
+                        KeyEvent.KEYCODE_4 -> "4"
+                        KeyEvent.KEYCODE_5 -> "5"
+                        KeyEvent.KEYCODE_6 -> "6"
+                        KeyEvent.KEYCODE_7 -> "7"
+                        KeyEvent.KEYCODE_8 -> "8"
+                        KeyEvent.KEYCODE_9 -> "9"
+                        else -> ""
+                    }
                 insertString(numChar)
                 return true
             }
@@ -216,7 +233,10 @@ class KeypadInputEngine(
         handler.removeCallbacks(commitRunnable)
     }
 
-    private fun isSentenceBoundary(text: CharSequence, targetIndex: Int): Boolean {
+    private fun isSentenceBoundary(
+        text: CharSequence,
+        targetIndex: Int,
+    ): Boolean {
         if (targetIndex <= 0) return true
         var idx = targetIndex - 1
         while (idx >= 0 && text[idx] == ' ') {
@@ -227,7 +247,10 @@ class KeypadInputEngine(
         return c == '.' || c == '?' || c == '!' || c == '\n'
     }
 
-    private fun formatChar(charStr: String, isReplacement: Boolean): String {
+    private fun formatChar(
+        charStr: String,
+        isReplacement: Boolean,
+    ): String {
         return when (currentMode) {
             InputMode.UPPER -> charStr.uppercase()
             InputMode.LOWER -> charStr.lowercase()

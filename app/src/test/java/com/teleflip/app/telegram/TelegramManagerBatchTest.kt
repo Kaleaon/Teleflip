@@ -10,11 +10,10 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 
 class TelegramManagerBatchTest {
-
     private lateinit var context: Context
     private lateinit var prefs: SharedPreferences
     private lateinit var telegramManager: TelegramManager
@@ -58,16 +57,17 @@ class TelegramManagerBatchTest {
 
     @Test
     fun testAddOrUpdateChatUpdatesStateFlow() {
-        val chat = TdApi.Chat().apply {
-            id = 101L
-            title = "Test Concurrent Chat"
-            unreadCount = 3
-            type = TdApi.ChatTypePrivate()
-        }
+        val chat =
+            TdApi.Chat().apply {
+                id = 101L
+                title = "Test Concurrent Chat"
+                unreadCount = 3
+                type = TdApi.ChatTypePrivate()
+            }
 
         // Simulate receiving a chat directly
         telegramManager.onResult(chat)
-        
+
         // Wait briefly for batchJob to collect and update StateFlow
         Thread.sleep(300)
 
@@ -80,12 +80,13 @@ class TelegramManagerBatchTest {
     @Test
     fun testMultipleChatsFlowIntoStateFlowWithoutLostUpdates() {
         for (i in 1..15) {
-            val chat = TdApi.Chat().apply {
-                id = i.toLong()
-                title = "Chat #$i"
-                unreadCount = 0
-                type = TdApi.ChatTypePrivate()
-            }
+            val chat =
+                TdApi.Chat().apply {
+                    id = i.toLong()
+                    title = "Chat #$i"
+                    unreadCount = 0
+                    type = TdApi.ChatTypePrivate()
+                }
             telegramManager.onResult(chat)
         }
 
@@ -98,10 +99,11 @@ class TelegramManagerBatchTest {
 
     @Test
     fun testErrorInOnResultHandledGracefully() {
-        val error = TdApi.Error().apply {
-            code = 400
-            message = "Bad Request"
-        }
+        val error =
+            TdApi.Error().apply {
+                code = 400
+                message = "Bad Request"
+            }
         telegramManager.onResult(error)
         // Ensure no exception is thrown and state flow is operational
         assertNotNull(telegramManager.chats.value)

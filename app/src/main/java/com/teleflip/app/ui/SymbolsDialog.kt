@@ -1,6 +1,5 @@
 package com.teleflip.app.ui
 
-import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
 import android.view.KeyEvent
@@ -14,15 +13,15 @@ import com.teleflip.app.R
 
 class SymbolsDialog(
     context: Context,
-    private val onSymbolSelected: (String) -> Unit
+    private val onSymbolSelected: (String) -> Unit,
 ) : BaseDialog(context) {
-
-    private val symbols = listOf(
-        "?", "!", "@", "#", "$", "%", "&", "*",
-        "(", ")", "-", "+", "=", "/", ":", ";",
-        "\"", "'", "<", ">", ",", ".", "~", "_",
-        "😊", "😂", "👍", "❤️", "🔥", "🎉", "👏", "🙏"
-    )
+    private val symbols =
+        listOf(
+            "?", "!", "@", "#", "$", "%", "&", "*",
+            "(", ")", "-", "+", "=", "/", ":", ";",
+            "\"", "'", "<", ">", ",", ".", "~", "_",
+            "😊", "😂", "👍", "❤️", "🔥", "🎉", "👏", "🙏",
+        )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,7 +41,10 @@ class SymbolsDialog(
         dismiss()
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (isBackOrRightSoftKey(keyCode)) {
             dismiss()
             return true
@@ -51,12 +53,18 @@ class SymbolsDialog(
     }
 
     inner class SymbolAdapter : RecyclerView.Adapter<SymbolAdapter.SymbolViewHolder>() {
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SymbolViewHolder {
+        override fun onCreateViewHolder(
+            parent: ViewGroup,
+            viewType: Int,
+        ): SymbolViewHolder {
             val view = LayoutInflater.from(parent.context).inflate(R.layout.dialog_symbol_item, parent, false)
             return SymbolViewHolder(view)
         }
 
-        override fun onBindViewHolder(holder: SymbolViewHolder, position: Int) {
+        override fun onBindViewHolder(
+            holder: SymbolViewHolder,
+            position: Int,
+        ) {
             val symbol = symbols[position]
             holder.tvSymbol.text = symbol
             holder.itemView.contentDescription = symbol

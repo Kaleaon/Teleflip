@@ -12,18 +12,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ModelTest {
-
     @Test
     fun testChatModelDefaultsAndProperties() {
-        val chat = ChatModel(
-            id = 1001L,
-            title = "Test Group",
-            lastMessage = "Hello World",
-            time = "12:00 PM",
-            unreadCount = 3,
-            chatType = ChatType.GROUP,
-            avatarLetters = "TG"
-        )
+        val chat =
+            ChatModel(
+                id = 1001L,
+                title = "Test Group",
+                lastMessage = "Hello World",
+                time = "12:00 PM",
+                unreadCount = 3,
+                chatType = ChatType.GROUP,
+                avatarLetters = "TG",
+            )
 
         assertEquals(1001L, chat.id)
         assertEquals("Test Group", chat.title)
@@ -39,15 +39,16 @@ class ModelTest {
 
     @Test
     fun testChatModelCopy() {
-        val chat = ChatModel(
-            id = 1L,
-            title = "John",
-            lastMessage = "Hey",
-            time = "10:00 AM",
-            unreadCount = 0,
-            chatType = ChatType.DIRECT,
-            avatarLetters = "J"
-        )
+        val chat =
+            ChatModel(
+                id = 1L,
+                title = "John",
+                lastMessage = "Hey",
+                time = "10:00 AM",
+                unreadCount = 0,
+                chatType = ChatType.DIRECT,
+                avatarLetters = "J",
+            )
 
         val updated = chat.copy(unreadCount = 5, isPinned = true)
         assertEquals(1L, updated.id)
@@ -57,14 +58,15 @@ class ModelTest {
 
     @Test
     fun testMessageModelDefaultsAndProperties() {
-        val msg = MessageModel(
-            id = 500L,
-            chatId = 1001L,
-            senderName = "Alice",
-            text = "Test message",
-            time = "12:01 PM",
-            isOutbound = true
-        )
+        val msg =
+            MessageModel(
+                id = 500L,
+                chatId = 1001L,
+                senderName = "Alice",
+                text = "Test message",
+                time = "12:01 PM",
+                isOutbound = true,
+            )
 
         assertEquals(500L, msg.id)
         assertEquals(1001L, msg.chatId)

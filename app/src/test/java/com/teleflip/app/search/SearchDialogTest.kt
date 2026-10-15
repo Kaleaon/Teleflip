@@ -12,11 +12,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 
 class SearchDialogTest {
-
     private fun createTelegramManager(): TelegramManager {
         val context = mock(Context::class.java)
         val prefs = mock(SharedPreferences::class.java)
@@ -33,14 +32,15 @@ class SearchDialogTest {
 
     @Test
     fun testMessageSearchResultModel() {
-        val result = MessageSearchResult(
-            messageId = 101L,
-            chatId = 1L,
-            chatTitle = "Telegram News",
-            senderName = "News Bot",
-            text = "Meeting at dinner tonight",
-            time = "12:00"
-        )
+        val result =
+            MessageSearchResult(
+                messageId = 101L,
+                chatId = 1L,
+                chatTitle = "Telegram News",
+                senderName = "News Bot",
+                text = "Meeting at dinner tonight",
+                time = "12:00",
+            )
 
         assertEquals(101L, result.messageId)
         assertEquals(1L, result.chatId)

@@ -1,6 +1,5 @@
 package com.teleflip.app.ui
 
-import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
 import android.view.KeyEvent
@@ -10,7 +9,6 @@ import com.teleflip.app.R
 import com.teleflip.app.report.AdbReporter
 
 class DiagnosticsDialog(context: Context) : BaseDialog(context) {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_diagnostics)
@@ -33,7 +31,10 @@ class DiagnosticsDialog(context: Context) : BaseDialog(context) {
         dismiss()
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (isBackOrRightSoftKey(keyCode)) {
             dismiss()
             return true
@@ -41,4 +42,3 @@ class DiagnosticsDialog(context: Context) : BaseDialog(context) {
         return super.onKeyDown(keyCode, event)
     }
 }
-

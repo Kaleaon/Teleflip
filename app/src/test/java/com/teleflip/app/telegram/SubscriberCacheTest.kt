@@ -15,7 +15,6 @@ import org.mockito.Mockito
 import org.mockito.Mockito.mock
 
 class SubscriberCacheTest {
-
     private lateinit var telegramManager: TelegramManager
 
     @Before
@@ -28,48 +27,52 @@ class SubscriberCacheTest {
 
     @Test
     fun testChatModelAndMessageModelDefaultsAndProperties() {
-        val chatDefault = ChatModel(
-            id = 100L,
-            title = "Test User",
-            lastMessage = "Hello",
-            time = "12:00",
-            unreadCount = 0,
-            chatType = ChatType.DIRECT,
-            avatarLetters = "TU"
-        )
+        val chatDefault =
+            ChatModel(
+                id = 100L,
+                title = "Test User",
+                lastMessage = "Hello",
+                time = "12:00",
+                unreadCount = 0,
+                chatType = ChatType.DIRECT,
+                avatarLetters = "TU",
+            )
         assertFalse("Default ChatModel isPremium should be false", chatDefault.isPremium)
 
         val chatPremium = chatDefault.copy(isPremium = true)
         assertTrue("ChatModel isPremium should be true when initialized", chatPremium.isPremium)
 
-        val msgDefault = MessageModel(
-            id = 1L,
-            chatId = 100L,
-            senderName = "Test User",
-            text = "Hi",
-            time = "12:01",
-            isOutbound = false
-        )
+        val msgDefault =
+            MessageModel(
+                id = 1L,
+                chatId = 100L,
+                senderName = "Test User",
+                text = "Hi",
+                time = "12:01",
+                isOutbound = false,
+            )
         assertEquals("Default stickerEmoji should be empty", "", msgDefault.stickerEmoji)
         assertFalse("Default isPremiumSticker should be false", msgDefault.isPremiumSticker)
 
-        val msgSticker = msgDefault.copy(
-            mediaType = MediaType.STICKER,
-            stickerEmoji = "🎉",
-            isPremiumSticker = true
-        )
+        val msgSticker =
+            msgDefault.copy(
+                mediaType = MediaType.STICKER,
+                stickerEmoji = "🎉",
+                isPremiumSticker = true,
+            )
         assertEquals("Sticker emoji should match", "🎉", msgSticker.stickerEmoji)
         assertTrue("isPremiumSticker should be true", msgSticker.isPremiumSticker)
     }
 
     @Test
     fun testUserUpdateUpdatesCacheAndChatList() {
-        val user = TdApi.User().apply {
-            id = 200L
-            firstName = "Premium"
-            lastName = "Subscriber"
-            isPremium = true
-        }
+        val user =
+            TdApi.User().apply {
+                id = 200L
+                firstName = "Premium"
+                lastName = "Subscriber"
+                isPremium = true
+            }
 
         telegramManager.handleUserUpdate(user)
 

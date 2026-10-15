@@ -3,17 +3,14 @@ package com.teleflip.app.ui
 import android.view.KeyEvent
 import android.view.View
 import android.widget.TextView
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 
 class SoftkeyAndBackNavigationTest {
-
     private lateinit var mockSoftkeyBar: View
     private lateinit var mockTvLeft: TextView
     private lateinit var mockTvCenter: TextView
@@ -27,12 +24,13 @@ class SoftkeyAndBackNavigationTest {
         mockTvCenter = mock(TextView::class.java)
         mockTvRight = mock(TextView::class.java)
 
-        softkeyManager = SoftkeyManager(
-            softkeyBar = mockSoftkeyBar,
-            tvLeft = mockTvLeft,
-            tvCenter = mockTvCenter,
-            tvRight = mockTvRight
-        )
+        softkeyManager =
+            SoftkeyManager(
+                softkeyBar = mockSoftkeyBar,
+                tvLeft = mockTvLeft,
+                tvCenter = mockTvCenter,
+                tvRight = mockTvRight,
+            )
     }
 
     @Test
@@ -49,16 +47,17 @@ class SoftkeyAndBackNavigationTest {
         var rightTriggered = false
         softkeyManager.update(
             right = "Demo",
-            onRight = { rightTriggered = true }
+            onRight = { rightTriggered = true },
         )
 
-        val rskCodes = listOf(
-            KeyEvent.KEYCODE_SOFT_RIGHT,
-            229,
-            230,
-            61,
-            158
-        )
+        val rskCodes =
+            listOf(
+                KeyEvent.KEYCODE_SOFT_RIGHT,
+                229,
+                230,
+                61,
+                158,
+            )
 
         for (code in rskCodes) {
             val event = KeyEvent(KeyEvent.ACTION_DOWN, code)
@@ -74,7 +73,7 @@ class SoftkeyAndBackNavigationTest {
         var rightTriggered = false
         softkeyManager.update(
             right = "Demo",
-            onRight = { rightTriggered = true }
+            onRight = { rightTriggered = true },
         )
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)
@@ -93,16 +92,17 @@ class SoftkeyAndBackNavigationTest {
         var leftTriggered = false
         softkeyManager.update(
             left = "Options",
-            onLeft = { leftTriggered = true }
+            onLeft = { leftTriggered = true },
         )
 
-        val lskCodes = listOf(
-            KeyEvent.KEYCODE_SOFT_LEFT,
-            KeyEvent.KEYCODE_MENU,
-            132,
-            60,
-            228
-        )
+        val lskCodes =
+            listOf(
+                KeyEvent.KEYCODE_SOFT_LEFT,
+                KeyEvent.KEYCODE_MENU,
+                132,
+                60,
+                228,
+            )
 
         for (code in lskCodes) {
             val event = KeyEvent(KeyEvent.ACTION_DOWN, code)
@@ -118,14 +118,15 @@ class SoftkeyAndBackNavigationTest {
         var centerTriggered = false
         softkeyManager.update(
             center = "Open",
-            onCenter = { centerTriggered = true }
+            onCenter = { centerTriggered = true },
         )
 
-        val centerCodes = listOf(
-            KeyEvent.KEYCODE_DPAD_CENTER,
-            KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_CALL
-        )
+        val centerCodes =
+            listOf(
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_CALL,
+            )
 
         for (code in centerCodes) {
             val event = KeyEvent(KeyEvent.ACTION_DOWN, code)

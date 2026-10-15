@@ -6,7 +6,6 @@ import org.junit.Test
 import org.telegram.PhoneFormat.PhoneFormat
 
 class PhoneFormatTest {
-
     @Test
     fun testStrip() {
         val input = "+1 (555) 123-4567 #12"

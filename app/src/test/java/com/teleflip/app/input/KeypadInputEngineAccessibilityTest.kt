@@ -1,6 +1,5 @@
 package com.teleflip.app.input
 
-import android.text.Editable
 import android.text.SpannableStringBuilder
 import android.view.KeyEvent
 import android.widget.EditText
@@ -12,7 +11,6 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 
 class KeypadInputEngineAccessibilityTest {
-
     @Test
     fun testModeIndicatorAnnouncesOnPoundKey() {
         val mockEditText = mock(EditText::class.java)

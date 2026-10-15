@@ -137,7 +137,7 @@ class AdbReporterTest {
     @Test
     fun testReportErrorSynchronousFlush() {
         AdbReporter.reportInfo("AsyncComp", "Pending info line")
-        
+
         // reportError must synchronously flush pending lines and the error line
         val exception = RuntimeException("Test Error")
         AdbReporter.reportError("ErrorComponent", "Fatal issue occurred", exception)
@@ -151,7 +151,7 @@ class AdbReporterTest {
     @Test
     fun testReportCrashSynchronousFlush() {
         AdbReporter.reportInfo("CrashContext", "Before crash log")
-        
+
         val crashException = IllegalStateException("Critical crash test")
         AdbReporter.reportCrash("MainThread", crashException)
 
@@ -185,7 +185,7 @@ class AdbReporterTest {
         }
 
         assertTrue("Threads timed out", latch.await(5, TimeUnit.SECONDS))
-        
+
         AdbReporter.flush()
 
         val lines = testLogFile.readLines().filter { it.isNotBlank() }

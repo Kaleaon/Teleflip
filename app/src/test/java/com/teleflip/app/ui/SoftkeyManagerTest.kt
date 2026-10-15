@@ -12,7 +12,6 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 
 class SoftkeyManagerTest {
-
     private lateinit var tvLeft: TextView
     private lateinit var tvCenter: TextView
     private lateinit var tvRight: TextView
@@ -31,7 +30,7 @@ class SoftkeyManagerTest {
         softkeyManager.update(
             left = "Options",
             center = "Open",
-            right = "Back"
+            right = "Back",
         )
 
         verify(tvLeft).text = "Options"
@@ -56,7 +55,7 @@ class SoftkeyManagerTest {
         softkeyManager.update(
             left = "",
             center = "",
-            right = ""
+            right = "",
         )
 
         val leftDescCaptor = ArgumentCaptor.forClass(CharSequence::class.java)
@@ -69,7 +68,7 @@ class SoftkeyManagerTest {
         var leftClicked = false
         softkeyManager.update(
             left = "Options",
-            onLeft = { leftClicked = true }
+            onLeft = { leftClicked = true },
         )
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SOFT_LEFT)
@@ -84,7 +83,7 @@ class SoftkeyManagerTest {
         var rightClicked = false
         softkeyManager.update(
             right = "Back",
-            onRight = { rightClicked = true }
+            onRight = { rightClicked = true },
         )
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SOFT_RIGHT)
@@ -99,7 +98,7 @@ class SoftkeyManagerTest {
         var centerClicked = false
         softkeyManager.update(
             center = "Open",
-            onCenter = { centerClicked = true }
+            onCenter = { centerClicked = true },
         )
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER)

@@ -18,7 +18,6 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
 
 class SubscriberCacheTest {
-
     private lateinit var mockContext: Context
     private lateinit var mockPrefs: SharedPreferences
 
@@ -36,31 +35,33 @@ class SubscriberCacheTest {
 
     @Test
     fun testChatModelAndMessageModelDefaults() {
-        val chat = ChatModel(
-            id = 100L,
-            title = "Test User",
-            lastMessage = "Hello",
-            time = "12:00",
-            unreadCount = 0,
-            chatType = ChatType.DIRECT,
-            avatarLetters = "TU"
-        )
+        val chat =
+            ChatModel(
+                id = 100L,
+                title = "Test User",
+                lastMessage = "Hello",
+                time = "12:00",
+                unreadCount = 0,
+                chatType = ChatType.DIRECT,
+                avatarLetters = "TU",
+            )
         assertFalse("Default isPremium should be false", chat.isPremium)
 
         val premiumChat = chat.copy(isPremium = true)
         assertTrue("isPremium should be true when set", premiumChat.isPremium)
 
-        val msg = MessageModel(
-            id = 1L,
-            chatId = 100L,
-            senderName = "Test User",
-            text = "",
-            time = "12:00",
-            isOutbound = false,
-            mediaType = MediaType.STICKER,
-            stickerEmoji = "🎉",
-            isPremiumSticker = true
-        )
+        val msg =
+            MessageModel(
+                id = 1L,
+                chatId = 100L,
+                senderName = "Test User",
+                text = "",
+                time = "12:00",
+                isOutbound = false,
+                mediaType = MediaType.STICKER,
+                stickerEmoji = "🎉",
+                isPremiumSticker = true,
+            )
         assertEquals("🎉", msg.stickerEmoji)
         assertTrue(msg.isPremiumSticker)
     }
@@ -76,18 +77,20 @@ class SubscriberCacheTest {
         assertTrue("Alice Smith in demo mode should be premium", aliceChat?.isPremium == true)
 
         // Test updating user subscriber cache via updateUserCache
-        val testUser = TdApi.User().apply {
-            id = 555L
-            isPremium = true
-        }
+        val testUser =
+            TdApi.User().apply {
+                id = 555L
+                isPremium = true
+            }
         manager.updateUserCache(testUser)
         assertTrue("userSubscriberCache should store true for user 555", manager.userSubscriberCache[555L] == true)
 
         // Test UpdateUser processing
-        val nonPremiumUser = TdApi.User().apply {
-            id = 666L
-            isPremium = false
-        }
+        val nonPremiumUser =
+            TdApi.User().apply {
+                id = 666L
+                isPremium = false
+            }
         val updateUser = TdApi.UpdateUser(nonPremiumUser)
         manager.onResult(updateUser)
         assertFalse("userSubscriberCache should store false for user 666", manager.userSubscriberCache[666L] == false)

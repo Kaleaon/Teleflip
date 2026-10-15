@@ -6,7 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SoftkeyUtilsTest {
-
     @Test
     fun testIsSoftLeftKey_standardKeycodes() {
         assertTrue(SoftkeyUtils.isSoftLeftKey(KeyEvent.KEYCODE_SOFT_LEFT))

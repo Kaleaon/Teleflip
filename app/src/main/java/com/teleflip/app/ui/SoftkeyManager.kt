@@ -8,12 +8,12 @@ class SoftkeyManager(
     private val softkeyBar: View? = null,
     private val tvLeft: TextView,
     private val tvCenter: TextView,
-    private val tvRight: TextView
+    private val tvRight: TextView,
 ) {
     constructor(
         tvLeft: TextView,
         tvCenter: TextView,
-        tvRight: TextView
+        tvRight: TextView,
     ) : this(null, tvLeft, tvCenter, tvRight)
 
     private var onLeftClick: (() -> Unit)? = null
@@ -36,7 +36,7 @@ class SoftkeyManager(
         right: String = "",
         onLeft: (() -> Unit)? = null,
         onCenter: (() -> Unit)? = null,
-        onRight: (() -> Unit)? = null
+        onRight: (() -> Unit)? = null,
     ) {
         tvLeft.text = left
         tvCenter.text = center
@@ -51,7 +51,10 @@ class SoftkeyManager(
         this.onRightClick = onRight
     }
 
-    fun handleKeyEvent(keyCode: Int, event: KeyEvent): Boolean {
+    fun handleKeyEvent(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN) return false
 
         // Top Left Button (Soft Left)

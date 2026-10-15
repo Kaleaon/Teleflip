@@ -1,12 +1,10 @@
 package com.teleflip.app
 
 import com.teleflip.app.input.InputMode
-import com.teleflip.app.input.KeypadInputEngine
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class KeypadInputEngineTest {
-
     @Test
     fun testInputModeCycle() {
         var mode = InputMode.CAP_FIRST

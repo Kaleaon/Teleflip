@@ -17,7 +17,7 @@ import java.io.File
 fun ImageView.loadCircularAvatarOrFallback(
     path: String?,
     fallbackLetters: String?,
-    fallbackTextView: TextView?
+    fallbackTextView: TextView?,
 ) {
     if (!path.isNullOrEmpty()) {
         try {
@@ -25,9 +25,10 @@ fun ImageView.loadCircularAvatarOrFallback(
             if (file.exists()) {
                 val bitmap = BitmapFactory.decodeFile(path)
                 if (bitmap != null) {
-                    val circularDrawable = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
-                        isCircular = true
-                    }
+                    val circularDrawable =
+                        RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                            isCircular = true
+                        }
                     setImageDrawable(circularDrawable)
                     visibility = View.VISIBLE
                     fallbackTextView?.visibility = View.GONE

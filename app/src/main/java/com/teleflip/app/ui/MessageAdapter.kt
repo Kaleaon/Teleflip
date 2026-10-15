@@ -11,8 +11,6 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import coil.dispose
-import coil.load
 import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
@@ -21,9 +19,8 @@ import java.util.Locale
 
 class MessageAdapter(
     private val onMessageFocused: ((MessageModel) -> Unit)? = null,
-    private val onMessageAction: ((MessageModel) -> Unit)? = null
+    private val onMessageAction: ((MessageModel) -> Unit)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
-
     private var playingMessageId: Long? = null
     private var currentSpeed: Float = 1.0f
 
@@ -31,7 +28,10 @@ class MessageAdapter(
         super.submitList(if (newItems != null) ArrayList(newItems) else null)
     }
 
-    fun setPlayingMessageId(id: Long?, speed: Float = currentSpeed) {
+    fun setPlayingMessageId(
+        id: Long?,
+        speed: Float = currentSpeed,
+    ) {
         playingMessageId = id
         currentSpeed = speed
         if (currentList.isNotEmpty()) {
@@ -54,12 +54,18 @@ class MessageAdapter(
         return currentList.indexOfFirst { it.id == messageId }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): MessageViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.view_message_item, parent, false)
         return MessageViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: MessageViewHolder,
+        position: Int,
+    ) {
         holder.bind(getItem(position))
     }
 
@@ -86,21 +92,23 @@ class MessageAdapter(
                 bubbleLayout.background = ContextCompat.getDrawable(context, R.drawable.bg_outbound_bubble)
                 tvSender.visibility = View.GONE
                 tvStatus.visibility = View.VISIBLE
-                tvStatus.text = when (message.status) {
-                    MessageStatus.SENDING -> " ⏱"
-                    MessageStatus.SENT -> " ✓"
-                    MessageStatus.READ -> " ✓✓"
-                    MessageStatus.FAILED -> " ⚠"
-                }
+                tvStatus.text =
+                    when (message.status) {
+                        MessageStatus.SENDING -> " ⏱"
+                        MessageStatus.SENT -> " ✓"
+                        MessageStatus.READ -> " ✓✓"
+                        MessageStatus.FAILED -> " ⚠"
+                    }
             } else {
                 rootLayout.gravity = Gravity.START
                 bubbleLayout.background = ContextCompat.getDrawable(context, R.drawable.bg_inbound_bubble)
-                tvSender.visibility = if (message.senderName.isNotBlank() && message.senderName != "You") {
-                    tvSender.text = message.senderName
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
+                tvSender.visibility =
+                    if (message.senderName.isNotBlank() && message.senderName != "You") {
+                        tvSender.text = message.senderName
+                        View.VISIBLE
+                    } else {
+                        View.GONE
+                    }
                 tvStatus.visibility = View.GONE
             }
 
@@ -169,11 +177,17 @@ class MessageAdapter(
     }
 
     class MessageDiffCallback : DiffUtil.ItemCallback<MessageModel>() {
-        override fun areItemsTheSame(oldItem: MessageModel, newItem: MessageModel): Boolean {
+        override fun areItemsTheSame(
+            oldItem: MessageModel,
+            newItem: MessageModel,
+        ): Boolean {
             return oldItem.id == newItem.id
         }
 
-        override fun areContentsTheSame(oldItem: MessageModel, newItem: MessageModel): Boolean {
+        override fun areContentsTheSame(
+            oldItem: MessageModel,
+            newItem: MessageModel,
+        ): Boolean {
             return oldItem == newItem
         }
     }

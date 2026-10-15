@@ -4,8 +4,11 @@ import android.content.Context
 import com.teleflip.app.R
 
 object ContentDescriptionFormatter {
-
-    fun formatAvatarDescription(title: String?, formatPattern: String, fallbackString: String): String {
+    fun formatAvatarDescription(
+        title: String?,
+        formatPattern: String,
+        fallbackString: String,
+    ): String {
         val trimmed = title?.trim().orEmpty()
         return if (trimmed.isNotEmpty()) {
             try {
@@ -18,7 +21,11 @@ object ContentDescriptionFormatter {
         }
     }
 
-    fun formatPhotoDescription(caption: String?, formatPattern: String, fallbackString: String): String {
+    fun formatPhotoDescription(
+        caption: String?,
+        formatPattern: String,
+        fallbackString: String,
+    ): String {
         val trimmed = caption?.trim().orEmpty()
         return if (trimmed.isNotEmpty()) {
             try {
@@ -31,19 +38,25 @@ object ContentDescriptionFormatter {
         }
     }
 
-    fun getAvatarDescription(context: Context, title: String?): String {
+    fun getAvatarDescription(
+        context: Context,
+        title: String?,
+    ): String {
         return formatAvatarDescription(
             title = title,
             formatPattern = context.getString(R.string.cd_avatar_format),
-            fallbackString = context.getString(R.string.cd_contact_avatar)
+            fallbackString = context.getString(R.string.cd_contact_avatar),
         )
     }
 
-    fun getPhotoDescription(context: Context, caption: String?): String {
+    fun getPhotoDescription(
+        context: Context,
+        caption: String?,
+    ): String {
         return formatPhotoDescription(
             caption = caption,
             formatPattern = context.getString(R.string.cd_photo_attachment_format),
-            fallbackString = context.getString(R.string.cd_photo_attachment)
+            fallbackString = context.getString(R.string.cd_photo_attachment),
         )
     }
 }

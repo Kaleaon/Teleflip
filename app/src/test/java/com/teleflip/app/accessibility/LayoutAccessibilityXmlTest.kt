@@ -8,7 +8,6 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 class LayoutAccessibilityXmlTest {
-
     private val androidNs = "http://schemas.android.com/apk/res/android"
 
     private fun getLayoutFile(filename: String): File {
@@ -32,7 +31,7 @@ class LayoutAccessibilityXmlTest {
     fun testChatConversationLiveRegions() {
         val file = getLayoutFile("view_chat_conversation.xml")
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
-        
+
         val recordStatusNode = findNodeById(doc, "@+id/tv_record_status")
         assertNotNull("tv_record_status should exist", recordStatusNode)
         assertEquals("polite", recordStatusNode?.attributes?.getNamedItemNS(androidNs, "accessibilityLiveRegion")?.nodeValue)
@@ -57,7 +56,10 @@ class LayoutAccessibilityXmlTest {
         assertEquals("polite", liveRegion)
     }
 
-    private fun findNodeById(node: org.w3c.dom.Node, targetId: String): org.w3c.dom.Node? {
+    private fun findNodeById(
+        node: org.w3c.dom.Node,
+        targetId: String,
+    ): org.w3c.dom.Node? {
         if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE) {
             val element = node as org.w3c.dom.Element
             val idAttr = element.getAttributeNS(androidNs, "id")

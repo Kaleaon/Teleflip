@@ -4,17 +4,15 @@ import android.content.Context
 import android.content.SharedPreferences
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 
 class TelegramManager2FaTest {
-
     private lateinit var context: Context
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var prefsEditor: SharedPreferences.Editor
@@ -36,11 +34,12 @@ class TelegramManager2FaTest {
 
     @Test
     fun testWaitPasswordStateMetadata() {
-        val waitPass = AuthState.WaitPassword(
-            hint = "Favorite color",
-            hasRecoveryEmailAddress = true,
-            recoveryEmailAddressPattern = "u***r@example.com"
-        )
+        val waitPass =
+            AuthState.WaitPassword(
+                hint = "Favorite color",
+                hasRecoveryEmailAddress = true,
+                recoveryEmailAddressPattern = "u***r@example.com",
+            )
 
         assertEquals("Favorite color", waitPass.hint)
         assertTrue(waitPass.hasRecoveryEmailAddress)
@@ -81,10 +80,11 @@ class TelegramManager2FaTest {
 
     @Test
     fun testEmailCodeInfoResultHandler() {
-        val codeInfo = TdApi.EmailAddressAuthenticationCodeInfo().apply {
-            emailAddressPattern = "a***b@test.com"
-            length = 6
-        }
+        val codeInfo =
+            TdApi.EmailAddressAuthenticationCodeInfo().apply {
+                emailAddressPattern = "a***b@test.com"
+                length = 6
+            }
 
         telegramManager.onResult(codeInfo)
 
@@ -96,9 +96,10 @@ class TelegramManager2FaTest {
 
     @Test
     fun testErrorMappingForWaitPasswordRecoveryCode() {
-        val codeInfo = TdApi.EmailAddressAuthenticationCodeInfo().apply {
-            emailAddressPattern = "a***b@test.com"
-        }
+        val codeInfo =
+            TdApi.EmailAddressAuthenticationCodeInfo().apply {
+                emailAddressPattern = "a***b@test.com"
+            }
         telegramManager.onResult(codeInfo)
 
         val tdError = TdApi.Error(400, "PASSWORD_RECOVERY_EXPIRED")

@@ -8,11 +8,10 @@ import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 
 class TelegramResendTest {
-
     private fun createMockContext(): Context {
         val context = mock(Context::class.java)
         val prefs = mock(SharedPreferences::class.java)

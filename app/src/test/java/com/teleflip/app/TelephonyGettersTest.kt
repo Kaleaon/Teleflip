@@ -5,7 +5,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class TelephonyGettersTest {
-
     @Test
     fun testCleanAndFormatPhoneNumber_validInputs() {
         assertEquals("+15551234567", MainActivity.cleanAndFormatPhoneNumber("15551234567"))

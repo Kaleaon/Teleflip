@@ -19,7 +19,6 @@ import java.io.FileOutputStream
 
 @RunWith(AndroidJUnit4::class)
 class ImageExtensionsTest {
-
     @get:Rule
     val tempFolder = TemporaryFolder()
 

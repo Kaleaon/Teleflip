@@ -8,13 +8,13 @@ object SoftkeyUtils {
 
     fun isSoftLeftKey(keyCode: Int): Boolean {
         return keyCode == KeyEvent.KEYCODE_SOFT_LEFT ||
-                keyCode == KeyEvent.KEYCODE_MENU ||
-                VENDOR_SOFT_LEFT_KEYCODES.contains(keyCode)
+            keyCode == KeyEvent.KEYCODE_MENU ||
+            VENDOR_SOFT_LEFT_KEYCODES.contains(keyCode)
     }
 
     fun isSoftRightKey(keyCode: Int): Boolean {
         return keyCode == KeyEvent.KEYCODE_SOFT_RIGHT ||
-                VENDOR_SOFT_RIGHT_KEYCODES.contains(keyCode)
+            VENDOR_SOFT_RIGHT_KEYCODES.contains(keyCode)
     }
 
     fun isBackOrSoftRightKey(keyCode: Int): Boolean {

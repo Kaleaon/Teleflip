@@ -11,11 +11,17 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyInt
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 
 class FakeEditable(private val sb: StringBuilder = StringBuilder()) : Editable, CharSequence by sb {
-    override fun replace(st: Int, en: Int, source: CharSequence, start: Int, end: Int): Editable {
+    override fun replace(
+        st: Int,
+        en: Int,
+        source: CharSequence,
+        start: Int,
+        end: Int,
+    ): Editable {
         val replacement = source.subSequence(start, end).toString()
         val safeSt = Math.max(0, Math.min(st, sb.length))
         val safeEn = Math.max(safeSt, Math.min(en, sb.length))
@@ -23,19 +29,34 @@ class FakeEditable(private val sb: StringBuilder = StringBuilder()) : Editable, 
         return this
     }
 
-    override fun replace(st: Int, en: Int, source: CharSequence): Editable {
+    override fun replace(
+        st: Int,
+        en: Int,
+        source: CharSequence,
+    ): Editable {
         return replace(st, en, source, 0, source.length)
     }
 
-    override fun insert(where: Int, text: CharSequence, start: Int, end: Int): Editable {
+    override fun insert(
+        where: Int,
+        text: CharSequence,
+        start: Int,
+        end: Int,
+    ): Editable {
         return replace(where, where, text, start, end)
     }
 
-    override fun insert(where: Int, text: CharSequence): Editable {
+    override fun insert(
+        where: Int,
+        text: CharSequence,
+    ): Editable {
         return replace(where, where, text, 0, text.length)
     }
 
-    override fun delete(st: Int, en: Int): Editable {
+    override fun delete(
+        st: Int,
+        en: Int,
+    ): Editable {
         return replace(st, en, "", 0, 0)
     }
 
@@ -43,7 +64,11 @@ class FakeEditable(private val sb: StringBuilder = StringBuilder()) : Editable, 
         return replace(sb.length, sb.length, text ?: "", 0, text?.length ?: 0)
     }
 
-    override fun append(text: CharSequence?, start: Int, end: Int): Editable {
+    override fun append(
+        text: CharSequence?,
+        start: Int,
+        end: Int,
+    ): Editable {
         return replace(sb.length, sb.length, text ?: "", start, end)
     }
 
@@ -55,29 +80,53 @@ class FakeEditable(private val sb: StringBuilder = StringBuilder()) : Editable, 
         sb.setLength(0)
     }
 
-    override fun getChars(start: Int, end: Int, dest: CharArray, destoff: Int) {
+    override fun getChars(
+        start: Int,
+        end: Int,
+        dest: CharArray,
+        destoff: Int,
+    ) {
         sb.getChars(start, end, dest, destoff)
     }
 
     override fun clearSpans() {}
+
     override fun setFilters(filters: Array<out InputFilter>?) {}
+
     override fun getFilters(): Array<InputFilter> = arrayOf()
 
-    override fun setSpan(what: Any?, start: Int, end: Int, flags: Int) {}
+    override fun setSpan(
+        what: Any?,
+        start: Int,
+        end: Int,
+        flags: Int,
+    ) {}
+
     override fun removeSpan(what: Any?) {}
+
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any?> getSpans(start: Int, end: Int, type: Class<T>?): Array<T> =
-        java.lang.reflect.Array.newInstance(type ?: Any::class.java, 0) as Array<T>
+    override fun <T : Any?> getSpans(
+        start: Int,
+        end: Int,
+        type: Class<T>?,
+    ): Array<T> = java.lang.reflect.Array.newInstance(type ?: Any::class.java, 0) as Array<T>
+
     override fun getSpanStart(tag: Any?): Int = -1
+
     override fun getSpanEnd(tag: Any?): Int = -1
+
     override fun getSpanFlags(tag: Any?): Int = 0
-    override fun nextSpanTransition(start: Int, limit: Int, type: Class<*>?): Int = limit
+
+    override fun nextSpanTransition(
+        start: Int,
+        limit: Int,
+        type: Class<*>?,
+    ): Int = limit
 
     override fun toString(): String = sb.toString()
 }
 
 class KeypadInputEngineTest {
-
     private lateinit var editText: EditText
     private lateinit var editable: FakeEditable
     private var selectionStart = 0
