@@ -50,6 +50,10 @@ class MessageAdapter(
         return if (position in 0 until currentList.size) getItem(position) else null
     }
 
+    fun getPositionForMessageId(messageId: Long): Int {
+        return items.indexOfFirst { it.id == messageId }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.view_message_item, parent, false)
         return MessageViewHolder(view)

@@ -44,3 +44,13 @@ data class MessageModel(
     val stickerEmoji: String = "",
     val isPremiumSticker: Boolean = false
 )
+
+data class MessageSearchResult(
+    val messageId: Long,
+    val chatId: Long,
+    val chatTitle: String,
+    val senderName: String,
+    val text: String,
+    val time: String,
+    val dateMillis: Long = 0L
+)
