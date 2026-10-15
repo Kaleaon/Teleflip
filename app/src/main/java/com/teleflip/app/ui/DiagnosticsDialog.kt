@@ -14,6 +14,7 @@ class DiagnosticsDialog(context: Context) : BaseDialog(context) {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_diagnostics)
+        setupDismissKeys()
 
         val tvLogs = findViewById<TextView>(R.id.tv_diag_logs)
         val btnClose = findViewById<Button>(R.id.btn_close_diag)
@@ -40,3 +41,4 @@ class DiagnosticsDialog(context: Context) : BaseDialog(context) {
         return super.onKeyDown(keyCode, event)
     }
 }
+

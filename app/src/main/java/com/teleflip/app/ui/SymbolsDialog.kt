@@ -27,6 +27,7 @@ class SymbolsDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_symbols)
+        setupDismissKeys()
 
         val rv = findViewById<RecyclerView>(R.id.rv_symbols_grid)
         rv?.layoutManager = GridLayoutManager(context, 4)
