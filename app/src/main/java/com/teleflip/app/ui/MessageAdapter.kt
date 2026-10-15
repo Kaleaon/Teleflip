@@ -125,6 +125,7 @@ class MessageAdapter(
             }
 
             // Photo image display if downloaded
+            ivPhoto.contentDescription = ContentDescriptionFormatter.getPhotoDescription(context, message.mediaCaption)
             if (message.mediaType == MediaType.PHOTO && !message.mediaFilePath.isNullOrEmpty() && File(message.mediaFilePath).exists()) {
                 try {
                     val bmp = BitmapFactory.decodeFile(message.mediaFilePath)
