@@ -55,15 +55,16 @@ android {
         jvmTarget = '17'
     }
 
-    testOptions {
-        unitTests {
-            returnDefaultValues = true
-            includeAndroidResources = true
-        }
-    }
     buildFeatures {
         viewBinding true
         buildConfig true
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true
+        }
     }
 }
 

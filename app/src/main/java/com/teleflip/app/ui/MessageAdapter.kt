@@ -17,7 +17,6 @@ import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
-import java.io.File
 import java.util.Locale
 
 class MessageAdapter(
@@ -135,22 +134,12 @@ class MessageAdapter(
                 }
             }
 
-            // Photo image display using Coil with placeholder, error fallbacks, and accessibility contentDescription
+            // Photo image display with accessibility contentDescription
             ivPhoto.contentDescription = ContentDescriptionFormatter.getPhotoDescription(context, message.mediaCaption)
-            if (message.mediaType == MediaType.PHOTO && !message.mediaFilePath.isNullOrEmpty()) {
-                ivPhoto.visibility = View.VISIBLE
-                ivPhoto.load(File(message.mediaFilePath)) {
-                    crossfade(true)
-                    placeholder(R.drawable.bg_item_selector)
-                    error(R.drawable.bg_item_selector)
-                    listener(
-                        onError = { _, _ ->
-                            ivPhoto.visibility = View.GONE
-                        }
-                    )
-                }
+            if (message.mediaType == MediaType.PHOTO) {
+                ivPhoto.loadBitmapFromFile(message.mediaFilePath)
             } else {
-                ivPhoto.dispose()
+                ivPhoto.setImageDrawable(null)
                 ivPhoto.visibility = View.GONE
             }
 
@@ -170,7 +159,7 @@ class MessageAdapter(
         }
 
         fun clearImage() {
-            ivPhoto.dispose()
+            ivPhoto.setImageDrawable(null)
         }
     }
 

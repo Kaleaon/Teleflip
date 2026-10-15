@@ -5,15 +5,17 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+<<<<<<< HEAD
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
+=======
+>>>>>>> origin/stitch/add-image-view-extensions-jm0-10aa97d9-bd9a-46ec-844e-494cfaf3102f
 import androidx.recyclerview.widget.RecyclerView
 import coil.dispose
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.teleflip.app.R
 import com.teleflip.app.model.ChatModel
-import java.io.File
 
 class ChatListAdapter(
     private val onChatSelected: (ChatModel) -> Unit
@@ -61,22 +63,8 @@ class ChatListAdapter(
                 tvShortcut.visibility = View.INVISIBLE
             }
 
-            // Render photo avatar using Coil with CircleCropTransformation or fallback to letter initials
-            if (!chat.avatarPath.isNullOrEmpty()) {
-                ivAvatar.visibility = View.VISIBLE
-                tvAvatar.visibility = View.GONE
-                ivAvatar.load(File(chat.avatarPath)) {
-                    crossfade(true)
-                    transformations(CircleCropTransformation())
-                    listener(
-                        onError = { _, _ ->
-                            showLetterFallback(chat)
-                        }
-                    )
-                }
-            } else {
-                showLetterFallback(chat)
-            }
+            // Render photo avatar or fallback to colored letter initials
+            ivAvatar.loadCircularAvatarOrFallback(chat.avatarPath, chat.avatarLetters, tvAvatar)
 
             tvTitle.text = chat.title
             tvTime.text = chat.time
@@ -95,14 +83,7 @@ class ChatListAdapter(
         }
 
         fun clearImage() {
-            ivAvatar.dispose()
-        }
-
-        private fun showLetterFallback(chat: ChatModel) {
-            ivAvatar.dispose()
-            ivAvatar.visibility = View.GONE
-            tvAvatar.visibility = View.VISIBLE
-            tvAvatar.text = chat.avatarLetters
+            ivAvatar.setImageDrawable(null)
         }
     }
 
