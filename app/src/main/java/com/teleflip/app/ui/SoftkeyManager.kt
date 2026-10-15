@@ -30,6 +30,10 @@ class SoftkeyManager(
         tvCenter.text = center
         tvRight.text = right
 
+        tvLeft.contentDescription = if (left.isNotBlank()) "$left softkey" else ""
+        tvCenter.contentDescription = if (center.isNotBlank()) "$center softkey" else ""
+        tvRight.contentDescription = if (right.isNotBlank()) "$right softkey" else ""
+
         this.onLeftClick = onLeft
         this.onCenterClick = onCenter
         this.onRightClick = onRight

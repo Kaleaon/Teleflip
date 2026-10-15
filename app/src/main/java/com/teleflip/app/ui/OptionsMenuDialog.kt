@@ -65,6 +65,7 @@ class OptionsMenuDialog(
             val opt = options[position]
             holder.tvShortcut.text = "${position + 1}."
             holder.tvLabel.text = opt.title
+            holder.itemView.contentDescription = "${position + 1}. ${opt.title}"
             holder.itemView.setOnClickListener {
                 dismiss()
                 opt.action.invoke()

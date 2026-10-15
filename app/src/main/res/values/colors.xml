@@ -3,13 +3,13 @@
     <!-- Core Dark OLED Theme for Flip Phones -->
     <color name="bg_dark">#12161D</color>
     <color name="bg_dark_card">#1C222D</color>
-    <color name="bg_dark_card_focused">#2A3649</color>
+    <color name="bg_dark_card_focused">#5B78A5</color>
     <color name="focus_highlight">#00D2FF</color>
     <color name="focus_highlight_gold">#FFC837</color>
     
     <!-- Telegram Branding Colors -->
-    <color name="tg_blue">#24A1DE</color>
-    <color name="tg_blue_dark">#1B7AB0</color>
+    <color name="tg_blue">#1A6C99</color>
+    <color name="tg_blue_dark">#061A28</color>
     <color name="tg_green">#00C853</color>
     <color name="tg_outbound_bubble">#1E3A5F</color>
     <color name="tg_inbound_bubble">#242D3D</color>
