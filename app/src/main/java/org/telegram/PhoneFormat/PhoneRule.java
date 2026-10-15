@@ -34,8 +34,6 @@ public class PhoneRule {
     public int flag12;
     public int flag13;
     public String format;
-    public boolean hasIntlPrefix;
-    public boolean hasTrunkPrefix;
 
     String format(String str, String intlPrefix, String trunkPrefix) {
         boolean hadC = false;
