@@ -100,6 +100,25 @@
             android:inputType="text"
             android:focusable="true"
             android:focusableInTouchMode="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Keypad Timeout Setting -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Multi-tap Timeout:"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <Spinner
+            android:id="@+id/sp_keypad_timeout"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_edittext_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:layout_marginBottom="16dp" />
 
         <!-- Save Button -->

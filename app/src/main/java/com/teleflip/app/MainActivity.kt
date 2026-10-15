@@ -9,11 +9,13 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -430,6 +432,7 @@ class MainActivity : AppCompatActivity() {
         composeInputEngine = KeypadInputEngine(
             editText = etComposeInput!!,
             modeIndicator = tvMode,
+            timeoutMs = telegramManager.keypadTimeoutMs,
             onSymbolRequested = { showSymbolsDialog { symbol -> composeInputEngine?.insertSymbol(symbol) } }
         )
 
@@ -784,7 +787,11 @@ class MainActivity : AppCompatActivity() {
         val btnDemo = view.findViewById<Button>(R.id.btn_demo_mode)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
 
-        loginInputEngine = KeypadInputEngine(etLoginInput!!, tvMode) {
+        loginInputEngine = KeypadInputEngine(
+            editText = etLoginInput!!,
+            modeIndicator = tvMode,
+            timeoutMs = telegramManager.keypadTimeoutMs
+        ) {
             showSymbolsDialog { symbol -> loginInputEngine?.insertSymbol(symbol) }
         }
 
@@ -971,6 +978,7 @@ class MainActivity : AppCompatActivity() {
 
         val etId = view.findViewById<EditText>(R.id.et_api_id)
         val etHash = view.findViewById<EditText>(R.id.et_api_hash)
+        val spTimeout = view.findViewById<Spinner>(R.id.sp_keypad_timeout)
         val btnSave = view.findViewById<Button>(R.id.btn_save_config)
         val btnLogout = view.findViewById<Button>(R.id.btn_logout)
         val btnBack = view.findViewById<Button>(R.id.btn_back_to_chats)
@@ -978,7 +986,25 @@ class MainActivity : AppCompatActivity() {
         etId.setText(telegramManager.apiId.toString())
         etHash.setText(telegramManager.apiHash)
 
+        val timeoutValues = listOf(300L, 500L, 900L)
+        val timeoutLabels = listOf("300 ms (Fast)", "500 ms (Normal)", "900 ms (Slow)")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, timeoutLabels)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spTimeout.adapter = adapter
+
+        val currentTimeout = telegramManager.keypadTimeoutMs
+        val initialIndex = when (currentTimeout) {
+            300L -> 0
+            900L -> 2
+            else -> 1
+        }
+        spTimeout.setSelection(initialIndex)
+
         val doSave = {
+            val selIndex = spTimeout.selectedItemPosition
+            if (selIndex in timeoutValues.indices) {
+                telegramManager.keypadTimeoutMs = timeoutValues[selIndex]
+            }
             val idStr = etId.text.toString().trim()
             val hashStr = etHash.text.toString().trim()
             if (idStr.isNotEmpty() && hashStr.isNotEmpty()) {
@@ -987,6 +1013,8 @@ class MainActivity : AppCompatActivity() {
                 showToast("Saved! Reconnecting...")
                 telegramManager.start()
                 showChatListScreen()
+            } else {
+                showToast("Saved!")
             }
         }
 
@@ -1101,7 +1129,8 @@ class MainActivity : AppCompatActivity() {
             val isInputKey = (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
                              keyCode == KeyEvent.KEYCODE_STAR ||
                              keyCode == KeyEvent.KEYCODE_POUND ||
-                             keyCode == KeyEvent.KEYCODE_DEL
+                             keyCode == KeyEvent.KEYCODE_DEL ||
+                             keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
             if (isInputKey) {
                 if (etLoginInput?.hasFocus() != true) {
                     etLoginInput?.requestFocus()
