@@ -530,9 +530,16 @@ class MainActivity : AppCompatActivity() {
             messageAdapter?.setPlayingMessageId(null)
         } else {
             messageAdapter?.setPlayingMessageId(msg.id)
-            val success = voicePlayer.play(path) {
-                messageAdapter?.setPlayingMessageId(null)
-            }
+            val success = voicePlayer.play(
+                path = path,
+                onError = {
+                    messageAdapter?.setPlayingMessageId(null)
+                    showToast("Unable to play audio recording", true)
+                },
+                onCompletion = {
+                    messageAdapter?.setPlayingMessageId(null)
+                }
+            )
             if (!success) {
                 messageAdapter?.setPlayingMessageId(null)
                 showToast("Unable to play audio recording", true)
