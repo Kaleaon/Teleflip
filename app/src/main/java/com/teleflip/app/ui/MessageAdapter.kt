@@ -15,6 +15,7 @@ import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
 import java.io.File
+import java.util.Locale
 
 class MessageAdapter(
     private val onMessageFocused: ((MessageModel) -> Unit)? = null,
@@ -23,6 +24,7 @@ class MessageAdapter(
 
     private val items = mutableListOf<MessageModel>()
     private var playingMessageId: Long? = null
+    private var currentSpeed: Float = 1.0f
 
     fun submitList(newItems: List<MessageModel>) {
         items.clear()
@@ -30,8 +32,14 @@ class MessageAdapter(
         notifyDataSetChanged()
     }
 
-    fun setPlayingMessageId(id: Long?) {
+    fun setPlayingMessageId(id: Long?, speed: Float = currentSpeed) {
         playingMessageId = id
+        currentSpeed = speed
+        notifyDataSetChanged()
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        currentSpeed = speed
         notifyDataSetChanged()
     }
 
@@ -87,7 +95,8 @@ class MessageAdapter(
                 MediaType.VOICE -> {
                     tvMedia.visibility = View.VISIBLE
                     val isPlaying = (playingMessageId == message.id)
-                    val icon = if (isPlaying) "⏸ Playing..." else "▶ Play (${message.durationSeconds}s)"
+                    val speedStr = String.format(Locale.US, "%.1fx", currentSpeed)
+                    val icon = if (isPlaying) "⏸ Playing ($speedStr)" else "▶ Play (${message.durationSeconds}s)"
                     tvMedia.text = "🎤 [Voice Message] $icon"
                 }
                 MediaType.LOCATION -> {
