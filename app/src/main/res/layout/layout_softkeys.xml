@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/softkey_bar"
+    android:layout_width="match_parent"
+    android:layout_height="40dp"
+    android:background="@color/softkey_bg"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp">
+
+    <!-- Left Soft Key (LSK) -->
+    <TextView
+        android:id="@+id/tv_softkey_left"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:gravity="center_vertical|start"
+        android:text="Options"
+        android:textColor="@color/softkey_text"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Center Key (OK / Enter) -->
+    <TextView
+        android:id="@+id/tv_softkey_center"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="Open"
+        android:textColor="@color/softkey_center"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Right Soft Key (RSK) -->
+    <TextView
+        android:id="@+id/tv_softkey_right"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:gravity="center_vertical|end"
+        android:text="Back"
+        android:textColor="@color/softkey_text"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+</LinearLayout>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Core Dark OLED Theme for Flip Phones -->
+    <color name="bg_dark">#12161D</color>
+    <color name="bg_dark_card">#1C222D</color>
+    <color name="bg_dark_card_focused">#2A3649</color>
+    <color name="focus_highlight">#00D2FF</color>
+    <color name="focus_highlight_gold">#FFC837</color>
+    
+    <!-- Telegram Branding Colors -->
+    <color name="tg_blue">#24A1DE</color>
+    <color name="tg_blue_dark">#1B7AB0</color>
+    <color name="tg_green">#00C853</color>
+    <color name="tg_outbound_bubble">#1E3A5F</color>
+    <color name="tg_inbound_bubble">#242D3D</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#F5F7FA</color>
+    <color name="text_secondary">#8E9AA8</color>
+    <color name="text_hint">#5B6877</color>
+    <color name="text_accent">#00D2FF</color>
+    <color name="text_error">#FF5252</color>
+
+    <!-- Softkey Bar -->
+    <color name="softkey_bg">#0D1117</color>
+    <color name="softkey_text">#FFFFFF</color>
+    <color name="softkey_center">#FFC837</color>
+    <color name="softkey_divider">#263040</color>
+
+    <!-- Badges & Accents -->
+    <color name="badge_unread">#24A1DE</color>
+    <color name="badge_unread_text">#FFFFFF</color>
+    <color name="online_indicator">#4CAF50</color>
+    <color name="offline_indicator">#757575</color>
+</resources>

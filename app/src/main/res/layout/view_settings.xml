@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Settings &amp; Configuration"
+            android:textColor="@color/tg_blue"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Profile Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_item_selector"
+            android:padding="12dp"
+            android:focusable="true"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:id="@+id/tv_settings_user"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Account: Not logged in"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_settings_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Status: Disconnected"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
+
+        </LinearLayout>
+
+        <!-- API ID Setting -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Telegram API ID:"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_api_id"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:hint="e.g. 21724"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_hint"
+            android:textSize="14sp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:background="@drawable/bg_edittext_selector"
+            android:inputType="number"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- API HASH Setting -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Telegram API Hash:"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_api_hash"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:hint="e.g. 3e0cb5da..."
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_hint"
+            android:textSize="13sp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:background="@drawable/bg_edittext_selector"
+            android:inputType="text"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Save Button -->
+        <Button
+            android:id="@+id/btn_save_config"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="Save &amp; Reconnect"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Log Out Button -->
+        <Button
+            android:id="@+id/btn_logout"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:text="Log Out"
+            android:textColor="@color/text_error"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Back to Chats Button -->
+        <Button
+            android:id="@+id/btn_back_to_chats"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:text="Back"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="20dp" />
+
+    </LinearLayout>
+
+</ScrollView>

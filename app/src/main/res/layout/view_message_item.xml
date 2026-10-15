@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layout_message_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp"
+    android:focusable="true"
+    android:focusableInTouchMode="true">
+
+    <LinearLayout
+        android:id="@+id/layout_bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:maxWidth="340dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:background="@drawable/bg_inbound_bubble">
+
+        <!-- Sender Name (shown in group chats for inbound) -->
+        <TextView
+            android:id="@+id/tv_sender_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sender Name"
+            android:textColor="@color/focus_highlight"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            android:layout_marginBottom="2dp" />
+
+        <!-- Media Attachment Indicator (e.g. [Photo], [Voice Note]) -->
+        <TextView
+            android:id="@+id/tv_media_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📷 [Photo]"
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            android:layout_marginBottom="2dp" />
+
+        <!-- Image Preview for Photos -->
+        <ImageView
+            android:id="@+id/iv_message_photo"
+            android:layout_width="160dp"
+            android:layout_height="120dp"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="4dp" />
+
+        <!-- Message Body Text -->
+        <TextView
+            android:id="@+id/tv_message_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Message content goes here..."
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <!-- Meta Line: Time & Status Tick -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_gravity="end"
+            android:gravity="center_vertical"
+            android:layout_marginTop="2dp">
+
+            <TextView
+                android:id="@+id/tv_message_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="14:20"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/tv_read_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" ✓✓"
+                android:textColor="@color/focus_highlight"
+                android:textSize="11sp"
+                android:visibility="visible" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

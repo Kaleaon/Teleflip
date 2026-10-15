@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/bg_dark_card"
+    android:padding="12dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="System Diagnostics &amp; Error Log"
+        android:textColor="@color/focus_highlight_gold"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:paddingBottom="6dp" />
+
+    <TextView
+        android:id="@+id/tv_diag_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ADB Tag: TELEFLIP_REPORT\nLog File: /sdcard/.../teleflip_reports.log"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:paddingBottom="6dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/softkey_divider"
+        android:layout_marginBottom="6dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:focusable="true">
+
+        <TextView
+            android:id="@+id/tv_diag_logs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Loading logs..."
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:padding="4dp" />
+
+    </ScrollView>
+
+    <Button
+        android:id="@+id/btn_close_diag"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:text="Close (or Press Back)"
+        android:textColor="@color/text_primary"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:background="@drawable/bg_button_selector"
+        android:focusable="true"
+        android:layout_marginTop="8dp" />
+
+</LinearLayout>

@@ -1,0 +1,11 @@
+## This file contains developer-specific local properties and API credentials.
+## Copy this file to local.properties and fill in your values.
+## DO NOT commit local.properties to version control.
+
+# Path to the Android SDK
+sdk.dir=/path/to/android-sdk
+
+# Telegram API credentials from https://my.telegram.org/apps
+# If left blank, you can also configure credentials within the app's Settings screen.
+TELEGRAM_API_ID=0
+TELEGRAM_API_HASH=
