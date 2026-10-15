@@ -140,6 +140,7 @@
             android:text="Recording... (Press OK to Stop &amp; Send)"
             android:textColor="@color/text_primary"
             android:textSize="12sp"
+            android:accessibilityLiveRegion="polite"
             android:ellipsize="end"
             android:maxLines="1" />
 
@@ -167,6 +168,7 @@
             android:textColor="@color/focus_highlight_gold"
             android:textSize="11sp"
             android:textStyle="bold"
+            android:accessibilityLiveRegion="polite"
             android:paddingStart="6dp"
             android:paddingEnd="6dp"
             android:paddingTop="3dp"

@@ -205,5 +205,6 @@ class KeypadInputEngine(
 
     private fun updateModeIndicator() {
         modeIndicator?.text = "[#] ${currentMode.label}"
+        modeIndicator?.announceForAccessibility("Input mode ${currentMode.label}")
     }
 }

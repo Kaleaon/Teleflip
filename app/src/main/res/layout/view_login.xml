@@ -41,6 +41,7 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:gravity="center"
+            android:accessibilityLiveRegion="polite"
             android:padding="8dp"
             android:background="@drawable/bg_tab_indicator"
             android:layout_marginBottom="16dp" />
