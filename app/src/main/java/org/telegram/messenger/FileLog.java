@@ -22,12 +22,4 @@ public class FileLog {
         Log.e(TAG, message, e);
         AdbReporter.INSTANCE.reportError(TAG, message, e);
     }
-
-    public static void d(String message) {
-        Log.d(TAG, message);
-    }
-
-    public static void w(String message) {
-        Log.w(TAG, message);
-    }
 }
