@@ -2,6 +2,7 @@ package com.teleflip.app.media
 
 import android.content.Context
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -32,6 +33,15 @@ class VoiceRecorder(private val context: Context) {
         }
     }
 
+    private fun createMediaRecorder(): MediaRecorder {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            MediaRecorder(context)
+        } else {
+            @Suppress("DEPRECATION")
+            MediaRecorder()
+        }
+    }
+
     fun startRecording(onTick: (Int) -> Unit): Boolean {
         if (isRecording) return false
 
@@ -42,7 +52,7 @@ class VoiceRecorder(private val context: Context) {
             val file = File(audioDir, "voice_${System.currentTimeMillis()}.m4a")
             currentFile = file
 
-            recorder = MediaRecorder().apply {
+            recorder = createMediaRecorder().apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
