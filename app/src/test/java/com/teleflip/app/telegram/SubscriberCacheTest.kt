@@ -5,6 +5,7 @@ import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
+import com.teleflip.app.model.MessageStatus
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -80,16 +81,32 @@ class SubscriberCacheTest {
     }
 
     @Test
-    fun testDemoModeIncludesPremiumContactsAndStickers() {
-        telegramManager.enableDemoMode()
+    fun testPremiumContactsAndStickersModel() {
+        val chat = ChatModel(2L, "Alice Smith", "Check this out!", "12:37", 0, ChatType.DIRECT, "AS", isPremium = true)
+        telegramManager.setChatsForTesting(listOf(chat))
 
         val chats = telegramManager.chats.value
         val aliceChat = chats.find { it.id == 2L }
-        assertTrue("Alice Smith in demo mode should be premium subscriber", aliceChat?.isPremium == true)
+        assertTrue("Alice Smith should be premium subscriber", aliceChat?.isPremium == true)
+
+        val stickerMsg =
+            MessageModel(
+                id = 203L,
+                chatId = 2L,
+                senderName = "Alice Smith",
+                text = "Check out this sticker!",
+                time = "12:37",
+                isOutbound = false,
+                status = MessageStatus.READ,
+                mediaType = MediaType.STICKER,
+                stickerEmoji = "🎉",
+                isPremiumSticker = true,
+            )
+        telegramManager.setMessagesForTesting(mapOf(2L to listOf(stickerMsg)))
 
         val messages = telegramManager.messages.value[2L] ?: emptyList()
-        val stickerMsg = messages.find { it.mediaType == MediaType.STICKER }
-        assertTrue("Sticker message should exist in demo chat", stickerMsg != null)
-        assertEquals("Sticker emoji should be '🎉'", "🎉", stickerMsg?.stickerEmoji)
+        val found = messages.find { it.mediaType == MediaType.STICKER }
+        assertTrue("Sticker message should exist in chat", found != null)
+        assertEquals("Sticker emoji should be '🎉'", "🎉", found?.stickerEmoji)
     }
 }

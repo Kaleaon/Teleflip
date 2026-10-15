@@ -46,7 +46,7 @@ class SoftkeyAndBackNavigationTest {
     fun testRightSoftkeyCodesTriggerRightAction() {
         var rightTriggered = false
         softkeyManager.update(
-            right = "Demo",
+            right = "Exit",
             onRight = { rightTriggered = true },
         )
 
@@ -72,7 +72,7 @@ class SoftkeyAndBackNavigationTest {
     fun testBackKeyCodeDoesNotTriggerSoftkeyOrRightAction() {
         var rightTriggered = false
         softkeyManager.update(
-            right = "Demo",
+            right = "Exit",
             onRight = { rightTriggered = true },
         )
 

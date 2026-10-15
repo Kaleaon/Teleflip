@@ -2,6 +2,8 @@ package com.teleflip.app.telegram
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.teleflip.app.model.ChatModel
+import com.teleflip.app.model.ChatType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -97,21 +99,18 @@ class TelegramManagerTest {
     }
 
     @Test
-    fun testDemoModeIsolation() {
+    fun testTestingHooksAndStateFlows() {
         val manager = TelegramManager(mockContext)
-        manager.enableDemoMode()
+        val chat = ChatModel(10L, "Test", "Msg", "12:00", 0, ChatType.DIRECT, "T")
+        manager.setChatsForTesting(listOf(chat))
+        assertEquals(1, manager.chats.value.size)
+        assertEquals("Test", manager.chats.value[0].title)
 
-        assertTrue("Demo mode should be enabled", manager.isDemoMode)
-        assertEquals("Demo (Offline)", manager.connectionState.value)
+        manager.setConnectionStateForTesting("Ready")
+        assertEquals("Ready", manager.connectionState.value)
 
-        // Demo submissions update auth state directly without touching native client or locking in-flight query
-        manager.sendPhoneNumber("+15559990000")
-        assertFalse("isAuthQueryInProgress must remain false in demo mode", manager.isAuthQueryInProgress)
-        assertTrue("Demo phone submit transitions to WaitCode", manager.authState.value is AuthState.WaitCode)
-
-        manager.checkCode("12345")
-        assertFalse("isAuthQueryInProgress must remain false in demo code check", manager.isAuthQueryInProgress)
-        assertTrue("Demo code check transitions to Ready", manager.authState.value is AuthState.Ready)
+        manager.setAuthStateForTesting(AuthState.Ready)
+        assertEquals(AuthState.Ready, manager.authState.value)
     }
 
     @Test

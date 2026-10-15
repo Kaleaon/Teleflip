@@ -2,6 +2,9 @@ package com.teleflip.app.telegram
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.teleflip.app.model.ActiveCall
+import com.teleflip.app.model.ChatModel
+import com.teleflip.app.model.ChatType
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -38,37 +41,29 @@ class TelegramFeaturesTest {
     }
 
     @Test
-    fun testInitiateTelegramCallDemoMode() {
-        telegramManager.enableDemoMode()
-        var callResultSuccess = false
-        telegramManager.initiateTelegramCall(2L) { success, _ ->
+    fun testInitiateTelegramCallWithoutActiveClient() {
+        var callResultSuccess: Boolean? = null
+        var errorMessage: String? = null
+        telegramManager.initiateTelegramCall(2L) { success, msg ->
             callResultSuccess = success
+            errorMessage = msg
         }
-        assertTrue("Telegram call in demo mode should succeed", callResultSuccess)
+        assertEquals(false, callResultSuccess)
+        assertEquals("TDLib client is not available", errorMessage)
     }
 
     @Test
-    fun testForwardMessageDemoMode() {
-        telegramManager.enableDemoMode()
-
-        var forwardSuccess = false
-        // Chat 2 has message 201L in demo mode: "Hey, does your flip phone have Telegram now?"
+    fun testForwardMessageWithoutActiveClient() {
+        var forwardSuccess: Boolean? = null
         telegramManager.forwardMessage(fromChatId = 2L, toChatId = 3L, messageId = 201L) { success ->
             forwardSuccess = success
         }
-
-        assertTrue("Forward message should succeed in demo mode", forwardSuccess)
-        val chat3Msgs = telegramManager.messages.value[3L] ?: emptyList()
-        val forwarded = chat3Msgs.find { it.text.contains("Forwarded") }
-        assertNotNull("Forwarded message should appear in target chat", forwarded)
-        assertTrue("Forwarded message should contain original text", forwarded?.text?.contains("Hey, does your flip phone") == true)
+        assertEquals(false, forwardSuccess)
     }
 
     @Test
     fun testTelegramToSComplianceMethods() {
-        telegramManager.enableDemoMode()
-
-        // Calling ToS methods in demo mode should be safe and no-op without exception
+        // Calling ToS methods without active native client should be safe and no-op without crashing
         telegramManager.openChat(1L)
         telegramManager.closeChat(1L)
         telegramManager.markMessagesAsRead(1L, longArrayOf(101L))
@@ -80,14 +75,17 @@ class TelegramFeaturesTest {
     }
 
     @Test
-    fun testCallingLifecycleDemoMode() {
-        telegramManager.enableDemoMode()
-
-        var callInitiated = false
-        telegramManager.initiateTelegramCall(2L) { success, _ ->
-            callInitiated = success
-        }
-        assertTrue("Call initiation should succeed in demo mode", callInitiated)
+    fun testCallingLifecycleAndAudioState() {
+        val initialCall =
+            ActiveCall(
+                callId = 12345,
+                userId = 2L,
+                userName = "Alice Smith",
+                isOutgoing = true,
+                state = com.teleflip.app.model.CallState.READY,
+                durationSec = 0,
+            )
+        telegramManager.setActiveCallForTesting(initialCall)
 
         val active = telegramManager.activeCall.value
         assertNotNull("Active call should be present", active)
@@ -158,33 +156,33 @@ class TelegramFeaturesTest {
     }
 
     @Test
-    fun testLoadChatProfileDemoMode() {
-        telegramManager.enableDemoMode()
+    fun testLoadChatProfileFallback() {
+        val chat = ChatModel(1L, "Telegram News", "News", "12:00", 0, ChatType.CHANNEL, "TN", isPremium = true)
+        telegramManager.setChatsForTesting(listOf(chat))
 
         var profileLoaded: com.teleflip.app.model.ChatProfile? = null
         telegramManager.loadChatProfile(1L) { profile ->
             profileLoaded = profile
         }
 
-        assertNotNull("Profile should be loaded", profileLoaded)
+        Thread.sleep(300)
+        assertNotNull("Profile should be loaded via fallback", profileLoaded)
         assertEquals(1L, profileLoaded?.chatId)
-        assertTrue("Status text should be present", profileLoaded?.statusText?.isNotEmpty() == true)
-        assertTrue("Bio should be present", profileLoaded?.bio?.isNotEmpty() == true)
+        assertEquals("Telegram News", profileLoaded?.title)
+        assertEquals("Details unavailable", profileLoaded?.statusText)
     }
 
     @Test
-    fun testToggleChatMuteDemoMode() {
-        telegramManager.enableDemoMode()
-
+    fun testToggleChatMuteWithoutActiveClient() {
         var toggledResult: Boolean? = null
         telegramManager.toggleChatMute(1L, currentMuted = false) { newMuted ->
             toggledResult = newMuted
         }
-        assertTrue("Should toggle to muted", toggledResult == true)
+        assertEquals(false, toggledResult)
 
         telegramManager.toggleChatMute(1L, currentMuted = true) { newMuted ->
             toggledResult = newMuted
         }
-        assertTrue("Should toggle to unmuted", toggledResult == false)
+        assertEquals(true, toggledResult)
     }
 }

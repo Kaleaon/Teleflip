@@ -203,7 +203,7 @@ class MainActivity : AppCompatActivity() {
                 when (state) {
                     is AuthState.Initial, is AuthState.WaitParameters -> {}
                     is AuthState.WaitPhoneNumber, is AuthState.WaitCode, is AuthState.WaitPassword, is AuthState.WaitPasswordRecoveryCode, is AuthState.Error -> {
-                        if (currentScreen != Screen.SETTINGS && !telegramManager.isDemoMode) {
+                        if (currentScreen != Screen.SETTINGS) {
                             showLoginScreen(state)
                         }
                     }
@@ -532,17 +532,13 @@ class MainActivity : AppCompatActivity() {
                     telegramManager.loadChats()
                     showToast("Refreshing chats...")
                 },
-                MenuOption(4, "Explore Demo / Offline Chats") {
-                    telegramManager.enableDemoMode()
-                    showToast("Demo mode active")
-                },
-                MenuOption(5, "Diagnostics & Error Log") {
+                MenuOption(4, "Diagnostics & Error Log") {
                     com.teleflip.app.ui.DiagnosticsDialog(this).show()
                 },
-                MenuOption(6, "Settings & API") {
+                MenuOption(5, "Settings & API") {
                     showSettingsScreen()
                 },
-                MenuOption(7, "Log Out") {
+                MenuOption(6, "Log Out") {
                     telegramManager.logOut()
                 },
             )
@@ -773,8 +769,7 @@ class MainActivity : AppCompatActivity() {
         lastResendTimestamp = now
 
         val isOffline =
-            !telegramManager.isDemoMode &&
-                (telegramManager.connectionState.value == "Offline" || telegramManager.connectionState.value == "Waiting for network")
+            telegramManager.connectionState.value == "Offline" || telegramManager.connectionState.value == "Waiting for network"
 
         if (isOffline) {
             telegramManager.updateMessageStatus(msg.chatId, msg.id, MessageStatus.FAILED)
@@ -1342,7 +1337,6 @@ class MainActivity : AppCompatActivity() {
         val btnForgotPassword = view.findViewById<Button>(R.id.btn_forgot_password)
         val btnResetAccount = view.findViewById<Button>(R.id.btn_reset_account)
         val btnUseSim = view.findViewById<Button>(R.id.btn_use_sim_number)
-        val btnDemo = view.findViewById<Button>(R.id.btn_demo_mode)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
 
         loginInputEngine =
@@ -1427,8 +1421,8 @@ class MainActivity : AppCompatActivity() {
                 btnForgotPassword?.nextFocusUpId = R.id.btn_login_submit
                 btnForgotPassword?.nextFocusDownId = R.id.btn_reset_account
                 btnResetAccount?.nextFocusUpId = R.id.btn_forgot_password
-                btnResetAccount?.nextFocusDownId = R.id.btn_demo_mode
-                btnDemo.nextFocusUpId = R.id.btn_reset_account
+                btnResetAccount?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_reset_account
 
                 btnForgotPassword?.setOnClickListener {
                     telegramManager.requestPasswordRecovery()
@@ -1463,8 +1457,8 @@ class MainActivity : AppCompatActivity() {
                 btnForgotPassword?.visibility = View.GONE
                 btnResetAccount?.visibility = View.GONE
 
-                btnSubmit.nextFocusDownId = R.id.btn_demo_mode
-                btnDemo.nextFocusUpId = R.id.btn_login_submit
+                btnSubmit.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_submit
 
                 tvLabel.text = "Email Recovery Code (6 digits):"
                 etLoginInput?.hint = "123456"
@@ -1486,8 +1480,8 @@ class MainActivity : AppCompatActivity() {
             }
             is AuthState.Error -> {
                 btnUseSim?.visibility = View.GONE
-                btnSubmit.nextFocusDownId = R.id.btn_demo_mode
-                btnDemo.nextFocusUpId = R.id.btn_login_submit
+                btnSubmit.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_submit
                 val errorMessage = "⚠️ Error: ${state.message}"
                 tvStatus.text = errorMessage
                 tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
@@ -1522,25 +1516,28 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 } else {
-                    showToast("Please enter a phone number, or press [Demo] (Right Softkey)", true)
+                    val hint =
+                        when (telegramManager.authState.value) {
+                            is AuthState.WaitCode -> "Please enter verification code"
+                            is AuthState.WaitPassword -> "Please enter password"
+                            is AuthState.WaitPasswordRecoveryCode -> "Please enter recovery code"
+                            else -> "Please enter a phone number"
+                        }
+                    showToast(hint, true)
                 }
             }
         }
 
         btnSubmit.setOnClickListener { doSubmit() }
-        btnDemo.setOnClickListener {
-            telegramManager.enableDemoMode()
-            showChatListScreen()
-        }
         btnConfig.setOnClickListener { showSettingsScreen() }
 
         updateLoginConnectionState(telegramManager.connectionState.value)
         updateLoginProgressState(telegramManager.isAuthQueryInProgress)
 
         softkeyManager.update(
-            left = "Config",
+            left = "Settings",
             center = "Submit",
-            right = "Demo",
+            right = "Exit",
             onLeft = { showSettingsScreen() },
             onCenter = {
                 if (currentFocus?.id == R.id.btn_retry_connection) {
@@ -1549,10 +1546,7 @@ class MainActivity : AppCompatActivity() {
                     doSubmit()
                 }
             },
-            onRight = {
-                telegramManager.enableDemoMode()
-                showChatListScreen()
-            },
+            onRight = { finish() },
         )
 
         etLoginInput?.requestFocus()
@@ -1608,7 +1602,6 @@ class MainActivity : AppCompatActivity() {
         val btnSubmit = findViewById<Button>(R.id.btn_login_submit) ?: return
         val btnRetry = findViewById<Button>(R.id.btn_retry_connection) ?: return
         val btnSim = findViewById<Button>(R.id.btn_use_sim_number) ?: return
-        val btnDemo = findViewById<Button>(R.id.btn_demo_mode) ?: return
         val btnConfig = findViewById<Button>(R.id.btn_config_credentials) ?: return
 
         etInput.nextFocusDownId = R.id.btn_login_submit
@@ -1628,11 +1621,8 @@ class MainActivity : AppCompatActivity() {
             prevId = R.id.btn_use_sim_number
         }
 
-        findViewById<View>(prevId)?.nextFocusDownId = R.id.btn_demo_mode
-        btnDemo.nextFocusUpId = prevId
-
-        btnDemo.nextFocusDownId = R.id.btn_config_credentials
-        btnConfig.nextFocusUpId = R.id.btn_demo_mode
+        findViewById<View>(prevId)?.nextFocusDownId = R.id.btn_config_credentials
+        btnConfig.nextFocusUpId = prevId
     }
 
     private fun showAccountResetConfirmationDialog() {

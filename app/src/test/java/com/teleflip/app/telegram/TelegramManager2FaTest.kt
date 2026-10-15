@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -47,35 +48,36 @@ class TelegramManager2FaTest {
     }
 
     @Test
-    fun testDemoModeRequestPasswordRecovery() {
-        telegramManager.enableDemoMode()
+    fun testRequestPasswordRecoveryWhenClientUnavailable() {
         telegramManager.requestPasswordRecovery()
 
+        assertFalse("isAuthQueryInProgress should remain false", telegramManager.isAuthQueryInProgress)
         val state = telegramManager.authState.value
-        assertTrue(state is AuthState.WaitPasswordRecoveryCode)
-        val recoveryState = state as AuthState.WaitPasswordRecoveryCode
-        assertEquals("d***o@example.com", recoveryState.recoveryEmailPattern)
+        assertTrue("Auth state should reflect unavailable client", state is AuthState.WaitPhoneNumber)
+        val phoneState = state as AuthState.WaitPhoneNumber
+        assertTrue("Error message should mention unavailable", phoneState.errorMessage?.contains("unavailable") == true)
     }
 
     @Test
-    fun testDemoModeRecoverPassword() {
-        telegramManager.enableDemoMode()
-        telegramManager.requestPasswordRecovery()
+    fun testRecoverPasswordWhenClientUnavailable() {
         telegramManager.recoverPassword("123456")
 
+        assertFalse("isAuthQueryInProgress should remain false", telegramManager.isAuthQueryInProgress)
         val state = telegramManager.authState.value
-        assertEquals(AuthState.Ready, state)
+        assertTrue("Auth state should reflect unavailable client", state is AuthState.WaitPhoneNumber)
+        val phoneState = state as AuthState.WaitPhoneNumber
+        assertTrue("Error message should mention unavailable", phoneState.errorMessage?.contains("unavailable") == true)
     }
 
     @Test
-    fun testDemoModeResetAccount() {
-        telegramManager.enableDemoMode()
+    fun testResetAccountWhenClientUnavailable() {
         telegramManager.resetAccount()
 
+        assertFalse("isAuthQueryInProgress should remain false", telegramManager.isAuthQueryInProgress)
         val state = telegramManager.authState.value
-        assertTrue(state is AuthState.WaitPhoneNumber)
+        assertTrue("Auth state should reflect unavailable client", state is AuthState.WaitPhoneNumber)
         val phoneState = state as AuthState.WaitPhoneNumber
-        assertEquals("Demo account reset successfully.", phoneState.errorMessage)
+        assertTrue("Error message should mention unavailable", phoneState.errorMessage?.contains("unavailable") == true)
     }
 
     @Test

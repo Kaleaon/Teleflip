@@ -6,6 +6,7 @@ import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
+import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.telegram.TelegramManager
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
@@ -70,11 +71,10 @@ class SubscriberCacheTest {
     fun testSubscriberCacheAndUserUpdates() {
         val manager = TelegramManager(mockContext)
 
-        // Enable demo mode first to populate initial chats
-        manager.enableDemoMode()
-        val demoChats = manager.chats.value
-        val aliceChat = demoChats.find { it.id == 2L }
-        assertTrue("Alice Smith in demo mode should be premium", aliceChat?.isPremium == true)
+        val chat = ChatModel(2L, "Alice Smith", "Hi", "12:00", 0, ChatType.DIRECT, "AS", isPremium = true)
+        manager.setChatsForTesting(listOf(chat))
+        val aliceChat = manager.chats.value.find { it.id == 2L }
+        assertTrue("Alice Smith should be premium", aliceChat?.isPremium == true)
 
         // Test updating user subscriber cache via updateUserCache
         val testUser =
@@ -93,19 +93,32 @@ class SubscriberCacheTest {
             }
         val updateUser = TdApi.UpdateUser(nonPremiumUser)
         manager.onResult(updateUser)
-        assertFalse("userSubscriberCache should store false for user 666", manager.userSubscriberCache[666L] == false)
+        assertEquals("userSubscriberCache should store false for user 666", false, manager.userSubscriberCache[666L])
     }
 
     @Test
-    fun testDemoModeStickerMessage() {
+    fun testStickerMessageModel() {
         val manager = TelegramManager(mockContext)
-        manager.enableDemoMode()
+        val stickerMsg =
+            MessageModel(
+                id = 203L,
+                chatId = 2L,
+                senderName = "Alice Smith",
+                text = "Sticker",
+                time = "12:37",
+                isOutbound = false,
+                status = MessageStatus.READ,
+                mediaType = MediaType.STICKER,
+                stickerEmoji = "🎉",
+                isPremiumSticker = true,
+            )
+        manager.setMessagesForTesting(mapOf(2L to listOf(stickerMsg)))
 
         val messages = manager.messages.value[2L]
-        assertTrue("Alice Smith should have messages in demo mode", !messages.isNullOrEmpty())
-        val stickerMsg = messages?.find { it.mediaType == MediaType.STICKER }
-        assertTrue("Sticker message should be present", stickerMsg != null)
-        assertEquals("🎉", stickerMsg?.stickerEmoji)
-        assertTrue("Sticker message should be marked premium", stickerMsg?.isPremiumSticker == true)
+        assertTrue("Messages should be present", !messages.isNullOrEmpty())
+        val found = messages?.find { it.mediaType == MediaType.STICKER }
+        assertTrue("Sticker message should be present", found != null)
+        assertEquals("🎉", found?.stickerEmoji)
+        assertTrue("Sticker message should be marked premium", found?.isPremiumSticker == true)
     }
 }

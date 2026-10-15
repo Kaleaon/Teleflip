@@ -2,6 +2,7 @@ package com.teleflip.app.telegram
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -28,49 +29,33 @@ class TelegramResendTest {
     @Test
     fun testUpdateMessageStatus() {
         val manager = TelegramManager(createMockContext())
-        manager.enableDemoMode()
+        val msg = MessageModel(101L, 2L, "You", "Hi", "12:00", true, MessageStatus.SENT)
+        manager.setMessagesForTesting(mapOf(2L to listOf(msg)))
 
-        val chatId = 2L
-        val initialMsgs = manager.messages.value[chatId] ?: emptyList()
-        val targetMsg = initialMsgs.first()
+        manager.updateMessageStatus(2L, 101L, MessageStatus.FAILED)
 
-        manager.updateMessageStatus(chatId, targetMsg.id, MessageStatus.FAILED)
-
-        val updatedMsgs = manager.messages.value[chatId] ?: emptyList()
-        val updatedMsg = updatedMsgs.find { it.id == targetMsg.id }
+        val updatedMsgs = manager.messages.value[2L] ?: emptyList()
+        val updatedMsg = updatedMsgs.find { it.id == 101L }
 
         assertNotNull(updatedMsg)
         assertEquals(MessageStatus.FAILED, updatedMsg?.status)
     }
 
     @Test
-    fun testResendMessageInDemoMode() {
+    fun testResendMessageTransitionsToSending() {
         val manager = TelegramManager(createMockContext())
-        manager.enableDemoMode()
+        manager.setConnectionStateForTesting("Ready")
 
         val chatId = 2L
-        manager.sendMessage(chatId, "Test resend outbound")
+        val msg = MessageModel(101L, chatId, "You", "Test resend outbound", "12:00", true, MessageStatus.FAILED)
+        manager.setMessagesForTesting(mapOf(chatId to listOf(msg)))
 
-        val outboundMsg = manager.messages.value[chatId]?.last()
-        assertNotNull(outboundMsg)
-        val msgId = outboundMsg!!.id
+        manager.resendMessage(chatId, 101L)
 
-        // Mark as FAILED
-        manager.updateMessageStatus(chatId, msgId, MessageStatus.FAILED)
-        assertEquals(MessageStatus.FAILED, manager.messages.value[chatId]?.find { it.id == msgId }?.status)
-
-        // Trigger resend
-        manager.resendMessage(chatId, msgId)
-
-        // Status should immediately change to SENDING
-        val sendingStatus = manager.messages.value[chatId]?.find { it.id == msgId }?.status
-        assertEquals(MessageStatus.SENDING, sendingStatus)
-
-        // Wait for demo coroutine to transition to SENT
-        Thread.sleep(1200)
-
-        val finalStatus = manager.messages.value[chatId]?.find { it.id == msgId }?.status
-        assertEquals(MessageStatus.SENT, finalStatus)
+        val chatMsgs = manager.messages.value[chatId] ?: emptyList()
+        val resendMsg = chatMsgs.find { it.id == 101L }
+        assertNotNull(resendMsg)
+        assertEquals(MessageStatus.SENDING, resendMsg?.status)
     }
 
     @Test

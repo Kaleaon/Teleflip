@@ -183,20 +183,6 @@
             android:focusable="true"
             android:visibility="gone"
             android:nextFocusUp="@+id/btn_login_submit"
-            android:nextFocusDown="@+id/btn_demo_mode"
-            android:layout_marginBottom="12dp" />
-
-        <!-- Alternative: Explore Demo Mode -->
-        <Button
-            android:id="@+id/btn_demo_mode"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:text="Explore Demo / Offline Chats"
-            android:textColor="@color/focus_highlight_gold"
-            android:textSize="13sp"
-            android:background="@drawable/bg_item_selector"
-            android:focusable="true"
-            android:nextFocusUp="@+id/btn_use_sim_number"
             android:nextFocusDown="@+id/btn_config_credentials"
             android:layout_marginBottom="12dp" />
 
@@ -210,7 +196,7 @@
             android:textSize="12sp"
             android:background="@drawable/bg_item_selector"
             android:focusable="true"
-            android:nextFocusUp="@+id/btn_demo_mode"
+            android:nextFocusUp="@+id/btn_use_sim_number"
             android:layout_marginBottom="16dp" />
 
         <!-- Progress Spinner -->

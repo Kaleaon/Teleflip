@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
+import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageSearchResult
+import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.telegram.TelegramManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -26,7 +28,21 @@ class SearchDialogTest {
         `when`(context.getSharedPreferences(anyString(), anyInt())).thenReturn(prefs)
 
         val tm = TelegramManager(context)
-        tm.enableDemoMode()
+        val testChats =
+            listOf(
+                ChatModel(1L, "Telegram News", "Welcome to TeleFlip!", "12:00", 1, ChatType.CHANNEL, "TN"),
+                ChatModel(2L, "Alice Smith", "Dinner at 7 PM", "12:35", 0, ChatType.DIRECT, "AS"),
+            )
+        tm.setChatsForTesting(testChats)
+
+        val testMessages: Map<Long, List<MessageModel>> =
+            mapOf(
+                2L to
+                    listOf(
+                        MessageModel(201L, 2L, "Alice Smith", "Meeting for dinner tonight", "12:35", false, MessageStatus.READ),
+                    ),
+            )
+        tm.setMessagesForTesting(testMessages)
         return tm
     }
 
@@ -51,7 +67,7 @@ class SearchDialogTest {
     }
 
     @Test
-    fun testDemoChatsSearch() {
+    fun testChatsSearch() {
         val tm = createTelegramManager()
         var searchResults: List<ChatModel>? = null
 
@@ -65,7 +81,7 @@ class SearchDialogTest {
     }
 
     @Test
-    fun testDemoContactsSearch() {
+    fun testContactsSearch() {
         val tm = createTelegramManager()
         var searchResults: List<ChatModel>? = null
 
@@ -80,7 +96,7 @@ class SearchDialogTest {
     }
 
     @Test
-    fun testDemoMessagesSearch() {
+    fun testMessagesSearch() {
         val tm = createTelegramManager()
         var msgResults: List<MessageSearchResult>? = null
 
