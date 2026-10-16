@@ -33,6 +33,9 @@ class KeypadInputEngine(
     var currentMode = InputMode.CAP_FIRST
         private set
 
+    var isModeSwitchingEnabled: Boolean = true
+    var isSymbolPickerEnabled: Boolean = true
+
     private var lastKeyCode = -1
     private var charIndex = 0
     private var lastKeyTime = 0L
@@ -147,15 +150,19 @@ class KeypadInputEngine(
         // Open Symbols Picker with * (STAR)
         if (keyCode == KeyEvent.KEYCODE_STAR) {
             commitCurrentChar()
-            onSymbolRequested?.invoke()
+            if (isSymbolPickerEnabled) {
+                onSymbolRequested?.invoke()
+            }
             return true
         }
 
         // Toggle Input Mode with # (POUND)
         if (keyCode == KeyEvent.KEYCODE_POUND) {
             commitCurrentChar()
-            currentMode = currentMode.next()
-            updateModeIndicator()
+            if (isModeSwitchingEnabled) {
+                currentMode = currentMode.next()
+                updateModeIndicator()
+            }
             return true
         }
 

@@ -84,6 +84,7 @@ dependencies {
 
     // Coil image loading library
     implementation 'io.coil-kt:coil:2.6.0'
+    implementation 'io.coil-kt:coil-gif:2.6.0'
 
     // Unit testing framework
     testImplementation 'junit:junit:4.13.2'

@@ -161,3 +161,23 @@ data class ChatProfile(
     val selfDestructTimerSec: Int = 0,
     val members: List<GroupMember> = emptyList(),
 )
+
+data class StickerItem(
+    val fileId: Int,
+    val emoji: String = "",
+    val filePath: String? = null,
+    val setName: String = "",
+)
+
+data class StickerSetModel(
+    val id: Long,
+    val title: String,
+    val stickers: List<StickerItem> = emptyList(),
+)
+
+data class SavedGifItem(
+    val fileId: Int,
+    val filePath: String? = null,
+    val durationSeconds: Int = 0,
+    val caption: String = "",
+)

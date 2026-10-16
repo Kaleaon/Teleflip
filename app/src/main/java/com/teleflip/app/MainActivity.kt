@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
+import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -44,6 +45,8 @@ import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
+import com.teleflip.app.model.SavedGifItem
+import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.notifications.NotificationHelper
 import com.teleflip.app.notifications.TeleFlipNotificationService
 import com.teleflip.app.telegram.AuthState
@@ -1128,7 +1131,7 @@ class MainActivity : AppCompatActivity() {
                     onRight = { showChatListScreen() },
                 )
             }
-            MediaType.PHOTO -> {
+            MediaType.PHOTO, MediaType.STICKER -> {
                 softkeyManager.update(
                     left = "Options",
                     center = "Zoom/View",
@@ -1175,7 +1178,7 @@ class MainActivity : AppCompatActivity() {
         when (msg.mediaType) {
             MediaType.VOICE -> handlePlayVoiceMessage(msg)
             MediaType.LOCATION -> LocationHelper.openInOrganicMaps(this, msg.latitude, msg.longitude)
-            MediaType.PHOTO, MediaType.VIDEO, MediaType.ANIMATION -> openMediaViewer(msg)
+            MediaType.PHOTO, MediaType.VIDEO, MediaType.ANIMATION, MediaType.STICKER -> openMediaViewer(msg)
             MediaType.POLL -> showPollVoteMenu(msg)
             else -> showMessageOptionsMenu(msg)
         }
@@ -1464,6 +1467,11 @@ class MainActivity : AppCompatActivity() {
         options.add(
             MenuOption(options.size + 1, "🎨 Send Sticker") {
                 showStickerPickerMenu(chat)
+            },
+        )
+        options.add(
+            MenuOption(options.size + 1, "🎞️ Send GIF / Animation") {
+                showGifPickerMenu(chat)
             },
         )
         if (chat.chatType == ChatType.BOT || chat.chatType == ChatType.GROUP) {
@@ -1767,7 +1775,66 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showStickerPickerMenu(chat: ChatModel) {
-        val stickers =
+        val rootOptions = mutableListOf<MenuOption>()
+
+        rootOptions.add(
+            MenuOption(rootOptions.size + 1, "📦 My Telegram Sticker Packs") {
+                telegramManager.loadInstalledStickers { sets ->
+                    if (sets.isEmpty()) {
+                        showToast("No installed sticker sets found")
+                    } else {
+                        showInstalledStickerPacksMenu(chat, sets)
+                    }
+                }
+                showToast("Loading sticker packs...")
+            },
+        )
+
+        rootOptions.add(
+            MenuOption(rootOptions.size + 1, "⭐ Popular Emoji Stickers") {
+                showPopularStickersMenu(chat)
+            },
+        )
+
+        rootOptions.add(
+            MenuOption(rootOptions.size + 1, "📁 Pick Sticker from Device (.webp/.png)") {
+                showSendMediaPicker(chat, isPhoto = true)
+            },
+        )
+
+        OptionsMenuDialog(this, "Send Sticker", rootOptions).show()
+    }
+
+    private fun showInstalledStickerPacksMenu(
+        chat: ChatModel,
+        sets: List<StickerSetModel>,
+    ) {
+        val packOptions =
+            sets.mapIndexed { idx, set ->
+                MenuOption(idx + 1, "📦 ${set.title} (${set.stickers.size})") {
+                    showStickerPackItemsMenu(chat, set)
+                }
+            }
+        OptionsMenuDialog(this, "Sticker Packs", packOptions).show()
+    }
+
+    private fun showStickerPackItemsMenu(
+        chat: ChatModel,
+        set: StickerSetModel,
+    ) {
+        val stickerOptions =
+            set.stickers.take(30).mapIndexed { idx, st ->
+                val label = if (st.emoji.isNotBlank()) "${st.emoji} Sticker ${idx + 1}" else "Sticker ${idx + 1}"
+                MenuOption(idx + 1, label) {
+                    telegramManager.sendSticker(chat.id, st.fileId, st.emoji)
+                    showToast("Sticker sent")
+                }
+            }
+        OptionsMenuDialog(this, set.title.take(20), stickerOptions).show()
+    }
+
+    private fun showPopularStickersMenu(chat: ChatModel) {
+        val popular =
             listOf(
                 "👍" to "👍 Thumbs Up",
                 "❤️" to "❤️ Red Heart",
@@ -1777,15 +1844,87 @@ class MainActivity : AppCompatActivity() {
                 "🙏" to "🙏 Thank You",
                 "😎" to "😎 Cool",
                 "🚀" to "🚀 Rocket",
+                "👏" to "👏 Applause",
+                "💯" to "💯 100",
+                "🤔" to "🤔 Thinking",
+                "😢" to "😢 Crying",
             )
         val options =
-            stickers.mapIndexed { idx, (emoji, label) ->
+            popular.mapIndexed { idx, (emoji, label) ->
                 MenuOption(idx + 1, label) {
                     telegramManager.sendStickerEmoji(chat.id, emoji)
                     showToast("Sticker $emoji sent")
                 }
             }
-        OptionsMenuDialog(this, "Send Sticker", options).show()
+        OptionsMenuDialog(this, "Popular Stickers", options).show()
+    }
+
+    private fun showGifPickerMenu(chat: ChatModel) {
+        val rootOptions = mutableListOf<MenuOption>()
+
+        rootOptions.add(
+            MenuOption(rootOptions.size + 1, "💾 Saved Telegram GIFs") {
+                telegramManager.loadSavedGifs { gifs ->
+                    if (gifs.isEmpty()) {
+                        showToast("No saved GIFs found")
+                    } else {
+                        showSavedGifsMenu(chat, gifs)
+                    }
+                }
+                showToast("Loading saved GIFs...")
+            },
+        )
+
+        rootOptions.add(
+            MenuOption(rootOptions.size + 1, "⚡ Popular Reaction Loops") {
+                showReactionGifsMenu(chat)
+            },
+        )
+
+        rootOptions.add(
+            MenuOption(rootOptions.size + 1, "📁 Pick GIF from Device (.gif/.mp4)") {
+                showSendMediaPicker(chat, isPhoto = false)
+            },
+        )
+
+        OptionsMenuDialog(this, "Send GIF / Animation", rootOptions).show()
+    }
+
+    private fun showSavedGifsMenu(
+        chat: ChatModel,
+        gifs: List<SavedGifItem>,
+    ) {
+        val gifOptions =
+            gifs.take(25).mapIndexed { idx, gif ->
+                val name = gif.caption.ifBlank { "GIF #${idx + 1}" }
+                MenuOption(idx + 1, "🎞️ $name (${gif.durationSeconds}s)") {
+                    telegramManager.sendSavedAnimation(chat.id, gif.fileId, gif.durationSeconds, gif.caption)
+                    showToast("GIF sent")
+                }
+            }
+        OptionsMenuDialog(this, "Saved GIFs", gifOptions).show()
+    }
+
+    private fun showReactionGifsMenu(chat: ChatModel) {
+        val reactions =
+            listOf(
+                "🎉 Celebration / Party",
+                "👋 Hello / Wave",
+                "👏 Applause / Bravo",
+                "🤣 Rolling with Laughter",
+                "👍 Thumbs Up",
+                "🔥 Fire / Awesome",
+                "💃 Dance / Groove",
+                "🤝 Deal / Handshake",
+            )
+        val options =
+            reactions.mapIndexed { idx, title ->
+                MenuOption(idx + 1, title) {
+                    telegramManager.sendMessage(chat.id, "🎞️ [$title]")
+                    showToast("Reaction sent")
+                }
+            }
+        OptionsMenuDialog(this, "Reaction GIFs", options).show()
     }
 
     private fun showBotCommandsMenu(chat: ChatModel) {
@@ -1912,7 +2051,7 @@ class MainActivity : AppCompatActivity() {
                 val sourceFile = File(path)
                 val targetDirType =
                     when (msg.mediaType) {
-                        MediaType.PHOTO -> Environment.DIRECTORY_PICTURES
+                        MediaType.PHOTO, MediaType.STICKER, MediaType.ANIMATION -> Environment.DIRECTORY_PICTURES
                         MediaType.VOICE -> Environment.DIRECTORY_MUSIC
                         MediaType.VIDEO -> Environment.DIRECTORY_MOVIES
                         else -> Environment.DIRECTORY_DOWNLOADS
@@ -1927,6 +2066,8 @@ class MainActivity : AppCompatActivity() {
                     sourceFile.extension.ifBlank {
                         when (msg.mediaType) {
                             MediaType.PHOTO -> "jpg"
+                            MediaType.STICKER -> "webp"
+                            MediaType.ANIMATION -> "gif"
                             MediaType.VOICE -> "m4a"
                             MediaType.VIDEO -> "mp4"
                             else -> "bin"
@@ -2033,7 +2174,7 @@ class MainActivity : AppCompatActivity() {
             },
         )
 
-        if (msg.mediaType == MediaType.PHOTO || msg.mediaType == MediaType.VIDEO || msg.mediaType == MediaType.ANIMATION) {
+        if (msg.mediaType == MediaType.PHOTO || msg.mediaType == MediaType.VIDEO || msg.mediaType == MediaType.ANIMATION || msg.mediaType == MediaType.STICKER) {
             options.add(
                 MenuOption(options.size + 1, "🔍 View Full-Screen / Play Media") {
                     openMediaViewer(msg)
@@ -2178,7 +2319,12 @@ class MainActivity : AppCompatActivity() {
 
         when (state) {
             is AuthState.WaitPhoneNumber -> {
+                val tf = etLoginInput?.typeface
+                etLoginInput?.inputType = InputType.TYPE_CLASS_PHONE
+                etLoginInput?.typeface = tf
                 tvMode?.visibility = View.VISIBLE
+                loginInputEngine?.isModeSwitchingEnabled = true
+                loginInputEngine?.isSymbolPickerEnabled = true
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
                 tvLabel.text = "Phone Number (with +country code):"
                 etLoginInput?.hint = "+1 555 123 4567"
@@ -2216,10 +2362,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitCode -> {
+                val tf = etLoginInput?.typeface
+                etLoginInput?.inputType = InputType.TYPE_CLASS_NUMBER
+                etLoginInput?.typeface = tf
                 tvMode?.visibility = View.GONE
+                loginInputEngine?.isModeSwitchingEnabled = false
+                loginInputEngine?.isSymbolPickerEnabled = false
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
                 btnUseSim?.visibility = View.GONE
-                tvLabel.text = "Verification Code (5 digits):"
+                tvLabel.text = "Verification Code (numbers only):"
                 etLoginInput?.hint = "12345"
                 btnSubmit.text = "Verify Code"
                 if (state.errorMessage != null) {
@@ -2233,7 +2384,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitPassword -> {
+                val tf = etLoginInput?.typeface
+                etLoginInput?.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                etLoginInput?.typeface = tf
                 tvMode?.visibility = View.VISIBLE
+                loginInputEngine?.isModeSwitchingEnabled = true
+                loginInputEngine?.isSymbolPickerEnabled = true
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.LOWER)
                 btnUseSim?.visibility = View.GONE
                 btnForgotPassword?.visibility = View.VISIBLE
@@ -2253,7 +2409,7 @@ class MainActivity : AppCompatActivity() {
                     showAccountResetConfirmationDialog()
                 }
                 tvLabel.text = "2-Step Verification Password:"
-                etLoginInput?.hint = "Cloud Password"
+                etLoginInput?.hint = "Cloud Password (letters, numbers, symbols)"
                 btnSubmit.text = "Submit Password"
                 if (state.errorMessage != null) {
                     val errorMessage = "⚠️ Error: ${state.errorMessage}"
@@ -2273,7 +2429,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitPasswordRecoveryCode -> {
+                val tf = etLoginInput?.typeface
+                etLoginInput?.inputType = InputType.TYPE_CLASS_NUMBER
+                etLoginInput?.typeface = tf
                 tvMode?.visibility = View.GONE
+                loginInputEngine?.isModeSwitchingEnabled = false
+                loginInputEngine?.isSymbolPickerEnabled = false
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
                 btnUseSim?.visibility = View.GONE
                 btnForgotPassword?.visibility = View.GONE
@@ -2282,7 +2443,7 @@ class MainActivity : AppCompatActivity() {
                 btnSubmit.nextFocusDownId = R.id.btn_config_credentials
                 btnConfig.nextFocusUpId = R.id.btn_login_submit
 
-                tvLabel.text = "Email Recovery Code (6 digits):"
+                tvLabel.text = "Email Recovery Code (numbers only):"
                 etLoginInput?.hint = "123456"
                 etLoginInput?.setText("")
                 btnSubmit.text = "Submit Recovery Code"
@@ -2356,11 +2517,23 @@ class MainActivity : AppCompatActivity() {
         updateLoginConnectionState(telegramManager.connectionState.value)
         updateLoginProgressState(telegramManager.isAuthQueryInProgress)
 
+        val isPasswordScreen = state is AuthState.WaitPassword
         softkeyManager.update(
-            left = "Settings",
-            center = "Submit",
+            left = if (isPasswordScreen) "Symbols" else "Settings",
+            center =
+                when (state) {
+                    is AuthState.WaitCode, is AuthState.WaitPasswordRecoveryCode -> "Verify"
+                    is AuthState.WaitPassword -> "Submit"
+                    else -> "Send"
+                },
             right = "Exit",
-            onLeft = { showSettingsScreen() },
+            onLeft = {
+                if (isPasswordScreen) {
+                    showSymbolsDialog { symbol -> loginInputEngine?.insertSymbol(symbol) }
+                } else {
+                    showSettingsScreen()
+                }
+            },
             onCenter = {
                 if (currentFocus?.id == R.id.btn_retry_connection) {
                     telegramManager.retryConnection()

@@ -5,6 +5,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
+import coil.load
 import java.io.File
 
 /**
@@ -65,5 +66,31 @@ fun ImageView.loadBitmapFromFile(path: String?) {
             // Safely fallback on decoding or memory allocation failure
         }
     }
+    visibility = View.GONE
+}
+
+/**
+ * Extension function for [ImageView] to load photos, stickers, and animated GIFs safely.
+ */
+fun ImageView.loadMediaFromFile(path: String?) {
+    if (!path.isNullOrEmpty()) {
+        try {
+            val file = File(path)
+            if (file.exists()) {
+                val bitmap = BitmapFactory.decodeFile(path)
+                if (bitmap != null) {
+                    setImageBitmap(bitmap)
+                    visibility = View.VISIBLE
+                    return
+                } else {
+                    load(file)
+                    visibility = View.VISIBLE
+                    return
+                }
+            }
+        } catch (_: Throwable) {
+        }
+    }
+    setImageDrawable(null)
     visibility = View.GONE
 }

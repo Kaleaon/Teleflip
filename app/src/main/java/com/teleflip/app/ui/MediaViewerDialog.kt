@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.VideoView
+import coil.load
 import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
@@ -77,6 +78,12 @@ class MediaViewerDialog(
                 tvZoomBadge?.text = if (isGif) "LOOP" else "00:00"
                 setupVideoOrGif(filePath, fileExists, isGif)
             }
+            MediaType.STICKER -> {
+                val emoji = message.stickerEmoji.ifBlank { "Sticker" }
+                tvTitle?.text = "🎨 $emoji Viewer"
+                tvHint?.text = "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
+                setupPhoto(filePath, fileExists)
+            }
             else -> {
                 tvTitle?.text = "📷 Photo Viewer"
                 tvHint?.text = "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
@@ -143,9 +150,17 @@ class MediaViewerDialog(
             }
         }
         vvVideo?.setOnErrorListener { _, _, _ ->
-            vvVideo?.visibility = View.GONE
-            tvStatus?.visibility = View.VISIBLE
-            tvStatus?.text = "Unable to play video stream on this device."
+            if (isLoopingGif) {
+                vvVideo?.visibility = View.GONE
+                ivPhoto?.visibility = View.VISIBLE
+                ivPhoto?.load(File(filePath))
+                tvStatus?.visibility = View.GONE
+                tvZoomBadge?.text = "GIF ▶"
+            } else {
+                vvVideo?.visibility = View.GONE
+                tvStatus?.visibility = View.VISIBLE
+                tvStatus?.text = "Unable to play video stream on this device."
+            }
             true
         }
     }

@@ -371,4 +371,39 @@ class KeypadInputEngineTest {
         engine.handleKeyEvent(KeyEvent.KEYCODE_3, createDownEvent(KeyEvent.KEYCODE_3))
         assertEquals("DA", editable.toString())
     }
+
+    @Test
+    fun testModeSwitchingDisabled() {
+        val engine = KeypadInputEngine(editText)
+        engine.setMode(InputMode.NUMERIC)
+        engine.isModeSwitchingEnabled = false
+
+        // Press #
+        engine.handleKeyEvent(KeyEvent.KEYCODE_POUND, createDownEvent(KeyEvent.KEYCODE_POUND))
+        assertEquals(InputMode.NUMERIC, engine.currentMode)
+
+        // Type digits 1, 2, 3
+        engine.handleKeyEvent(KeyEvent.KEYCODE_1, createDownEvent(KeyEvent.KEYCODE_1))
+        engine.handleKeyEvent(KeyEvent.KEYCODE_2, createDownEvent(KeyEvent.KEYCODE_2))
+        engine.handleKeyEvent(KeyEvent.KEYCODE_3, createDownEvent(KeyEvent.KEYCODE_3))
+        assertEquals("123", editable.toString())
+    }
+
+    @Test
+    fun testSymbolPickerDisabled() {
+        var symbolRequested = false
+        val engine =
+            KeypadInputEngine(
+                editText = editText,
+                onSymbolRequested = { symbolRequested = true },
+            )
+        engine.isSymbolPickerEnabled = false
+
+        engine.handleKeyEvent(KeyEvent.KEYCODE_STAR, createDownEvent(KeyEvent.KEYCODE_STAR))
+        org.junit.Assert.assertFalse(symbolRequested)
+
+        engine.isSymbolPickerEnabled = true
+        engine.handleKeyEvent(KeyEvent.KEYCODE_STAR, createDownEvent(KeyEvent.KEYCODE_STAR))
+        org.junit.Assert.assertTrue(symbolRequested)
+    }
 }

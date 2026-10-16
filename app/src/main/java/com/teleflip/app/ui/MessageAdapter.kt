@@ -184,10 +184,34 @@ class MessageAdapter(
                 }
             }
 
-            // Photo image display with accessibility contentDescription
-            ivPhoto.contentDescription = ContentDescriptionFormatter.getPhotoDescription(context, message.mediaCaption)
-            if (message.mediaType == MediaType.PHOTO) {
-                ivPhoto.loadBitmapFromFile(message.mediaFilePath)
+            // Photo, Sticker, and GIF display with accessibility contentDescription
+            val isVisualMedia =
+                message.mediaType == MediaType.PHOTO ||
+                    message.mediaType == MediaType.STICKER ||
+                    message.mediaType == MediaType.ANIMATION
+            if (isVisualMedia) {
+                ivPhoto.contentDescription =
+                    when (message.mediaType) {
+                        MediaType.STICKER -> {
+                            val emo = message.stickerEmoji.ifBlank { "Sticker" }
+                            "Sticker $emo"
+                        }
+                        MediaType.ANIMATION -> "GIF Animation"
+                        else -> ContentDescriptionFormatter.getPhotoDescription(context, message.mediaCaption)
+                    }
+                val density = context.resources.displayMetrics.density
+                val lp = ivPhoto.layoutParams
+                if (message.mediaType == MediaType.STICKER) {
+                    ivPhoto.scaleType = ImageView.ScaleType.FIT_CENTER
+                    lp.width = (120 * density).toInt()
+                    lp.height = (120 * density).toInt()
+                } else {
+                    ivPhoto.scaleType = ImageView.ScaleType.CENTER_CROP
+                    lp.width = (160 * density).toInt()
+                    lp.height = (120 * density).toInt()
+                }
+                ivPhoto.layoutParams = lp
+                ivPhoto.loadMediaFromFile(message.mediaFilePath)
             } else {
                 ivPhoto.setImageDrawable(null)
                 ivPhoto.visibility = View.GONE

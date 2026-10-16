@@ -16,6 +16,9 @@ import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.model.PollOption
+import com.teleflip.app.model.SavedGifItem
+import com.teleflip.app.model.StickerItem
+import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.notifications.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -866,6 +869,175 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 this.inputMessageContent = content
             }
         tdClient?.send(sendReq, this)
+    }
+
+    fun sendSticker(
+        chatId: Long,
+        stickerFileId: Int,
+        emoji: String = "",
+    ) {
+        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val newMsg =
+            MessageModel(
+                id = System.currentTimeMillis(),
+                chatId = chatId,
+                senderName = "You",
+                text = if (emoji.isNotBlank()) "🎨 [Sticker $emoji]" else "🎨 [Sticker]",
+                time = timeStr,
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.STICKER,
+                stickerEmoji = emoji,
+                mediaFileId = stickerFileId,
+            )
+        appendMessage(chatId, newMsg)
+
+        try {
+            val inputSticker =
+                TdApi.InputSticker().apply {
+                    this.sticker = TdApi.InputFileId(stickerFileId)
+                }
+            val content =
+                TdApi.InputMessageSticker().apply {
+                    this.sticker = inputSticker
+                    this.emoji = emoji
+                }
+            val req =
+                TdApi.SendMessage().apply {
+                    this.chatId = chatId
+                    this.inputMessageContent = content
+                }
+            tdClient?.send(req, this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to send sticker via TDLib: ${e.message}")
+        }
+    }
+
+    fun loadInstalledStickers(onResult: (List<StickerSetModel>) -> Unit) {
+        val client = tdClient
+        if (client == null) {
+            onResult(emptyList())
+            return
+        }
+        client.send(TdApi.GetInstalledStickerSets(TdApi.StickerTypeRegular())) { obj ->
+            if (obj is TdApi.StickerSets) {
+                val resultSets = mutableListOf<StickerSetModel>()
+                val count = obj.sets.size
+                if (count == 0) {
+                    scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+                    return@send
+                }
+                var completed = 0
+                for (info in obj.sets) {
+                    client.send(TdApi.GetStickerSet(info.id)) { setObj ->
+                        if (setObj is TdApi.StickerSet) {
+                            val items =
+                                setObj.stickers.map { st ->
+                                    StickerItem(
+                                        fileId = st.sticker.id,
+                                        emoji = st.emoji,
+                                        filePath = if (st.sticker.local.isDownloadingCompleted) st.sticker.local.path else null,
+                                        setName = setObj.title,
+                                    )
+                                }
+                            synchronized(resultSets) {
+                                resultSets.add(StickerSetModel(setObj.id, setObj.title, items))
+                            }
+                        }
+                        completed++
+                        if (completed >= count) {
+                            scope.launch(Dispatchers.Main) {
+                                onResult(resultSets)
+                            }
+                        }
+                    }
+                }
+            } else {
+                scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+            }
+        }
+    }
+
+    fun loadSavedGifs(onResult: (List<SavedGifItem>) -> Unit) {
+        val client = tdClient
+        if (client == null) {
+            onResult(emptyList())
+            return
+        }
+        client.send(TdApi.GetSavedAnimations()) { obj ->
+            val list = mutableListOf<SavedGifItem>()
+            if (obj is TdApi.Animations) {
+                for (anim in obj.animations) {
+                    val file = anim.animation
+                    val path =
+                        if (file.local.isDownloadingCompleted && file.local.path.isNotBlank()) {
+                            file.local.path
+                        } else {
+                            if (file.local.canBeDownloaded && !file.local.isDownloadingActive) {
+                                client.send(TdApi.DownloadFile(file.id, 1, 0, 0, false), this)
+                            }
+                            null
+                        }
+                    list.add(
+                        SavedGifItem(
+                            fileId = file.id,
+                            filePath = path,
+                            durationSeconds = anim.duration,
+                            caption = anim.fileName.ifBlank { "GIF" },
+                        ),
+                    )
+                }
+            }
+            scope.launch(Dispatchers.Main) {
+                onResult(list)
+            }
+        }
+    }
+
+    fun sendSavedAnimation(
+        chatId: Long,
+        animFileId: Int,
+        duration: Int = 0,
+        caption: String = "",
+    ) {
+        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val display = if (caption.isNotBlank()) "🎞️ [GIF] $caption" else "🎞️ [GIF]"
+        val newMsg =
+            MessageModel(
+                id = System.currentTimeMillis(),
+                chatId = chatId,
+                senderName = "You",
+                text = display,
+                time = timeStr,
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.ANIMATION,
+                mediaCaption = caption,
+                mediaFileId = animFileId,
+                durationSeconds = duration,
+            )
+        appendMessage(chatId, newMsg)
+
+        try {
+            val inputAnim =
+                TdApi.InputAnimation().apply {
+                    this.animation = TdApi.InputFileId(animFileId)
+                    this.duration = duration
+                }
+            val content =
+                TdApi.InputMessageAnimation().apply {
+                    this.animation = inputAnim
+                    this.caption = TdApi.FormattedText(caption, emptyArray())
+                }
+            val req =
+                TdApi.SendMessage().apply {
+                    this.chatId = chatId
+                    this.inputMessageContent = content
+                }
+            tdClient?.send(req, this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to send saved animation via TDLib: ${e.message}")
+        }
     }
 
     fun sendVideo(
@@ -2971,43 +3143,45 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessagePhoto.CONSTRUCTOR -> {
                 val photo = content as TdApi.MessagePhoto
                 val size = photo.photo.sizes.lastOrNull()
-                val f = size?.photo
-                if (f != null) {
-                    if (f.local.isDownloadingCompleted && f.local.path.isNotBlank()) {
-                        Pair(f.id, f.local.path)
-                    } else {
-                        if (f.local.canBeDownloaded && !f.local.isDownloadingActive) {
-                            tdClient?.send(TdApi.DownloadFile(f.id, 1, 0, 0, false), this)
-                        }
-                        Pair(f.id, null)
-                    }
-                } else {
-                    Pair(0, null)
-                }
+                resolveFile(size?.photo)
             }
             TdApi.MessageVoiceNote.CONSTRUCTOR -> {
                 val voice = (content as TdApi.MessageVoiceNote).voiceNote.voice
-                if (voice.local.isDownloadingCompleted && voice.local.path.isNotBlank()) {
-                    Pair(voice.id, voice.local.path)
-                } else {
-                    if (voice.local.canBeDownloaded && !voice.local.isDownloadingActive) {
-                        tdClient?.send(TdApi.DownloadFile(voice.id, 1, 0, 0, false), this)
-                    }
-                    Pair(voice.id, null)
-                }
+                resolveFile(voice)
             }
             TdApi.MessageAudio.CONSTRUCTOR -> {
                 val audio = (content as TdApi.MessageAudio).audio.audio
-                if (audio.local.isDownloadingCompleted && audio.local.path.isNotBlank()) {
-                    Pair(audio.id, audio.local.path)
-                } else {
-                    if (audio.local.canBeDownloaded && !audio.local.isDownloadingActive) {
-                        tdClient?.send(TdApi.DownloadFile(audio.id, 1, 0, 0, false), this)
-                    }
-                    Pair(audio.id, null)
-                }
+                resolveFile(audio)
+            }
+            TdApi.MessageAnimation.CONSTRUCTOR -> {
+                val anim = (content as TdApi.MessageAnimation).animation
+                resolveFile(anim.animation)
+            }
+            TdApi.MessageSticker.CONSTRUCTOR -> {
+                val sticker = (content as TdApi.MessageSticker).sticker
+                resolveFile(sticker?.sticker)
+            }
+            TdApi.MessageVideo.CONSTRUCTOR -> {
+                val video = (content as TdApi.MessageVideo).video
+                resolveFile(video.video)
+            }
+            TdApi.MessageDocument.CONSTRUCTOR -> {
+                val doc = (content as TdApi.MessageDocument).document
+                resolveFile(doc.document)
             }
             else -> Pair(0, null)
+        }
+    }
+
+    private fun resolveFile(f: TdApi.File?): Pair<Int, String?> {
+        if (f == null) return Pair(0, null)
+        return if (f.local.isDownloadingCompleted && f.local.path.isNotBlank()) {
+            Pair(f.id, f.local.path)
+        } else {
+            if (f.local.canBeDownloaded && !f.local.isDownloadingActive) {
+                tdClient?.send(TdApi.DownloadFile(f.id, 1, 0, 0, false), this)
+            }
+            Pair(f.id, null)
         }
     }
 
