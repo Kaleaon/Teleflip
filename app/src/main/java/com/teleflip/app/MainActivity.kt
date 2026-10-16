@@ -1992,6 +1992,60 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showStorageLocationDialog(onChanged: () -> Unit) {
+        val storageOptions = com.teleflip.app.storage.StorageManager.getStorageOptions(this)
+        val currentType = com.teleflip.app.storage.StorageManager.getSelectedStorageType(this)
+        val menuOptions =
+            storageOptions.mapIndexed { idx, opt ->
+                val check = if (opt.type == currentType) "✓ " else ""
+                val status = if (opt.isAvailable) opt.description else "Not Mounted"
+                MenuOption(idx + 1, "$check💾 ${opt.title}\n   $status") {
+                    if (!opt.isAvailable) {
+                        showToast("MicroSD Card is not detected. Please insert an SD card.", true)
+                    } else {
+                        telegramManager.switchStorageLocation(opt.type) { ok, msg ->
+                            showToast(msg, !ok)
+                            onChanged()
+                        }
+                    }
+                }
+            }
+        OptionsMenuDialog(this, "💾 Storage Location", menuOptions).show()
+    }
+
+    private fun showAutoDownloadDialog(onChanged: () -> Unit) {
+        val modes = com.teleflip.app.storage.AutoDownloadMode.values()
+        val currentMode = com.teleflip.app.storage.StorageManager.getAutoDownloadMode(this)
+        val menuOptions =
+            modes.mapIndexed { idx, mode ->
+                val check = if (mode == currentMode) "✓ " else ""
+                MenuOption(idx + 1, "$check📥 ${mode.label}") {
+                    com.teleflip.app.storage.StorageManager.setAutoDownloadMode(this, mode)
+                    showToast("Auto-download set to ${mode.label}")
+                    onChanged()
+                }
+            }
+        OptionsMenuDialog(this, "📥 Auto-Download Media", menuOptions).show()
+    }
+
+    private fun showKeepMediaDialog(onChanged: () -> Unit) {
+        val durations = com.teleflip.app.storage.KeepMediaDuration.values()
+        val currentDur = com.teleflip.app.storage.StorageManager.getKeepMediaDuration(this)
+        val menuOptions =
+            durations.mapIndexed { idx, dur ->
+                val check = if (dur == currentDur) "✓ " else ""
+                MenuOption(idx + 1, "$check⏳ ${dur.label}") {
+                    com.teleflip.app.storage.StorageManager.setKeepMediaDuration(this, dur)
+                    telegramManager.clearMediaCache(dur.days) { _, freed ->
+                        val mb = freed / BYTES_PER_MB
+                        showToast("Keep Media: ${dur.label} ($mb MB cleaned)")
+                        onChanged()
+                    }
+                }
+            }
+        OptionsMenuDialog(this, "⏳ Keep Media Duration", menuOptions).show()
+    }
+
     private fun showSelfDestructTimerMenu(chat: ChatModel) {
         val presets =
             listOf(
@@ -2379,7 +2433,12 @@ class MainActivity : AppCompatActivity() {
                         else -> Environment.DIRECTORY_DOWNLOADS
                     }
 
-                val publicDir = File(Environment.getExternalStoragePublicDirectory(targetDirType), "TeleFlip")
+                val publicDir =
+                    if (com.teleflip.app.storage.StorageManager.getSelectedStorageType(this) == com.teleflip.app.storage.StorageLocationType.SD_CARD) {
+                        com.teleflip.app.storage.StorageManager.getDownloadDirectory(this)
+                    } else {
+                        File(Environment.getExternalStoragePublicDirectory(targetDirType), "TeleFlip")
+                    }
                 if (!publicDir.exists()) {
                     publicDir.mkdirs()
                 }
@@ -2424,7 +2483,7 @@ class MainActivity : AppCompatActivity() {
             showToast("Downloading media to device... Please retry once complete.")
         } else if (msg.text.isNotBlank()) {
             try {
-                val publicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TeleFlip")
+                val publicDir = com.teleflip.app.storage.StorageManager.getDownloadDirectory(this)
                 if (!publicDir.exists()) {
                     publicDir.mkdirs()
                 }
@@ -3122,6 +3181,10 @@ class MainActivity : AppCompatActivity() {
         val btnBgPush = view.findViewById<Button>(R.id.btn_toggle_bg_notifications)
         val btnEditProfile = view.findViewById<Button>(R.id.btn_edit_profile)
         val btnActiveSessions = view.findViewById<Button>(R.id.btn_active_sessions)
+        val btnStorageLocation = view.findViewById<Button>(R.id.btn_storage_location)
+        val btnAutoDownload = view.findViewById<Button>(R.id.btn_auto_download)
+        val btnKeepMedia = view.findViewById<Button>(R.id.btn_keep_media)
+        val btnSaveToGallery = view.findViewById<Button>(R.id.btn_save_to_gallery)
         val btnClearCache = view.findViewById<Button>(R.id.btn_clear_cache)
         val btnSave = view.findViewById<Button>(R.id.btn_save_config)
         val btnLogout = view.findViewById<Button>(R.id.btn_logout)
@@ -3143,8 +3206,38 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        fun updateStorageLabels() {
+            val currentStorage = com.teleflip.app.storage.StorageManager.getSelectedStorageType(this)
+            val storageLabel =
+                if (currentStorage == com.teleflip.app.storage.StorageLocationType.SD_CARD) {
+                    "MicroSD Card"
+                } else {
+                    "Internal Storage"
+                }
+            btnStorageLocation?.text = "💾 Storage: $storageLabel"
+
+            val autoMode = com.teleflip.app.storage.StorageManager.getAutoDownloadMode(this)
+            btnAutoDownload?.text = "📥 Auto-Download: ${autoMode.label}"
+
+            val keepMedia = com.teleflip.app.storage.StorageManager.getKeepMediaDuration(this)
+            btnKeepMedia?.text = "⏳ Keep Media: ${keepMedia.label}"
+
+            val saveEnabled = com.teleflip.app.storage.StorageManager.isSaveToDownloadsEnabled(this)
+            btnSaveToGallery?.text = "📁 Save to Downloads: ${if (saveEnabled) "ON" else "OFF"}"
+        }
+        updateStorageLabels()
+
         btnEditProfile?.setOnClickListener { showEditProfileMenu() }
         btnActiveSessions?.setOnClickListener { showActiveSessionsMenu() }
+        btnStorageLocation?.setOnClickListener { showStorageLocationDialog { updateStorageLabels() } }
+        btnAutoDownload?.setOnClickListener { showAutoDownloadDialog { updateStorageLabels() } }
+        btnKeepMedia?.setOnClickListener { showKeepMediaDialog { updateStorageLabels() } }
+        btnSaveToGallery?.setOnClickListener {
+            val newState = !com.teleflip.app.storage.StorageManager.isSaveToDownloadsEnabled(this)
+            com.teleflip.app.storage.StorageManager.setSaveToDownloadsEnabled(this, newState)
+            updateStorageLabels()
+            showToast(if (newState) "Automatic save to downloads enabled" else "Automatic save to downloads disabled")
+        }
         btnClearCache?.setOnClickListener {
             telegramManager.clearMediaCache { _, freed ->
                 val mb = freed / BYTES_PER_MB

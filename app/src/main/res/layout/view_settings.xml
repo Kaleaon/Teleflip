@@ -157,6 +157,54 @@
             android:focusable="true"
             android:layout_marginBottom="12dp" />
 
+        <!-- Storage Location (Internal vs SD Card) -->
+        <Button
+            android:id="@+id/btn_storage_location"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="💾 Storage Location: Internal Storage"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Auto-Download Media Setting -->
+        <Button
+            android:id="@+id/btn_auto_download"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="📥 Auto-Download: Wi-Fi Only"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Keep Media Duration Setting -->
+        <Button
+            android:id="@+id/btn_keep_media"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="⏳ Keep Media: Forever"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Save Media to Public Downloads Setting -->
+        <Button
+            android:id="@+id/btn_save_to_gallery"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="📁 Save Media to Downloads: OFF"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
         <!-- Clear Media Cache Button -->
         <Button
             android:id="@+id/btn_clear_cache"

@@ -2529,7 +2529,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     // =========================================================================
     // Storage & Media Cache Cleaner
     // =========================================================================
-    fun clearMediaCache(onResult: (Boolean, Long) -> Unit) {
+    fun clearMediaCache(
+        ttlDays: Int = 0,
+        onResult: (Boolean, Long) -> Unit,
+    ) {
         scope.launch(Dispatchers.IO) {
             var freedBytes = 0L
             try {
@@ -2545,10 +2548,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 }
                 val client = tdClient
                 if (client != null) {
+                    val ttlSec =
+                        if (ttlDays > 0) {
+                            ttlDays * com.teleflip.app.storage.StorageManager.SECONDS_PER_DAY
+                        } else {
+                            -1
+                        }
                     val req =
                         TdApi.OptimizeStorage().apply {
                             this.size = -1L
-                            this.ttl = -1
+                            this.ttl = ttlSec
                             this.count = -1
                             this.immunityDelay = -1
                         }
@@ -2561,6 +2570,31 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 withContext(Dispatchers.Main) {
                     onResult(false, 0L)
                 }
+            }
+        }
+    }
+
+    fun switchStorageLocation(
+        newType: com.teleflip.app.storage.StorageLocationType,
+        onComplete: (Boolean, String) -> Unit,
+    ) {
+        val oldDir = com.teleflip.app.storage.StorageManager.getFilesDirectory(context)
+        val success = com.teleflip.app.storage.StorageManager.setSelectedStorageType(context, newType)
+        if (!success) {
+            onComplete(false, "Storage location is not available or not mounted")
+            return
+        }
+        val newDir = com.teleflip.app.storage.StorageManager.getFilesDirectory(context)
+        scope.launch(Dispatchers.IO) {
+            val copied = com.teleflip.app.storage.StorageManager.copyMediaFiles(oldDir, newDir)
+            val label =
+                if (newType == com.teleflip.app.storage.StorageLocationType.SD_CARD) {
+                    "MicroSD Card"
+                } else {
+                    "Internal Storage"
+                }
+            withContext(Dispatchers.Main) {
+                onComplete(true, "Storage switched to $label. Migrated $copied files.")
             }
         }
     }
@@ -3132,9 +3166,12 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     return
                 }
                 val dbDir = File(context.filesDir, "tdlib_${this@TelegramManager.apiId}").absolutePath
+                val filesDir = com.teleflip.app.storage.StorageManager.getFilesDirectory(context).absolutePath
                 val params =
                     TdApi.SetTdlibParameters().apply {
                         databaseDirectory = dbDir
+                        filesDirectory = filesDir
+                        useFileDatabase = true
                         useMessageDatabase = true
                         useSecretChats = true
                         apiId = this@TelegramManager.apiId
@@ -3533,6 +3570,21 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
         if (msgUpdated) {
             _messages.value = currentMsgs
+            if (com.teleflip.app.storage.StorageManager.isSaveToDownloadsEnabled(context)) {
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        val src = File(file.local.path)
+                        if (src.exists() && src.isFile) {
+                            val destDir = com.teleflip.app.storage.StorageManager.getDownloadDirectory(context)
+                            val dest = File(destDir, src.name)
+                            if (!dest.exists()) {
+                                src.copyTo(dest, overwrite = false)
+                            }
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
+            }
         }
     }
 
@@ -3591,7 +3643,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             Pair(f.id, f.local.path)
         } else {
             if (f.local.canBeDownloaded && !f.local.isDownloadingActive) {
-                tdClient?.send(TdApi.DownloadFile(f.id, 1, 0, 0, false), this)
+                if (com.teleflip.app.storage.StorageManager.shouldAutoDownloadMedia(context)) {
+                    tdClient?.send(TdApi.DownloadFile(f.id, 1, 0, 0, false), this)
+                }
             }
             Pair(f.id, null)
         }
