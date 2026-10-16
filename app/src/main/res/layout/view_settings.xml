@@ -157,6 +157,30 @@
             android:focusable="true"
             android:layout_marginBottom="12dp" />
 
+        <!-- Blocked Users Button -->
+        <Button
+            android:id="@+id/btn_blocked_users"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="🚫 Blocked Users"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- App Passcode Lock Button -->
+        <Button
+            android:id="@+id/btn_passcode_lock"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="🔒 App Passcode Lock: OFF"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
         <!-- Storage Location (Internal vs SD Card) -->
         <Button
             android:id="@+id/btn_storage_location"

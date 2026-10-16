@@ -28,6 +28,7 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -49,6 +50,9 @@ import com.teleflip.app.model.SavedGifItem
 import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.notifications.NotificationHelper
 import com.teleflip.app.notifications.TeleFlipNotificationService
+import com.teleflip.app.security.PasscodeManager
+import com.teleflip.app.storage.StorageLocationType
+import com.teleflip.app.storage.StorageManager
 import com.teleflip.app.telegram.AuthState
 import com.teleflip.app.telegram.TelegramManager
 import com.teleflip.app.ui.ChatListAdapter
@@ -76,6 +80,7 @@ enum class Screen {
     SETTINGS,
     PROFILE,
     IN_CALL,
+    PASSCODE_LOCK,
 }
 
 class MainActivity : AppCompatActivity() {
@@ -122,6 +127,11 @@ class MainActivity : AppCompatActivity() {
     private var etLoginInput: EditText? = null
     private var loginInputEngine: KeypadInputEngine? = null
 
+    // Passcode Lock State
+    private var passcodeEntry: String = ""
+    private var tvPasscodeDots: TextView? = null
+    private var tvPasscodeError: TextView? = null
+
     companion object {
         private const val REQ_AUDIO_PERM = 1001
         private const val REQ_LOC_PERM = 1002
@@ -130,6 +140,11 @@ class MainActivity : AppCompatActivity() {
         private const val REQ_PICK_DOCUMENT = 1005
         private const val REQ_PICK_VIDEO = 1006
         private const val BYTES_PER_MB = 1024 * 1024L
+        private const val MUTE_1_HOUR_SEC = 3600
+        private const val MUTE_8_HOURS_SEC = 28800
+        private const val MUTE_2_DAYS_SEC = 172800
+        private const val MUTE_FOREVER_SEC = 31536000
+        private const val PASSCODE_PIN_LENGTH = 4
 
         internal fun cleanAndFormatPhoneNumber(raw: String?): String? {
             if (raw.isNullOrBlank()) return null
@@ -179,6 +194,7 @@ class MainActivity : AppCompatActivity() {
                         return
                     }
                     when (currentScreen) {
+                        Screen.PASSCODE_LOCK -> finish()
                         Screen.CONVERSATION -> showChatListScreen()
                         Screen.PROFILE -> {
                             if (activeChat != null) {
@@ -226,6 +242,23 @@ class MainActivity : AppCompatActivity() {
                 openConversation(targetChat)
             }
         }
+
+        if (PasscodeManager.isLocked(this)) {
+            showPasscodeUnlockScreen()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        PasscodeManager.onAppForegrounded(this)
+        if (PasscodeManager.isLocked(this) && currentScreen != Screen.PASSCODE_LOCK) {
+            showPasscodeUnlockScreen()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        PasscodeManager.onAppBackgrounded()
     }
 
     override fun onDestroy() {
@@ -246,12 +279,16 @@ class MainActivity : AppCompatActivity() {
                     is AuthState.WaitPasswordRecoveryCode,
                     is AuthState.Error,
                     -> {
-                        if (currentScreen != Screen.SETTINGS) {
+                        if (PasscodeManager.isLocked(this@MainActivity)) {
+                            // Locked behind passcode screen
+                        } else if (currentScreen != Screen.SETTINGS) {
                             showLoginScreen(state)
                         }
                     }
                     is AuthState.Ready -> {
-                        if (currentScreen == Screen.LOGIN || mainContainer.childCount == 0) {
+                        if (PasscodeManager.isLocked(this@MainActivity)) {
+                            // Locked behind passcode screen
+                        } else if (currentScreen == Screen.LOGIN || mainContainer.childCount == 0) {
                             showChatListScreen()
                         }
                     }
@@ -750,12 +787,10 @@ class MainActivity : AppCompatActivity() {
                     }
                 },
             )
-            val muteLabel = if (focusedChat.isMuted) "🔔 Unmute ${focusedChat.title}" else "🔇 Mute ${focusedChat.title}"
+            val muteLabel = if (focusedChat.isMuted) "🔔 Unmute ${focusedChat.title}" else "🔇 Mute Notifications..."
             options.add(
                 MenuOption(options.size + 1, muteLabel) {
-                    telegramManager.toggleChatMute(focusedChat.id, focusedChat.isMuted) { isNowMuted ->
-                        showToast(if (isNowMuted) "Muted ${focusedChat.title}" else "Unmuted ${focusedChat.title}")
-                    }
+                    showChatMuteDialog(focusedChat.id, focusedChat.isMuted, focusedChat.title)
                 },
             )
             val archiveLabel = if (focusedChat.isArchived) "📤 Unarchive ${focusedChat.title}" else "📦 Archive ${focusedChat.title}"
@@ -2046,6 +2081,382 @@ class MainActivity : AppCompatActivity() {
         OptionsMenuDialog(this, "⏳ Keep Media Duration", menuOptions).show()
     }
 
+    // =========================================================================
+    // Passcode Lock Implementation
+    // =========================================================================
+    private fun showPasscodeUnlockScreen() {
+        commitActiveInputEngines()
+        currentScreen = Screen.PASSCODE_LOCK
+        mainContainer.removeAllViews()
+        val view = LayoutInflater.from(this).inflate(R.layout.view_passcode_lock, mainContainer, true)
+
+        passcodeEntry = ""
+        tvPasscodeDots = view.findViewById(R.id.tv_passcode_dots)
+        tvPasscodeError = view.findViewById(R.id.tv_passcode_error)
+        updatePasscodeDotsDisplay()
+
+        val btnForgot = view.findViewById<Button>(R.id.btn_passcode_forgot)
+        btnForgot.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("Forgot Passcode?")
+                .setMessage("To reset your passcode, you will need to log out and sign in again. All local passcode settings will be cleared.")
+                .setPositiveButton("Log Out & Reset") { _, _ ->
+                    PasscodeManager.disablePasscode(this)
+                    telegramManager.logOut()
+                    showLoginScreen(AuthState.WaitPhoneNumber())
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
+        softkeyManager.update(
+            left = "",
+            center = "Unlock",
+            right = "Clear",
+            onLeft = {},
+            onCenter = {
+                if (passcodeEntry.length == PASSCODE_PIN_LENGTH) {
+                    attemptPasscodeUnlock()
+                }
+            },
+            onRight = {
+                if (passcodeEntry.isNotEmpty()) {
+                    passcodeEntry = passcodeEntry.dropLast(1)
+                    updatePasscodeDotsDisplay()
+                }
+            },
+        )
+    }
+
+    private fun updatePasscodeDotsDisplay() {
+        val dots = StringBuilder()
+        for (i in 0 until PASSCODE_PIN_LENGTH) {
+            if (i > 0) dots.append("   ")
+            if (i < passcodeEntry.length) {
+                dots.append("●")
+            } else {
+                dots.append("○")
+            }
+        }
+        tvPasscodeDots?.text = dots.toString()
+        if (passcodeEntry.isEmpty()) {
+            tvPasscodeError?.text = ""
+        }
+    }
+
+    private fun attemptPasscodeUnlock() {
+        val unlocked = PasscodeManager.unlock(this, passcodeEntry)
+        passcodeEntry = ""
+        if (unlocked) {
+            tvPasscodeError?.text = ""
+            if (telegramManager.authState.value is AuthState.Ready) {
+                showChatListScreen()
+            } else {
+                showLoginScreen(telegramManager.authState.value)
+            }
+        } else {
+            updatePasscodeDotsDisplay()
+            tvPasscodeError?.text = "Incorrect PIN. Try again."
+        }
+    }
+
+    private fun showPasscodeSettingsDialog(onChanged: () -> Unit) {
+        commitActiveInputEngines()
+        val isEnabled = PasscodeManager.isEnabled(this)
+        val options = mutableListOf<MenuOption>()
+        if (!isEnabled) {
+            options.add(
+                MenuOption(1, "🔒 Enable 4-Digit Passcode") {
+                    promptNewPasscode { pin ->
+                        PasscodeManager.setPasscode(this, pin)
+                        showToast("Passcode lock enabled")
+                        onChanged()
+                    }
+                },
+            )
+        } else {
+            options.add(
+                MenuOption(1, "🔑 Change Passcode") {
+                    promptVerifyCurrentPasscode {
+                        promptNewPasscode { pin ->
+                            PasscodeManager.setPasscode(this, pin)
+                            showToast("Passcode updated successfully")
+                            onChanged()
+                        }
+                    }
+                },
+            )
+            val timeoutLabel = PasscodeManager.getAutoLockLabel(this)
+            options.add(
+                MenuOption(2, "⏱️ Auto-Lock: $timeoutLabel") {
+                    showAutoLockTimeoutDialog {
+                        onChanged()
+                    }
+                },
+            )
+            options.add(
+                MenuOption(3, "🔓 Turn Off Passcode Lock") {
+                    promptVerifyCurrentPasscode {
+                        PasscodeManager.disablePasscode(this)
+                        showToast("Passcode lock disabled")
+                        onChanged()
+                    }
+                },
+            )
+        }
+        OptionsMenuDialog(this, "🔒 Passcode Lock Settings", options).show()
+    }
+
+    private fun showAutoLockTimeoutDialog(onChanged: () -> Unit) {
+        val options =
+            listOf(
+                MenuOption(1, "Immediately") {
+                    PasscodeManager.setAutoLockTimeoutSeconds(this, PasscodeManager.TIMEOUT_IMMEDIATE)
+                    showToast("Auto-lock set to Immediately")
+                    onChanged()
+                },
+                MenuOption(2, "After 1 Minute") {
+                    PasscodeManager.setAutoLockTimeoutSeconds(this, PasscodeManager.TIMEOUT_1_MIN)
+                    showToast("Auto-lock set to 1 minute")
+                    onChanged()
+                },
+                MenuOption(3, "After 5 Minutes") {
+                    PasscodeManager.setAutoLockTimeoutSeconds(this, PasscodeManager.TIMEOUT_5_MIN)
+                    showToast("Auto-lock set to 5 minutes")
+                    onChanged()
+                },
+            )
+        OptionsMenuDialog(this, "⏱️ Auto-Lock Timeout", options).show()
+    }
+
+    private fun promptVerifyCurrentPasscode(onSuccess: () -> Unit) {
+        val input =
+            EditText(this).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                filters = arrayOf(android.text.InputFilter.LengthFilter(PASSCODE_PIN_LENGTH))
+                hint = "Current 4-digit PIN"
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+            }
+        AlertDialog.Builder(this)
+            .setTitle("Enter Current Passcode")
+            .setView(input)
+            .setPositiveButton("Verify") { _, _ ->
+                val pin = input.text.toString().trim()
+                if (PasscodeManager.verifyPasscode(this, pin)) {
+                    onSuccess()
+                } else {
+                    showToast("Incorrect passcode", isError = true)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun promptNewPasscode(onSuccess: (String) -> Unit) {
+        val input =
+            EditText(this).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                filters = arrayOf(android.text.InputFilter.LengthFilter(PASSCODE_PIN_LENGTH))
+                hint = "New 4-digit PIN"
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+            }
+        AlertDialog.Builder(this)
+            .setTitle("Set 4-Digit Passcode")
+            .setView(input)
+            .setPositiveButton("Next") { _, _ ->
+                val pin = input.text.toString().trim()
+                if (pin.length == PASSCODE_PIN_LENGTH) {
+                    promptConfirmPasscode(pin, onSuccess)
+                } else {
+                    showToast("Passcode must be exactly 4 digits", isError = true)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun promptConfirmPasscode(
+        expectedPin: String,
+        onSuccess: (String) -> Unit,
+    ) {
+        val input =
+            EditText(this).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                filters = arrayOf(android.text.InputFilter.LengthFilter(PASSCODE_PIN_LENGTH))
+                hint = "Re-enter 4-digit PIN"
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+            }
+        AlertDialog.Builder(this)
+            .setTitle("Confirm Passcode")
+            .setView(input)
+            .setPositiveButton("Confirm") { _, _ ->
+                val confirmPin = input.text.toString().trim()
+                if (confirmPin == expectedPin) {
+                    onSuccess(expectedPin)
+                } else {
+                    showToast("Passcodes do not match", isError = true)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // =========================================================================
+    // Chat Notification Mute Implementation
+    // =========================================================================
+    private fun showChatMuteDialog(
+        chatId: Long,
+        isCurrentlyMuted: Boolean,
+        chatTitle: String,
+        onMuteStateChanged: ((Boolean) -> Unit)? = null,
+    ) {
+        commitActiveInputEngines()
+        val options = mutableListOf<MenuOption>()
+        if (isCurrentlyMuted) {
+            options.add(
+                MenuOption(1, "🔔 Unmute Notifications") {
+                    telegramManager.setChatNotificationMute(chatId, 0) { isMuted ->
+                        showToast("Unmuted $chatTitle")
+                        onMuteStateChanged?.invoke(isMuted)
+                    }
+                },
+            )
+        } else {
+            options.add(
+                MenuOption(1, "🔇 Mute for 1 Hour") {
+                    telegramManager.setChatNotificationMute(chatId, MUTE_1_HOUR_SEC) { isMuted ->
+                        showToast("Muted $chatTitle for 1 hour")
+                        onMuteStateChanged?.invoke(isMuted)
+                    }
+                },
+            )
+            options.add(
+                MenuOption(2, "🔇 Mute for 8 Hours") {
+                    telegramManager.setChatNotificationMute(chatId, MUTE_8_HOURS_SEC) { isMuted ->
+                        showToast("Muted $chatTitle for 8 hours")
+                        onMuteStateChanged?.invoke(isMuted)
+                    }
+                },
+            )
+            options.add(
+                MenuOption(3, "🔇 Mute for 2 Days") {
+                    telegramManager.setChatNotificationMute(chatId, MUTE_2_DAYS_SEC) { isMuted ->
+                        showToast("Muted $chatTitle for 2 days")
+                        onMuteStateChanged?.invoke(isMuted)
+                    }
+                },
+            )
+            options.add(
+                MenuOption(4, "🔇 Mute Forever") {
+                    telegramManager.setChatNotificationMute(chatId, MUTE_FOREVER_SEC) { isMuted ->
+                        showToast("Muted $chatTitle forever")
+                        onMuteStateChanged?.invoke(isMuted)
+                    }
+                },
+            )
+        }
+        OptionsMenuDialog(this, "Notifications: $chatTitle", options).show()
+    }
+
+    // =========================================================================
+    // Blocked Users Management Implementation
+    // =========================================================================
+    private fun showBlockedUsersDialog() {
+        commitActiveInputEngines()
+        telegramManager.loadBlockedUsers { blockedList ->
+            val options = mutableListOf<MenuOption>()
+            options.add(
+                MenuOption(1, "🚫 Block User from Contacts...") {
+                    showBlockUserSelectionDialog()
+                },
+            )
+            blockedList.forEachIndexed { index, contact ->
+                val name = "${contact.firstName} ${contact.lastName}".trim().ifBlank { "User ${contact.userId}" }
+                val handle = if (contact.username.isNotBlank()) " (@${contact.username})" else ""
+                options.add(
+                    MenuOption(index + 2, "❌ Unblock $name$handle") {
+                        confirmUnblockUser(contact.userId, name)
+                    },
+                )
+            }
+            val title = "🚫 Blocked Users (${blockedList.size})"
+            OptionsMenuDialog(this, title, options).show()
+        }
+    }
+
+    private fun confirmUnblockUser(
+        userId: Long,
+        name: String,
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle("Unblock User")
+            .setMessage("Are you sure you want to unblock $name?")
+            .setPositiveButton("Unblock") { _, _ ->
+                telegramManager.unblockUser(userId) { success, err ->
+                    if (success) {
+                        showToast("Unblocked $name")
+                        showBlockedUsersDialog()
+                    } else {
+                        showToast(err ?: "Failed to unblock", isError = true)
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showBlockUserSelectionDialog() {
+        commitActiveInputEngines()
+        telegramManager.loadContacts { contacts ->
+            val options = mutableListOf<MenuOption>()
+            contacts.forEachIndexed { idx, contact ->
+                val name = "${contact.firstName} ${contact.lastName}".trim().ifBlank { contact.phoneNumber }
+                options.add(
+                    MenuOption(idx + 1, "🚫 Block $name") {
+                        confirmBlockUser(contact.userId, name)
+                    },
+                )
+            }
+            if (options.isEmpty()) {
+                showToast("No contacts found to block")
+            } else {
+                OptionsMenuDialog(this, "Select Contact to Block", options).show()
+            }
+        }
+    }
+
+    private fun confirmBlockUser(
+        userId: Long,
+        name: String,
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle("Block User")
+            .setMessage("Are you sure you want to block $name? They will not be able to send you messages or call you.")
+            .setPositiveButton("Block") { _, _ ->
+                telegramManager.blockUser(userId) { success, err ->
+                    if (success) {
+                        showToast("Blocked $name")
+                        if (currentScreen == Screen.SETTINGS) {
+                            showBlockedUsersDialog()
+                        }
+                    } else {
+                        showToast(err ?: "Failed to block", isError = true)
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun showSelfDestructTimerMenu(chat: ChatModel) {
         val presets =
             listOf(
@@ -3181,6 +3592,8 @@ class MainActivity : AppCompatActivity() {
         val btnBgPush = view.findViewById<Button>(R.id.btn_toggle_bg_notifications)
         val btnEditProfile = view.findViewById<Button>(R.id.btn_edit_profile)
         val btnActiveSessions = view.findViewById<Button>(R.id.btn_active_sessions)
+        val btnBlockedUsers = view.findViewById<Button>(R.id.btn_blocked_users)
+        val btnPasscodeLock = view.findViewById<Button>(R.id.btn_passcode_lock)
         val btnStorageLocation = view.findViewById<Button>(R.id.btn_storage_location)
         val btnAutoDownload = view.findViewById<Button>(R.id.btn_auto_download)
         val btnKeepMedia = view.findViewById<Button>(R.id.btn_keep_media)
@@ -3229,6 +3642,20 @@ class MainActivity : AppCompatActivity() {
 
         btnEditProfile?.setOnClickListener { showEditProfileMenu() }
         btnActiveSessions?.setOnClickListener { showActiveSessionsMenu() }
+        btnBlockedUsers?.setOnClickListener { showBlockedUsersDialog() }
+
+        fun updatePasscodeLabel() {
+            val isEnabled = PasscodeManager.isEnabled(this)
+            val timeoutLabel = PasscodeManager.getAutoLockLabel(this)
+            btnPasscodeLock?.text = if (isEnabled) "🔒 App Passcode: ON ($timeoutLabel)" else "🔒 App Passcode Lock: OFF"
+        }
+        updatePasscodeLabel()
+        btnPasscodeLock?.setOnClickListener {
+            showPasscodeSettingsDialog {
+                updatePasscodeLabel()
+            }
+        }
+
         btnStorageLocation?.setOnClickListener { showStorageLocationDialog { updateStorageLabels() } }
         btnAutoDownload?.setOnClickListener { showAutoDownloadDialog { updateStorageLabels() } }
         btnKeepMedia?.setOnClickListener { showKeepMediaDialog { updateStorageLabels() } }
@@ -3639,10 +4066,20 @@ class MainActivity : AppCompatActivity() {
 
             btnToggleMute.text = if (profile.isMuted) "🔔 Notifications: Muted" else "🔔 Notifications: Sound"
             btnToggleMute.setOnClickListener {
-                telegramManager.toggleChatMute(profile.chatId, profile.isMuted) { newMuted ->
-                    showToast(if (newMuted) "Notifications muted" else "Notifications unmuted")
+                showChatMuteDialog(profile.chatId, profile.isMuted, profile.title) { newMuted ->
                     btnToggleMute.text = if (newMuted) "🔔 Notifications: Muted" else "🔔 Notifications: Sound"
                 }
+            }
+
+            val btnBlock = view.findViewById<Button>(R.id.btn_profile_block_user)
+            if (chat.chatType == ChatType.DIRECT) {
+                btnBlock?.visibility = View.VISIBLE
+                btnBlock?.setOnClickListener {
+                    val targetUserId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+                    confirmBlockUser(targetUserId, chat.title)
+                }
+            } else {
+                btnBlock?.visibility = View.GONE
             }
 
             btnTgCall.setOnClickListener {
@@ -3674,6 +4111,34 @@ class MainActivity : AppCompatActivity() {
         // Top Right hardware softkey handling (isolated from KEYCODE_BACK)
         if (SoftkeyUtils.isSoftRightKey(keyCode)) {
             if (softkeyManager.handleKeyEvent(keyCode, event)) return true
+        }
+
+        // Passcode Unlock Screen Key Routing
+        if (currentScreen == Screen.PASSCODE_LOCK && event.action == KeyEvent.ACTION_DOWN) {
+            if (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) {
+                val digit = (keyCode - KeyEvent.KEYCODE_0).toString()
+                if (passcodeEntry.length < PASSCODE_PIN_LENGTH) {
+                    passcodeEntry += digit
+                    updatePasscodeDotsDisplay()
+                    if (passcodeEntry.length == PASSCODE_PIN_LENGTH) {
+                        attemptPasscodeUnlock()
+                    }
+                }
+                return true
+            }
+            if (keyCode == KeyEvent.KEYCODE_DEL) {
+                if (passcodeEntry.isNotEmpty()) {
+                    passcodeEntry = passcodeEntry.dropLast(1)
+                    updatePasscodeDotsDisplay()
+                }
+                return true
+            }
+            if (SoftkeyUtils.isCenterKey(keyCode)) {
+                if (passcodeEntry.length == PASSCODE_PIN_LENGTH) {
+                    attemptPasscodeUnlock()
+                    return true
+                }
+            }
         }
 
         // Dedicated Call button: Start call in direct chat or accept if incoming call

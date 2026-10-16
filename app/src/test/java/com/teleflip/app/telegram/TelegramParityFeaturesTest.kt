@@ -297,4 +297,54 @@ class TelegramParityFeaturesTest {
         assertEquals(ChatType.GROUP, createdGroup?.chatType)
         assertEquals("Flip Phone Enthusiasts", createdGroup?.title)
     }
+
+    @Test
+    fun testSetChatNotificationMuteWithDuration() {
+        val chatId = 1001L
+        val chat =
+            ChatModel(
+                id = chatId,
+                title = "Test Group",
+                lastMessage = "Hello",
+                time = "12:00",
+                unreadCount = 0,
+                chatType = ChatType.GROUP,
+                avatarLetters = "TG",
+                isMuted = false,
+            )
+        telegramManager.setChatsForTesting(listOf(chat))
+        assertFalse(telegramManager.chats.value.first().isMuted)
+
+        // Mute for 8 hours (28800 seconds)
+        telegramManager.setChatNotificationMute(chatId, 28800)
+        assertTrue(telegramManager.chats.value.first().isMuted)
+
+        // Unmute (0 seconds)
+        telegramManager.setChatNotificationMute(chatId, 0)
+        assertFalse(telegramManager.chats.value.first().isMuted)
+    }
+
+    @Test
+    fun testBlockedUsersManagement() {
+        var blockedUsersLoaded = false
+        telegramManager.loadBlockedUsers { list ->
+            blockedUsersLoaded = true
+            assertTrue(list.isEmpty())
+        }
+        assertTrue(blockedUsersLoaded)
+
+        var blockCallbackCalled = false
+        telegramManager.blockUser(12345L) { ok, _ ->
+            blockCallbackCalled = true
+            assertFalse(ok)
+        }
+        assertTrue(blockCallbackCalled)
+
+        var unblockCallbackCalled = false
+        telegramManager.unblockUser(12345L) { ok, _ ->
+            unblockCallbackCalled = true
+            assertFalse(ok)
+        }
+        assertTrue(unblockCallbackCalled)
+    }
 }

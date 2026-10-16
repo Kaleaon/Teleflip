@@ -3034,17 +3034,129 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             onResult?.invoke(currentMuted)
             return
         }
-        val muteFor = if (currentMuted) 0 else 31536000
+        val newMuted = !currentMuted
+        val muteFor = if (newMuted) 31536000 else 0
+        setChatNotificationMute(chatId, muteFor, onResult)
+    }
+
+    fun setChatNotificationMute(
+        chatId: Long,
+        muteForSeconds: Int,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val isMuted = muteForSeconds > 0
+        _chats.value =
+            _chats.value.map {
+                if (it.id == chatId) it.copy(isMuted = isMuted) else it
+            }
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(isMuted)
+            return
+        }
         val settings =
             TdApi.ChatNotificationSettings().apply {
                 this.useDefaultMuteFor = false
-                this.muteFor = muteFor
+                this.muteFor = muteForSeconds
             }
         val req = TdApi.SetChatNotificationSettings(chatId, settings)
         client.send(req) { obj ->
             val success = obj is TdApi.Ok
             scope.launch(Dispatchers.Main) {
-                onResult?.invoke(if (success) !currentMuted else currentMuted)
+                onResult?.invoke(if (success) isMuted else !isMuted)
+            }
+        }
+    }
+
+    // =========================================================================
+    // Blocked Users Management
+    // =========================================================================
+    fun loadBlockedUsers(onResult: (List<ContactModel>) -> Unit) {
+        val client = tdClient
+        if (client == null) {
+            onResult(emptyList())
+            return
+        }
+        val req = TdApi.GetBlockedMessageSenders(TdApi.BlockListMain(), 0, 100)
+        client.send(req) { obj ->
+            if (obj is TdApi.MessageSenders) {
+                val userIds =
+                    obj.senders.mapNotNull { sender ->
+                        if (sender is TdApi.MessageSenderUser) sender.userId else null
+                    }
+                if (userIds.isEmpty()) {
+                    scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+                    return@send
+                }
+                val blockedList = mutableListOf<ContactModel>()
+                val latch = java.util.concurrent.atomic.AtomicInteger(userIds.size)
+                for (uid in userIds) {
+                    client.send(TdApi.GetUser(uid)) { uObj ->
+                        if (uObj is TdApi.User) {
+                            blockedList.add(
+                                ContactModel(
+                                    userId = uObj.id,
+                                    firstName = uObj.firstName,
+                                    lastName = uObj.lastName,
+                                    phoneNumber = uObj.phoneNumber,
+                                    username = uObj.usernames?.activeUsernames?.firstOrNull() ?: "",
+                                    isOnline = false,
+                                ),
+                            )
+                        }
+                        if (latch.decrementAndGet() == 0) {
+                            scope.launch(Dispatchers.Main) { onResult(blockedList) }
+                        }
+                    }
+                }
+            } else {
+                scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+            }
+        }
+    }
+
+    fun blockUser(
+        userId: Long,
+        onResult: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(false, "Not connected")
+            return
+        }
+        val req = TdApi.SetMessageSenderBlockList(TdApi.MessageSenderUser(userId), TdApi.BlockListMain())
+        client.send(req) { obj ->
+            scope.launch(Dispatchers.Main) {
+                if (obj is TdApi.Ok) {
+                    onResult?.invoke(true, null)
+                } else if (obj is TdApi.Error) {
+                    onResult?.invoke(false, obj.message)
+                } else {
+                    onResult?.invoke(false, "Failed to block user")
+                }
+            }
+        }
+    }
+
+    fun unblockUser(
+        userId: Long,
+        onResult: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(false, "Not connected")
+            return
+        }
+        val req = TdApi.SetMessageSenderBlockList(TdApi.MessageSenderUser(userId), null)
+        client.send(req) { obj ->
+            scope.launch(Dispatchers.Main) {
+                if (obj is TdApi.Ok) {
+                    onResult?.invoke(true, null)
+                } else if (obj is TdApi.Error) {
+                    onResult?.invoke(false, obj.message)
+                } else {
+                    onResult?.invoke(false, "Failed to unblock user")
+                }
             }
         }
     }
@@ -3484,14 +3596,17 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         appendMessage(msg.chatId, model)
         if (!msg.isOutgoing && backgroundPushEnabled) {
-            val chatTitle = _chats.value.find { it.id == msg.chatId }?.title ?: "Telegram"
-            NotificationHelper.showIncomingMessageNotification(
-                context = context,
-                chatId = msg.chatId,
-                chatTitle = chatTitle,
-                senderName = model.senderName,
-                messageText = model.text,
-            )
+            val targetChat = _chats.value.find { it.id == msg.chatId }
+            if (targetChat?.isMuted != true) {
+                val chatTitle = targetChat?.title ?: "Telegram"
+                NotificationHelper.showIncomingMessageNotification(
+                    context = context,
+                    chatId = msg.chatId,
+                    chatTitle = chatTitle,
+                    senderName = model.senderName,
+                    messageText = model.text,
+                )
+            }
         }
     }
 
