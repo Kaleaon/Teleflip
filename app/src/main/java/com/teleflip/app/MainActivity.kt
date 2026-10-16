@@ -129,6 +129,7 @@ class MainActivity : AppCompatActivity() {
         private const val REQ_PICK_PHOTO = 1004
         private const val REQ_PICK_DOCUMENT = 1005
         private const val REQ_PICK_VIDEO = 1006
+        private const val BYTES_PER_MB = 1024 * 1024L
 
         internal fun cleanAndFormatPhoneNumber(raw: String?): String? {
             if (raw.isNullOrBlank()) return null
@@ -732,6 +733,11 @@ class MainActivity : AppCompatActivity() {
                 telegramManager.openSavedMessages { savedChat ->
                     openConversation(savedChat)
                 }
+            },
+        )
+        options.add(
+            MenuOption(options.size + 1, "👥 Telegram Contacts") {
+                showContactsMenu()
             },
         )
 
@@ -1515,6 +1521,16 @@ class MainActivity : AppCompatActivity() {
                 showProfileScreen(chat)
             },
         )
+        options.add(
+            MenuOption(options.size + 1, "🔍 Search in This Chat") {
+                showSearchInChatDialog(chat)
+            },
+        )
+        options.add(
+            MenuOption(options.size + 1, "🗑️ Clear Chat History") {
+                showClearChatHistoryDialog(chat)
+            },
+        )
         OptionsMenuDialog(this, "Attach & Actions", options).show()
     }
 
@@ -1623,18 +1639,25 @@ class MainActivity : AppCompatActivity() {
     private fun showGroupMembersMenu(chat: ChatModel) {
         commitActiveInputEngines()
         val members = telegramManager.getGroupMembers(chat.id)
-        val options =
-            members.mapIndexed { idx, member ->
-                val badge =
-                    when {
-                        member.isCreator -> "👑 Owner"
-                        member.isAdmin -> "🛡️ Admin"
-                        else -> "👤 Member"
-                    }
-                MenuOption(idx + 1, "${member.name} ($badge • ${member.status})") {
-                    showMemberAdminActionsMenu(chat, member)
+        val options = mutableListOf<MenuOption>()
+        options.add(
+            MenuOption(1, "➕ Add Member to Group") {
+                showAddMemberToGroupMenu(chat)
+            },
+        )
+        members.forEachIndexed { idx, member ->
+            val badge =
+                when {
+                    member.isCreator -> "👑 Owner"
+                    member.isAdmin -> "🛡️ Admin"
+                    else -> "👤 Member"
                 }
-            }
+            options.add(
+                MenuOption(idx + 2, "${member.name} ($badge • ${member.status})") {
+                    showMemberAdminActionsMenu(chat, member)
+                },
+            )
+        }
         OptionsMenuDialog(this, "👥 Members (${members.size})", options).show()
     }
 
@@ -1668,6 +1691,305 @@ class MainActivity : AppCompatActivity() {
             )
         }
         OptionsMenuDialog(this, member.name, options).show()
+    }
+
+    private fun showAddMemberToGroupMenu(chat: ChatModel) {
+        commitActiveInputEngines()
+        telegramManager.loadContacts { contacts ->
+            val options = mutableListOf<MenuOption>()
+            contacts.forEachIndexed { idx, contact ->
+                val name = "${contact.firstName} ${contact.lastName}".trim().ifBlank { contact.phoneNumber }
+                options.add(
+                    MenuOption(idx + 1, "👤 Add $name") {
+                        telegramManager.addChatMember(chat.id, contact.userId) { success, err ->
+                            if (success) {
+                                showToast("Added $name to ${chat.title}")
+                            } else {
+                                showToast("Could not add member: ${err ?: "Failed"}", isError = true)
+                            }
+                        }
+                    },
+                )
+            }
+            if (options.isEmpty()) {
+                showToast("No Telegram contacts found")
+            } else {
+                OptionsMenuDialog(this, "➕ Add Member to ${chat.title}", options).show()
+            }
+        }
+    }
+
+    private fun showSearchInChatDialog(chat: ChatModel) {
+        commitActiveInputEngines()
+        val container =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(40, 20, 40, 20)
+            }
+        val etSearch =
+            EditText(this).apply {
+                hint = "Search text in this chat..."
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+                isSingleLine = true
+            }
+        container.addView(etSearch)
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("🔍 Search in ${chat.title}")
+            .setView(container)
+            .setPositiveButton("Search") { dialog, _ ->
+                dialog.dismiss()
+                val query = etSearch.text.toString().trim()
+                if (query.isNotEmpty()) {
+                    telegramManager.searchChatMessages(chat.id, query) { results ->
+                        if (results.isEmpty()) {
+                            showToast("No messages found matching \"$query\"")
+                        } else {
+                            val options =
+                                results.mapIndexed { idx, res ->
+                                    val snippet = if (res.text.length > 50) "${res.text.take(50)}..." else res.text
+                                    MenuOption(idx + 1, "[${res.time}] ${res.senderName}: $snippet") {
+                                        val pos = messageAdapter?.getPositionForMessageId(res.messageId) ?: -1
+                                        if (pos != -1) {
+                                            rvMessages?.scrollToPosition(pos)
+                                            rvMessages?.post {
+                                                rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+                                            }
+                                        } else {
+                                            showToast("Jumped to message #${res.messageId}")
+                                        }
+                                    }
+                                }
+                            OptionsMenuDialog(this@MainActivity, "Results for \"$query\" (${results.size})", options).show()
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .show()
+
+        etSearch.post { etSearch.requestFocus() }
+    }
+
+    private fun showClearChatHistoryDialog(chat: ChatModel) {
+        commitActiveInputEngines()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Clear Chat History?")
+            .setMessage("Are you sure you want to delete all messages in \"${chat.title}\"? This action cannot be undone.")
+            .setPositiveButton("Clear History") { dialog, _ ->
+                dialog.dismiss()
+                telegramManager.deleteChatHistory(chat.id, revoke = true) {
+                    showToast("Chat history cleared")
+                }
+            }
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .show()
+    }
+
+    private fun showContactsMenu() {
+        commitActiveInputEngines()
+        telegramManager.loadContacts { contacts ->
+            val options = mutableListOf<MenuOption>()
+            options.add(
+                MenuOption(1, "➕ Add New Contact") {
+                    showAddContactDialog()
+                },
+            )
+            contacts.forEachIndexed { idx, contact ->
+                val name = "${contact.firstName} ${contact.lastName}".trim().ifBlank { contact.phoneNumber }
+                val statusIcon = if (contact.isOnline) "🟢" else "👤"
+                val phoneSnippet = if (contact.phoneNumber.isNotBlank()) " (${contact.phoneNumber})" else ""
+                options.add(
+                    MenuOption(idx + 2, "$statusIcon $name$phoneSnippet") {
+                        val query = contact.phoneNumber.ifBlank { contact.username.ifBlank { contact.userId.toString() } }
+                        telegramManager.resolveAndCreateChat(query) { directChat, _ ->
+                            if (directChat != null) openConversation(directChat)
+                        }
+                    },
+                )
+            }
+            OptionsMenuDialog(this, "👥 Contacts (${contacts.size})", options).show()
+        }
+    }
+
+    private fun showAddContactDialog() {
+        commitActiveInputEngines()
+        val container =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(40, 20, 40, 20)
+            }
+        val etFirstName =
+            EditText(this).apply {
+                hint = "First Name"
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+                isSingleLine = true
+            }
+        val etLastName =
+            EditText(this).apply {
+                hint = "Last Name (Optional)"
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+                isSingleLine = true
+            }
+        val etPhone =
+            EditText(this).apply {
+                hint = "Phone Number (+15551234567)"
+                inputType = InputType.TYPE_CLASS_PHONE
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+                isSingleLine = true
+            }
+        container.addView(etFirstName)
+        container.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 16) })
+        container.addView(etLastName)
+        container.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 16) })
+        container.addView(etPhone)
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("➕ Add New Contact")
+            .setView(container)
+            .setPositiveButton("Save Contact") { dialog, _ ->
+                dialog.dismiss()
+                val first = etFirstName.text.toString().trim()
+                val last = etLastName.text.toString().trim()
+                val phone = etPhone.text.toString().trim()
+                if (first.isNotBlank() && phone.isNotBlank()) {
+                    telegramManager.addContact(phone, first, last) { success, err ->
+                        if (success) {
+                            showToast("Contact added: $first")
+                            telegramManager.resolveAndCreateChat(phone) { directChat, _ ->
+                                if (directChat != null) openConversation(directChat)
+                            }
+                        } else {
+                            showToast("Error adding contact: ${err ?: "Unknown"}", isError = true)
+                        }
+                    }
+                } else {
+                    showToast("First name and phone number required", isError = true)
+                }
+            }
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .show()
+
+        etFirstName.post { etFirstName.requestFocus() }
+    }
+
+    private fun showEditProfileMenu() {
+        commitActiveInputEngines()
+        val current = telegramManager.currentUser.value
+        val container =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(40, 20, 40, 20)
+            }
+        val etFirst =
+            EditText(this).apply {
+                hint = "First Name"
+                setText(current?.firstName.orEmpty())
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+                isSingleLine = true
+            }
+        val etLast =
+            EditText(this).apply {
+                hint = "Last Name"
+                setText(current?.lastName.orEmpty())
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+                isSingleLine = true
+            }
+        val etUsername =
+            EditText(this).apply {
+                hint = "Username (@username)"
+                setText(current?.username.orEmpty())
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+                isSingleLine = true
+            }
+        val etBio =
+            EditText(this).apply {
+                hint = "Bio (About you)"
+                setText(current?.bio.orEmpty())
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_hint))
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_edittext_selector)
+                setPadding(24, 20, 24, 20)
+                isSingleLine = true
+            }
+        container.addView(etFirst)
+        container.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 12) })
+        container.addView(etLast)
+        container.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 12) })
+        container.addView(etUsername)
+        container.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 12) })
+        container.addView(etBio)
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("✏️ Edit Profile")
+            .setView(container)
+            .setPositiveButton("Save Profile") { dialog, _ ->
+                dialog.dismiss()
+                val f = etFirst.text.toString().trim()
+                val l = etLast.text.toString().trim()
+                val u = etUsername.text.toString().trim()
+                val b = etBio.text.toString().trim()
+                telegramManager.updateProfile(f, l, b, u) { success, err ->
+                    if (success) {
+                        showToast("Profile updated!")
+                    } else {
+                        showToast("Profile update error: ${err ?: "Failed"}", isError = true)
+                    }
+                }
+            }
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .show()
+
+        etFirst.post { etFirst.requestFocus() }
+    }
+
+    private fun showActiveSessionsMenu() {
+        commitActiveInputEngines()
+        telegramManager.loadActiveSessions { sessions ->
+            val options = mutableListOf<MenuOption>()
+            options.add(
+                MenuOption(1, "🚫 Terminate All Other Sessions") {
+                    telegramManager.terminateAllOtherSessions { ok, err ->
+                        if (ok) {
+                            showToast("All other sessions terminated")
+                        } else {
+                            showToast("Error: ${err ?: "Failed"}", isError = true)
+                        }
+                    }
+                },
+            )
+            sessions.forEachIndexed { idx, session ->
+                val currentBadge = if (session.isCurrent) " [This Device]" else ""
+                val info = "${session.deviceModel} • ${session.platform} • ${session.ip}$currentBadge"
+                options.add(
+                    MenuOption(idx + 2, "📱 $info") {
+                        showToast("Session: ${session.appName} ${session.appVersion} (${session.activeDate})")
+                    },
+                )
+            }
+            OptionsMenuDialog(this, "📱 Active Sessions (${sessions.size})", options).show()
+        }
     }
 
     private fun showSelfDestructTimerMenu(chat: ChatModel) {
@@ -2798,9 +3120,37 @@ class MainActivity : AppCompatActivity() {
         val etHash = view.findViewById<EditText>(R.id.et_api_hash)
         val spTimeout = view.findViewById<Spinner>(R.id.sp_keypad_timeout)
         val btnBgPush = view.findViewById<Button>(R.id.btn_toggle_bg_notifications)
+        val btnEditProfile = view.findViewById<Button>(R.id.btn_edit_profile)
+        val btnActiveSessions = view.findViewById<Button>(R.id.btn_active_sessions)
+        val btnClearCache = view.findViewById<Button>(R.id.btn_clear_cache)
         val btnSave = view.findViewById<Button>(R.id.btn_save_config)
         val btnLogout = view.findViewById<Button>(R.id.btn_logout)
         val btnBack = view.findViewById<Button>(R.id.btn_back_to_chats)
+
+        val tvUser = view.findViewById<TextView>(R.id.tv_settings_user)
+        val tvStatus = view.findViewById<TextView>(R.id.tv_settings_status)
+
+        telegramManager.loadCurrentUser()
+        lifecycleScope.launch {
+            telegramManager.currentUser.collectLatest { profile ->
+                if (profile != null) {
+                    val name = "${profile.firstName} ${profile.lastName}".trim().ifBlank { "User #${profile.userId}" }
+                    val phone = if (profile.phoneNumber.isNotBlank()) " (${profile.phoneNumber})" else ""
+                    tvUser?.text = "Account: $name$phone"
+                    val handle = if (profile.username.isNotBlank()) "@${profile.username} • " else ""
+                    tvStatus?.text = "${handle}Bio: ${profile.bio.ifBlank { "None" }}"
+                }
+            }
+        }
+
+        btnEditProfile?.setOnClickListener { showEditProfileMenu() }
+        btnActiveSessions?.setOnClickListener { showActiveSessionsMenu() }
+        btnClearCache?.setOnClickListener {
+            telegramManager.clearMediaCache { _, freed ->
+                val mb = freed / BYTES_PER_MB
+                showToast("Cleared media cache ($mb MB freed)")
+            }
+        }
 
         fun updateBgPushLabel(enabled: Boolean) {
             btnBgPush?.text =

@@ -131,6 +131,42 @@
             android:textSize="13sp"
             android:background="@drawable/bg_item_selector"
             android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Edit Profile Button -->
+        <Button
+            android:id="@+id/btn_edit_profile"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="👤 Edit Profile (Name, Bio, Username)"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Active Sessions & Security Button -->
+        <Button
+            android:id="@+id/btn_active_sessions"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="📱 Active Sessions &amp; Devices"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Clear Media Cache Button -->
+        <Button
+            android:id="@+id/btn_clear_cache"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:text="🧹 Clear Local Media Cache"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
             android:layout_marginBottom="14dp" />
 
         <!-- Save Button -->

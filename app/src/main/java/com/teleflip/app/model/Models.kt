@@ -181,3 +181,34 @@ data class SavedGifItem(
     val durationSeconds: Int = 0,
     val caption: String = "",
 )
+
+data class ContactModel(
+    val userId: Long,
+    val firstName: String,
+    val lastName: String,
+    val phoneNumber: String,
+    val username: String = "",
+    val isOnline: Boolean = false,
+)
+
+data class UserProfileModel(
+    val userId: Long,
+    val firstName: String,
+    val lastName: String,
+    val phoneNumber: String,
+    val username: String = "",
+    val bio: String = "",
+)
+
+data class SessionModel(
+    val id: Long,
+    val isCurrent: Boolean,
+    val deviceModel: String,
+    val platform: String,
+    val systemVersion: String,
+    val appName: String,
+    val appVersion: String,
+    val ip: String,
+    val country: String,
+    val activeDate: String,
+)

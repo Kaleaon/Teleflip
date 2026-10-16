@@ -9,6 +9,7 @@ import com.teleflip.app.model.ChatFolderModel
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatProfile
 import com.teleflip.app.model.ChatType
+import com.teleflip.app.model.ContactModel
 import com.teleflip.app.model.ForumTopicModel
 import com.teleflip.app.model.GroupMember
 import com.teleflip.app.model.MediaType
@@ -17,8 +18,10 @@ import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.model.PollOption
 import com.teleflip.app.model.SavedGifItem
+import com.teleflip.app.model.SessionModel
 import com.teleflip.app.model.StickerItem
 import com.teleflip.app.model.StickerSetModel
+import com.teleflip.app.model.UserProfileModel
 import com.teleflip.app.notifications.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +100,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     private val _chatFolders = MutableStateFlow<List<ChatFolderModel>>(emptyList())
     val chatFolders: StateFlow<List<ChatFolderModel>> = _chatFolders.asStateFlow()
+
+    private val _currentUser = MutableStateFlow<UserProfileModel?>(null)
+    val currentUser: StateFlow<UserProfileModel?> = _currentUser.asStateFlow()
 
     private var tdClient: Client? = null
 
@@ -2155,6 +2161,411 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     }
 
     // =========================================================================
+    // In-Chat Message Search
+    // =========================================================================
+    fun searchChatMessages(
+        chatId: Long,
+        query: String,
+        onResult: (List<MessageSearchResult>) -> Unit,
+    ) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            onResult(emptyList())
+            return
+        }
+
+        val client = tdClient
+        if (client == null) {
+            val lower = trimmed.lowercase()
+            val localMsgs = _messages.value[chatId].orEmpty()
+            val matches =
+                localMsgs.filter {
+                    it.text.lowercase().contains(lower) || it.mediaCaption.lowercase().contains(lower)
+                }.map {
+                    MessageSearchResult(
+                        messageId = it.id,
+                        chatId = it.chatId,
+                        chatTitle = _chats.value.find { c -> c.id == chatId }?.title ?: "Chat",
+                        senderName = it.senderName,
+                        text = it.text.ifBlank { it.mediaCaption },
+                        time = it.time,
+                    )
+                }
+            onResult(matches)
+            return
+        }
+
+        val req =
+            TdApi.SearchChatMessages().apply {
+                this.chatId = chatId
+                this.query = trimmed
+                this.fromMessageId = 0L
+                this.offset = 0
+                this.limit = 50
+                this.filter = null
+            }
+
+        client.send(req) { obj ->
+            if (obj is TdApi.FoundChatMessages) {
+                val list = mutableListOf<MessageSearchResult>()
+                val chatTitle = _chats.value.find { it.id == chatId }?.title ?: "Chat"
+                for (msg in obj.messages) {
+                    val text = extractMessageText(msg.content)
+                    val time = formatTime(msg.date.toLong() * 1000)
+                    val sender = if (msg.isOutgoing) "You" else "Contact"
+                    list.add(
+                        MessageSearchResult(
+                            messageId = msg.id,
+                            chatId = chatId,
+                            chatTitle = chatTitle,
+                            senderName = sender,
+                            text = text,
+                            time = time,
+                            dateMillis = msg.date.toLong() * 1000,
+                        ),
+                    )
+                }
+                scope.launch(Dispatchers.Main) {
+                    onResult(list)
+                }
+            } else {
+                scope.launch(Dispatchers.Main) {
+                    onResult(emptyList())
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // Chat History Management (Clear History)
+    // =========================================================================
+    fun deleteChatHistory(
+        chatId: Long,
+        revoke: Boolean = true,
+        onComplete: (() -> Unit)? = null,
+    ) {
+        val client = tdClient
+        if (client != null) {
+            val req =
+                TdApi.DeleteChatHistory().apply {
+                    this.chatId = chatId
+                    this.removeFromChatList = false
+                    this.revoke = revoke
+                }
+            client.send(req) {
+                scope.launch(Dispatchers.Main) {
+                    val currentMap = _messages.value.toMutableMap()
+                    currentMap[chatId] = emptyList()
+                    _messages.value = currentMap
+                    onComplete?.invoke()
+                }
+            }
+        } else {
+            val currentMap = _messages.value.toMutableMap()
+            currentMap[chatId] = emptyList()
+            _messages.value = currentMap
+            onComplete?.invoke()
+        }
+    }
+
+    // =========================================================================
+    // Contact Management
+    // =========================================================================
+    fun loadContacts(onResult: (List<ContactModel>) -> Unit) {
+        val client = tdClient
+        if (client == null) {
+            val fallbackContacts =
+                _chats.value.filter { it.chatType == ChatType.DIRECT }.map {
+                    ContactModel(
+                        userId = it.id,
+                        firstName = it.title,
+                        lastName = "",
+                        phoneNumber = "",
+                        username = "",
+                        isOnline = false,
+                    )
+                }
+            onResult(fallbackContacts)
+            return
+        }
+
+        client.send(TdApi.GetContacts()) { obj ->
+            if (obj is TdApi.Users) {
+                val userIds = obj.userIds
+                if (userIds.isEmpty()) {
+                    scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+                    return@send
+                }
+                val contacts = mutableListOf<ContactModel>()
+                val latch = java.util.concurrent.atomic.AtomicInteger(userIds.size)
+                for (uid in userIds) {
+                    client.send(TdApi.GetUser(uid)) { uObj ->
+                        if (uObj is TdApi.User) {
+                            val isOnline = uObj.status is TdApi.UserStatusOnline
+                            contacts.add(
+                                ContactModel(
+                                    userId = uObj.id,
+                                    firstName = uObj.firstName,
+                                    lastName = uObj.lastName,
+                                    phoneNumber = uObj.phoneNumber,
+                                    username = uObj.usernames?.activeUsernames?.firstOrNull() ?: "",
+                                    isOnline = isOnline,
+                                ),
+                            )
+                        }
+                        if (latch.decrementAndGet() == 0) {
+                            val sorted = contacts.sortedBy { "${it.firstName} ${it.lastName}".trim().lowercase() }
+                            scope.launch(Dispatchers.Main) { onResult(sorted) }
+                        }
+                    }
+                }
+            } else {
+                scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+            }
+        }
+    }
+
+    fun addContact(
+        phoneNumber: String,
+        firstName: String,
+        lastName: String,
+        onResult: (Boolean, String?) -> Unit,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult(false, "Client not connected")
+            return
+        }
+        val cleanPhone = org.telegram.PhoneFormat.PhoneFormat.stripExceptNumbers(phoneNumber, true) ?: phoneNumber
+        val normalized = if (!cleanPhone.startsWith("+")) "+$cleanPhone" else cleanPhone
+        val newContact =
+            TdApi.ImportedContact().apply {
+                this.phoneNumber = normalized
+                this.firstName = firstName
+                this.lastName = lastName
+            }
+        val req =
+            TdApi.ImportContacts().apply {
+                this.contacts = arrayOf(newContact)
+            }
+        client.send(req) { obj ->
+            scope.launch(Dispatchers.Main) {
+                if (obj is TdApi.ImportedContacts) {
+                    onResult(true, null)
+                } else if (obj is TdApi.Error) {
+                    onResult(false, obj.message)
+                } else {
+                    onResult(false, "Failed to add contact")
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // User Profile Management (View & Edit Profile)
+    // =========================================================================
+    fun loadCurrentUser(onResult: ((UserProfileModel?) -> Unit)? = null) {
+        val client = tdClient ?: return
+        client.send(TdApi.GetMe()) { meObj ->
+            if (meObj is TdApi.User) {
+                client.send(TdApi.GetUserFullInfo(meObj.id)) { infoObj ->
+                    val bioText = if (infoObj is TdApi.UserFullInfo) infoObj.bio?.text.orEmpty() else ""
+                    val model =
+                        UserProfileModel(
+                            userId = meObj.id,
+                            firstName = meObj.firstName,
+                            lastName = meObj.lastName,
+                            phoneNumber = meObj.phoneNumber,
+                            username = meObj.usernames?.activeUsernames?.firstOrNull() ?: "",
+                            bio = bioText,
+                        )
+                    _currentUser.value = model
+                    scope.launch(Dispatchers.Main) {
+                        onResult?.invoke(model)
+                    }
+                }
+            } else {
+                scope.launch(Dispatchers.Main) {
+                    onResult?.invoke(null)
+                }
+            }
+        }
+    }
+
+    fun updateProfile(
+        firstName: String,
+        lastName: String,
+        bio: String,
+        username: String,
+        onResult: (Boolean, String?) -> Unit,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult(false, "Client not connected")
+            return
+        }
+        scope.launch {
+            try {
+                sendQuery(
+                    TdApi.SetName().apply {
+                        this.firstName = firstName
+                        this.lastName = lastName
+                    },
+                )
+                sendQuery(
+                    TdApi.SetBio().apply {
+                        this.bio = bio
+                    },
+                )
+                if (username.isNotBlank()) {
+                    val cleanUsername = username.removePrefix("@").trim()
+                    sendQuery(
+                        TdApi.SetUsername().apply {
+                            this.username = cleanUsername
+                        },
+                    )
+                }
+                loadCurrentUser()
+                withContext(Dispatchers.Main) {
+                    onResult(true, null)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, e.message)
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // Group Administration: Add Member
+    // =========================================================================
+    fun addChatMember(
+        chatId: Long,
+        userId: Long,
+        onResult: (Boolean, String?) -> Unit,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult(false, "Not connected")
+            return
+        }
+        val req =
+            TdApi.AddChatMember().apply {
+                this.chatId = chatId
+                this.userId = userId
+                this.forwardLimit = 50
+            }
+        client.send(req) { obj ->
+            scope.launch(Dispatchers.Main) {
+                if (obj is TdApi.Ok) {
+                    onResult(true, null)
+                } else if (obj is TdApi.Error) {
+                    onResult(false, obj.message)
+                } else {
+                    onResult(false, "Unable to add member")
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // Active Sessions & Devices Security
+    // =========================================================================
+    fun loadActiveSessions(onResult: (List<SessionModel>) -> Unit) {
+        val client = tdClient
+        if (client == null) {
+            onResult(emptyList())
+            return
+        }
+        client.send(TdApi.GetActiveSessions()) { obj ->
+            if (obj is TdApi.Sessions) {
+                val list =
+                    obj.sessions.map { s ->
+                        val dateStr = formatTime(s.lastActiveDate.toLong() * 1000)
+                        SessionModel(
+                            id = s.id,
+                            isCurrent = s.isCurrent,
+                            deviceModel = s.deviceModel,
+                            platform = s.platform,
+                            systemVersion = s.systemVersion,
+                            appName = s.applicationName,
+                            appVersion = s.applicationVersion,
+                            ip = s.ipAddress,
+                            country = s.location,
+                            activeDate = dateStr,
+                        )
+                    }
+                scope.launch(Dispatchers.Main) {
+                    onResult(list)
+                }
+            } else {
+                scope.launch(Dispatchers.Main) {
+                    onResult(emptyList())
+                }
+            }
+        }
+    }
+
+    fun terminateAllOtherSessions(onResult: (Boolean, String?) -> Unit) {
+        val client = tdClient
+        if (client == null) {
+            onResult(false, "Not connected")
+            return
+        }
+        client.send(TdApi.TerminateAllOtherSessions()) { obj ->
+            scope.launch(Dispatchers.Main) {
+                if (obj is TdApi.Ok) {
+                    onResult(true, null)
+                } else if (obj is TdApi.Error) {
+                    onResult(false, obj.message)
+                } else {
+                    onResult(false, "Failed to terminate sessions")
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // Storage & Media Cache Cleaner
+    // =========================================================================
+    fun clearMediaCache(onResult: (Boolean, Long) -> Unit) {
+        scope.launch(Dispatchers.IO) {
+            var freedBytes = 0L
+            try {
+                val cacheDir = context.cacheDir
+                cacheDir?.listFiles()?.forEach { file ->
+                    freedBytes += file.length()
+                    file.deleteRecursively()
+                }
+                val extCache = context.externalCacheDir
+                extCache?.listFiles()?.forEach { file ->
+                    freedBytes += file.length()
+                    file.deleteRecursively()
+                }
+                val client = tdClient
+                if (client != null) {
+                    val req =
+                        TdApi.OptimizeStorage().apply {
+                            this.size = -1L
+                            this.ttl = -1
+                            this.count = -1
+                            this.immunityDelay = -1
+                        }
+                    client.send(req) {}
+                }
+                withContext(Dispatchers.Main) {
+                    onResult(true, freedBytes)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, 0L)
+                }
+            }
+        }
+    }
+
+    // =========================================================================
     // Telegram API ToS §1.4 Compliance: Read receipts
     // Messages must be marked as read when viewed — no "ghost mode"
     // =========================================================================
@@ -2756,6 +3167,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.AuthorizationStateReady.CONSTRUCTOR -> {
                 _authState.value = AuthState.Ready
                 loadChats()
+                loadCurrentUser()
             }
             TdApi.AuthorizationStateClosed.CONSTRUCTOR -> {
                 _authState.value = AuthState.Initial
