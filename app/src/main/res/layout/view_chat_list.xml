@@ -42,7 +42,7 @@
 
     </LinearLayout>
 
-    <!-- Tab Bar for Filtering Chats -->
+    <!-- Tab Bar for Filtering Chats, Folders, and Archive -->
     <HorizontalScrollView
         android:id="@+id/scroll_tabs"
         android:layout_width="match_parent"
@@ -77,7 +77,7 @@
                 android:background="@drawable/bg_tab_indicator"
                 android:focusable="true"
                 android:nextFocusDown="@id/rv_chats"
-                android:nextFocusLeft="@id/tab_channels"
+                android:nextFocusLeft="@id/tab_archived"
                 android:nextFocusRight="@id/tab_direct"
                 android:layout_marginEnd="6dp" />
 
@@ -141,6 +141,69 @@
                 android:focusable="true"
                 android:nextFocusDown="@id/rv_chats"
                 android:nextFocusLeft="@id/tab_groups"
+                android:nextFocusRight="@id/tab_bots"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/tab_bots"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:minWidth="48dp"
+                android:gravity="center"
+                android:text="Bots"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:background="@drawable/bg_tab_indicator"
+                android:focusable="true"
+                android:nextFocusDown="@id/rv_chats"
+                android:nextFocusLeft="@id/tab_channels"
+                android:nextFocusRight="@id/tab_folders"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/tab_folders"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:minWidth="48dp"
+                android:gravity="center"
+                android:text="📁 Folders"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:background="@drawable/bg_tab_indicator"
+                android:focusable="true"
+                android:nextFocusDown="@id/rv_chats"
+                android:nextFocusLeft="@id/tab_bots"
+                android:nextFocusRight="@id/tab_archived"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/tab_archived"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:minWidth="48dp"
+                android:gravity="center"
+                android:text="📦 Archive"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:background="@drawable/bg_tab_indicator"
+                android:focusable="true"
+                android:nextFocusDown="@id/rv_chats"
+                android:nextFocusLeft="@id/tab_folders"
                 android:nextFocusRight="@id/tab_all" />
 
         </LinearLayout>

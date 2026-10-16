@@ -78,9 +78,12 @@ class MessageAdapter(
         private val rootLayout: LinearLayout = itemView.findViewById(R.id.layout_message_root)
         private val bubbleLayout: LinearLayout = itemView.findViewById(R.id.layout_bubble)
         private val tvSender: TextView = itemView.findViewById(R.id.tv_sender_name)
+        private val tvForwarded: TextView? = itemView.findViewById(R.id.tv_forwarded_header)
+        private val tvReplyQuote: TextView? = itemView.findViewById(R.id.tv_reply_quote)
         private val tvMedia: TextView = itemView.findViewById(R.id.tv_media_indicator)
         private val ivPhoto: ImageView = itemView.findViewById(R.id.iv_message_photo)
         private val tvText: TextView = itemView.findViewById(R.id.tv_message_text)
+        private val tvReactions: TextView? = itemView.findViewById(R.id.tv_reactions)
         private val tvTime: TextView = itemView.findViewById(R.id.tv_message_time)
         private val tvStatus: TextView = itemView.findViewById(R.id.tv_read_status)
 
@@ -112,6 +115,23 @@ class MessageAdapter(
                 tvStatus.visibility = View.GONE
             }
 
+            if (message.forwardedFrom.isNotBlank()) {
+                tvForwarded?.visibility = View.VISIBLE
+                tvForwarded?.text = "↪ Forwarded from ${message.forwardedFrom}"
+            } else {
+                tvForwarded?.visibility = View.GONE
+            }
+
+            if (message.replyToPreview.isNotBlank()) {
+                tvReplyQuote?.visibility = View.VISIBLE
+                tvReplyQuote?.text = "↩ ${message.replyToPreview}"
+            } else if (message.replyToMessageId != 0L) {
+                tvReplyQuote?.visibility = View.VISIBLE
+                tvReplyQuote?.text = "↩ Reply to #${message.replyToMessageId}"
+            } else {
+                tvReplyQuote?.visibility = View.GONE
+            }
+
             // Media attachment preview
             when (message.mediaType) {
                 MediaType.VOICE -> {
@@ -127,7 +147,7 @@ class MessageAdapter(
                 }
                 MediaType.PHOTO -> {
                     tvMedia.visibility = View.VISIBLE
-                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "📷 ${message.mediaCaption}" else "📷 [Photo]"
+                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "📷 ${message.mediaCaption}" else "📷 [Photo • OK to Zoom]"
                 }
                 MediaType.DOCUMENT -> {
                     tvMedia.visibility = View.VISIBLE
@@ -140,7 +160,24 @@ class MessageAdapter(
                 }
                 MediaType.VIDEO -> {
                     tvMedia.visibility = View.VISIBLE
-                    tvMedia.text = "📹 [Video]"
+                    val dur = if (message.durationSeconds > 0) " (${message.durationSeconds}s)" else ""
+                    tvMedia.text = "📹 [Video$dur] ▶ Press OK to Play"
+                }
+                MediaType.ANIMATION -> {
+                    tvMedia.visibility = View.VISIBLE
+                    tvMedia.text = "🎞️ [GIF] ▶ Press OK to Play"
+                }
+                MediaType.POLL -> {
+                    tvMedia.visibility = View.VISIBLE
+                    val statusTag =
+                        if (message.pollIsClosed) {
+                            "Closed"
+                        } else if (message.pollIsAnonymous) {
+                            "Anonymous Poll"
+                        } else {
+                            "Public Poll"
+                        }
+                    tvMedia.text = "📊 [$statusTag • Press OK to Vote]"
                 }
                 MediaType.NONE -> {
                     tvMedia.visibility = View.GONE
@@ -156,9 +193,37 @@ class MessageAdapter(
                 ivPhoto.visibility = View.GONE
             }
 
-            tvText.text = message.text
-            tvText.visibility = if (message.text.isNotBlank()) View.VISIBLE else View.GONE
-            tvTime.text = message.time
+            if (message.mediaType == MediaType.POLL && message.pollOptions.isNotEmpty()) {
+                val pollBody =
+                    buildString {
+                        appendLine(message.pollQuestion.ifBlank { message.text })
+                        message.pollOptions.forEachIndexed { idx, opt ->
+                            val mark = if (opt.isChosen) "[✓]" else "[ ]"
+                            appendLine("${idx + 1}. $mark ${opt.text} (${opt.votePercentage}% • ${opt.voterCount})")
+                        }
+                        append("Total votes: ${message.pollTotalVoters}")
+                    }
+                tvText.text = pollBody
+                tvText.visibility = View.VISIBLE
+            } else {
+                tvText.text = message.text
+                tvText.visibility = if (message.text.isNotBlank()) View.VISIBLE else View.GONE
+            }
+
+            if (message.reactions.isNotEmpty()) {
+                tvReactions?.visibility = View.VISIBLE
+                tvReactions?.text = message.reactions.joinToString(" ")
+            } else {
+                tvReactions?.visibility = View.GONE
+            }
+
+            val metaPrefix =
+                buildString {
+                    if (message.selfDestructSeconds > 0) append("⏱️${message.selfDestructSeconds}s ")
+                    if (message.isPinned) append("📌 ")
+                    if (message.isEdited) append("edited ")
+                }
+            tvTime.text = "$metaPrefix${message.time}"
 
             itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {

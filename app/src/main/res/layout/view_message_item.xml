@@ -33,6 +33,36 @@
             android:visibility="gone"
             android:layout_marginBottom="2dp" />
 
+        <!-- Forwarded Header -->
+        <TextView
+            android:id="@+id/tv_forwarded_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="↪ Forwarded message"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="italic"
+            android:visibility="gone"
+            android:layout_marginBottom="2dp" />
+
+        <!-- Quoted Reply Preview -->
+        <TextView
+            android:id="@+id/tv_reply_quote"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="↩ Reply preview"
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="11sp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:background="@drawable/bg_tab_indicator"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:visibility="gone"
+            android:layout_marginBottom="3dp" />
+
         <!-- Media Attachment Indicator (e.g. [Photo], [Voice Note]) -->
         <TextView
             android:id="@+id/tv_media_indicator"
@@ -64,6 +94,22 @@
             android:text="Message content goes here..."
             android:textColor="@color/text_primary"
             android:textSize="14sp" />
+
+        <!-- Emoji Reactions Row -->
+        <TextView
+            android:id="@+id/tv_reactions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="👍 ❤️"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_tab_indicator"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="1dp"
+            android:paddingBottom="1dp"
+            android:visibility="gone"
+            android:layout_marginTop="3dp" />
 
         <!-- Meta Line: Time & Status Tick -->
         <LinearLayout

@@ -97,6 +97,34 @@
 
     </LinearLayout>
 
+    <!-- Pinned Message Banner (Shown when chat has a pinned message) -->
+    <LinearLayout
+        android:id="@+id/layout_pinned_banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/bg_dark_card"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_pinned_banner_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📌 Pinned message"
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+    </LinearLayout>
+
     <!-- Message History List -->
     <FrameLayout
         android:layout_width="match_parent"
@@ -120,6 +148,44 @@
             android:visibility="gone" />
 
     </FrameLayout>
+
+    <!-- Reply / Edit Context Banner (Visible when replying to or editing a message) -->
+    <LinearLayout
+        android:id="@+id/layout_reply_edit_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/bg_dark_card"
+        android:paddingStart="10dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_reply_edit_preview"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="↩ Replying to message..."
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <Button
+            android:id="@+id/btn_cancel_reply_edit"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:minWidth="40dp"
+            android:text="✕"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true" />
+
+    </LinearLayout>
 
     <!-- Voice Recording Live Bar (Visible during Push-to-Talk) -->
     <LinearLayout

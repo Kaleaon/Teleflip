@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/bg_dark_card">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="6dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="📊 Create Telegram Poll"
+                android:textColor="@color/focus_highlight_gold"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_poll_input_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="[#] Abc"
+                android:textColor="@color/focus_highlight_gold"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/softkey_divider"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Poll Question:"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/et_poll_question"
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_edittext_selector"
+            android:hint="Ask a question..."
+            android:textColorHint="@color/text_hint"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:singleLine="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Options (at least 2):"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/et_poll_opt1"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_edittext_selector"
+            android:hint="Option 1"
+            android:textColorHint="@color/text_hint"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:singleLine="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/et_poll_opt2"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_edittext_selector"
+            android:hint="Option 2"
+            android:textColorHint="@color/text_hint"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:singleLine="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/et_poll_opt3"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_edittext_selector"
+            android:hint="Option 3 (optional)"
+            android:textColorHint="@color/text_hint"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:singleLine="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btn_poll_anonymous_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="☑ Anonymous Voting: ON"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btn_poll_submit"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:text="📊 Send Poll"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_poll_cancel"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="Cancel"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true" />
+
+    </LinearLayout>
+</ScrollView>

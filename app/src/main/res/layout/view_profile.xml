@@ -198,6 +198,48 @@
             android:layout_marginBottom="6dp" />
 
         <Button
+            android:id="@+id/btn_profile_secret_chat"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="🔒 Start Encrypted Secret Chat"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_profile_self_destruct"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="⏱️ Self-Destruct Timer: Off"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_profile_members"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="👥 Group Members &amp; Admins"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
+            android:visibility="gone"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_profile_forum_topics"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="🧵 Forum Topics / Threads"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
+            android:visibility="gone"
+            android:layout_marginBottom="6dp" />
+
+        <Button
             android:id="@+id/btn_profile_send_msg"
             android:layout_width="match_parent"
             android:layout_height="44dp"

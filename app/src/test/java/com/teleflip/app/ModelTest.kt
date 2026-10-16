@@ -33,6 +33,14 @@ class ModelTest {
         assertEquals(ChatType.GROUP, chat.chatType)
         assertEquals("TG", chat.avatarLetters)
         assertFalse(chat.isPinned)
+        assertFalse(chat.isMuted)
+        assertFalse(chat.isArchived)
+        assertFalse(chat.isSecretChat)
+        assertFalse(chat.isForum)
+        assertEquals("", chat.draftText)
+        assertEquals("", chat.folderName)
+        assertEquals(0L, chat.pinnedMessageId)
+        assertEquals(0, chat.selfDestructTimerSec)
         assertNull(chat.avatarPath)
         assertEquals(0, chat.avatarFileId)
     }
@@ -50,10 +58,26 @@ class ModelTest {
                 avatarLetters = "J",
             )
 
-        val updated = chat.copy(unreadCount = 5, isPinned = true)
+        val updated =
+            chat.copy(
+                unreadCount = 5,
+                isPinned = true,
+                isMuted = true,
+                draftText = "Hi",
+                isArchived = true,
+                folderName = "Work",
+                isSecretChat = true,
+                selfDestructTimerSec = 30,
+            )
         assertEquals(1L, updated.id)
         assertEquals(5, updated.unreadCount)
         assertTrue(updated.isPinned)
+        assertTrue(updated.isMuted)
+        assertTrue(updated.isArchived)
+        assertTrue(updated.isSecretChat)
+        assertEquals("Hi", updated.draftText)
+        assertEquals("Work", updated.folderName)
+        assertEquals(30, updated.selfDestructTimerSec)
     }
 
     @Test
@@ -82,12 +106,25 @@ class ModelTest {
         assertEquals(0, msg.durationSeconds)
         assertEquals(0.0, msg.latitude, 0.0001)
         assertEquals(0.0, msg.longitude, 0.0001)
+        assertEquals(0L, msg.replyToMessageId)
+        assertEquals("", msg.replyToPreview)
+        assertFalse(msg.isEdited)
+        assertFalse(msg.isPinned)
+        assertTrue(msg.reactions.isEmpty())
+        assertEquals("", msg.forwardedFrom)
+        assertEquals("", msg.pollQuestion)
+        assertTrue(msg.pollOptions.isEmpty())
+        assertTrue(msg.pollIsAnonymous)
+        assertFalse(msg.pollIsClosed)
+        assertEquals(0, msg.pollTotalVoters)
+        assertEquals(0L, msg.messageThreadId)
+        assertEquals(0, msg.selfDestructSeconds)
     }
 
     @Test
     fun testEnumValues() {
         assertEquals(4, ChatType.values().size)
         assertEquals(4, MessageStatus.values().size)
-        assertEquals(7, MediaType.values().size)
+        assertEquals(9, MediaType.values().size)
     }
 }

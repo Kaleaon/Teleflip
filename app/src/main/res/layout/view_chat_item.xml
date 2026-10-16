@@ -57,7 +57,7 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <!-- Top Row: Name and Time -->
+        <!-- Top Row: Name, Badges, and Time -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -91,7 +91,27 @@
                     android:layout_marginStart="4dp"
                     android:focusable="false"
                     android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tv_mute_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔇"
+                    android:textSize="12sp"
+                    android:layout_marginStart="4dp"
+                    android:focusable="false"
+                    android:visibility="gone" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_pin_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📌"
+                android:textSize="12sp"
+                android:layout_marginStart="4dp"
+                android:focusable="false"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/tv_chat_time"

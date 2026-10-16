@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/bg_dark_card"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/tv_new_chat_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="➕ New Chat, Secret Chat, Group, or Channel"
+        android:textColor="@color/focus_highlight_gold"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:paddingBottom="6dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/softkey_divider"
+        android:layout_marginBottom="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp">
+
+        <TextView
+            android:id="@+id/tv_new_chat_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@username, +phone, or Group/Channel title:"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_new_chat_input_mode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="[#] Abc"
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/et_new_chat_input"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_edittext_selector"
+        android:hint="@username or +15551234567"
+        android:textColorHint="@color/text_hint"
+        android:textColor="@color/text_primary"
+        android:textSize="14sp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:singleLine="true"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:layout_marginBottom="10dp" />
+
+    <Button
+        android:id="@+id/btn_start_direct_chat"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:text="1. 💬 Open / Start Chat (@user or +phone)"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:background="@drawable/bg_button_selector"
+        android:focusable="true"
+        android:layout_marginBottom="5dp" />
+
+    <Button
+        android:id="@+id/btn_open_saved_messages"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:text="2. ⭐ Saved Messages (Cloud Storage)"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:background="@drawable/bg_item_selector"
+        android:focusable="true"
+        android:layout_marginBottom="5dp" />
+
+    <Button
+        android:id="@+id/btn_create_group"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:text="3. 👥 Create New Group"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:background="@drawable/bg_item_selector"
+        android:focusable="true"
+        android:layout_marginBottom="5dp" />
+
+    <Button
+        android:id="@+id/btn_create_channel"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:text="4. 📢 Create New Channel"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:background="@drawable/bg_item_selector"
+        android:focusable="true"
+        android:layout_marginBottom="5dp" />
+
+    <Button
+        android:id="@+id/btn_start_secret_chat"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:text="5. 🔒 Start Secret Chat (E2E Encrypted)"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:background="@drawable/bg_item_selector"
+        android:focusable="true"
+        android:layout_marginBottom="5dp" />
+
+    <Button
+        android:id="@+id/btn_cancel_new_chat"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:text="Cancel (Back)"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        android:background="@drawable/bg_item_selector"
+        android:focusable="true" />
+
+</LinearLayout>

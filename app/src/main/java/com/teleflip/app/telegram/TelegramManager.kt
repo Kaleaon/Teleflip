@@ -5,13 +5,18 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.teleflip.app.model.ActiveCall
 import com.teleflip.app.model.CallState
+import com.teleflip.app.model.ChatFolderModel
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatProfile
 import com.teleflip.app.model.ChatType
+import com.teleflip.app.model.ForumTopicModel
+import com.teleflip.app.model.GroupMember
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.model.MessageStatus
+import com.teleflip.app.model.PollOption
+import com.teleflip.app.notifications.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -83,6 +88,12 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     val chatIdToUserId = java.util.concurrent.ConcurrentHashMap<Long, Long>()
     val userPhoneCache = java.util.concurrent.ConcurrentHashMap<Long, String>()
     val userCache = java.util.concurrent.ConcurrentHashMap<Long, TdApi.User>()
+    val chatDrafts = java.util.concurrent.ConcurrentHashMap<Long, String>()
+    val forumTopicsCache = java.util.concurrent.ConcurrentHashMap<Long, List<ForumTopicModel>>()
+    val groupMembersCache = java.util.concurrent.ConcurrentHashMap<Long, List<GroupMember>>()
+
+    private val _chatFolders = MutableStateFlow<List<ChatFolderModel>>(emptyList())
+    val chatFolders: StateFlow<List<ChatFolderModel>> = _chatFolders.asStateFlow()
 
     private var tdClient: Client? = null
 
@@ -219,6 +230,17 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         set(value) {
             val validValue = if (value == 300L || value == 500L || value == 900L) value else 500L
             prefs.edit().putLong("keypad_timeout_ms", validValue).apply()
+        }
+
+    var backgroundPushEnabled: Boolean
+        get() =
+            try {
+                prefs.getBoolean("bg_push_enabled", true)
+            } catch (_: Exception) {
+                true
+            }
+        set(value) {
+            prefs.edit()?.putBoolean("bg_push_enabled", value)?.apply()
         }
 
     init {
@@ -409,9 +431,26 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     fun sendMessage(
         chatId: Long,
         text: String,
+        replyToMessageId: Long = 0L,
+        replyToPreview: String = "",
     ) {
         if (text.isBlank()) return
 
+        val resolvedPreview =
+            if (replyToPreview.isNotBlank()) {
+                replyToPreview
+            } else if (replyToMessageId != 0L) {
+                val target = _messages.value[chatId]?.find { it.id == replyToMessageId }
+                if (target != null) "${target.senderName}: ${target.text.take(40)}" else ""
+            } else {
+                ""
+            }
+
+        saveChatDraft(chatId, "")
+
+        val activeChatModel = _chats.value.find { it.id == chatId }
+        val threadId = activeChatModel?.activeTopicId ?: 0L
+        val ttlSec = activeChatModel?.selfDestructTimerSec ?: 0
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val newMsg =
             MessageModel(
@@ -422,6 +461,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 time = timeStr,
                 isOutbound = true,
                 status = MessageStatus.SENT,
+                replyToMessageId = replyToMessageId,
+                replyToPreview = resolvedPreview,
+                messageThreadId = threadId,
+                selfDestructSeconds = ttlSec,
             )
 
         appendMessage(chatId, newMsg)
@@ -437,8 +480,1153 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.SendMessage().apply {
                 this.chatId = chatId
                 this.inputMessageContent = content
+                if (replyToMessageId != 0L) {
+                    applyReplyToMessageId(this, replyToMessageId)
+                }
             }
         tdClient?.send(sendReq, this)
+    }
+
+    private fun applyReplyToMessageId(
+        sendReq: TdApi.SendMessage,
+        replyToMessageId: Long,
+    ) {
+        try {
+            val field = sendReq.javaClass.getField("replyToMessageId")
+            field.setLong(sendReq, replyToMessageId)
+        } catch (e: Throwable) {
+            try {
+                val replyToField = sendReq.javaClass.getField("replyTo")
+                val replyClass = Class.forName("org.drinkless.tdlib.TdApi\$InputMessageReplyToMessage")
+                val replyObj = replyClass.getDeclaredConstructor().newInstance()
+                replyClass.getField("messageId").setLong(replyObj, replyToMessageId)
+                replyToField.set(sendReq, replyObj)
+            } catch (ex: Throwable) {
+                Log.w(tag, "Reply field mapping not supported in this TDLib build: ${ex.message}")
+            }
+        }
+    }
+
+    fun editMessageText(
+        chatId: Long,
+        messageId: Long,
+        newText: String,
+        onComplete: ((Boolean) -> Unit)? = null,
+    ) {
+        val trimmed = newText.trim()
+        if (trimmed.isEmpty()) {
+            onComplete?.invoke(false)
+            return
+        }
+
+        val currentMap = _messages.value.toMutableMap()
+        val chatMsgs = (currentMap[chatId] ?: emptyList()).toMutableList()
+        val idx = chatMsgs.indexOfFirst { it.id == messageId }
+        if (idx >= 0) {
+            val updatedMsg = chatMsgs[idx].copy(text = trimmed, isEdited = true)
+            chatMsgs[idx] = updatedMsg
+            currentMap[chatId] = chatMsgs
+            _messages.value = currentMap
+
+            if (idx == chatMsgs.lastIndex) {
+                _chats.value =
+                    _chats.value.map {
+                        if (it.id == chatId) it.copy(lastMessage = trimmed) else it
+                    }
+            }
+        }
+
+        val client = tdClient
+        if (client == null) {
+            onComplete?.invoke(idx >= 0)
+            return
+        }
+
+        try {
+            val content =
+                TdApi.InputMessageText(
+                    TdApi.FormattedText(trimmed, emptyArray()),
+                    null,
+                    true,
+                )
+            val req =
+                TdApi.EditMessageText().apply {
+                    this.chatId = chatId
+                    this.messageId = messageId
+                    this.inputMessageContent = content
+                }
+            client.send(req) { result ->
+                val ok = result is TdApi.Message || result is TdApi.Ok
+                scope.launch(Dispatchers.Main) {
+                    onComplete?.invoke(ok)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to edit message via TDLib: ${e.message}")
+            onComplete?.invoke(idx >= 0)
+        }
+    }
+
+    fun toggleMessageReaction(
+        chatId: Long,
+        messageId: Long,
+        emoji: String,
+    ) {
+        if (emoji.isBlank()) return
+        val currentMap = _messages.value.toMutableMap()
+        val chatMsgs = (currentMap[chatId] ?: emptyList()).toMutableList()
+        val idx = chatMsgs.indexOfFirst { it.id == messageId }
+        var added = true
+        if (idx >= 0) {
+            val msg = chatMsgs[idx]
+            val updatedReactions = msg.reactions.toMutableList()
+            if (updatedReactions.contains(emoji)) {
+                updatedReactions.remove(emoji)
+                added = false
+            } else {
+                updatedReactions.add(emoji)
+                added = true
+            }
+            chatMsgs[idx] = msg.copy(reactions = updatedReactions)
+            currentMap[chatId] = chatMsgs
+            _messages.value = currentMap
+        }
+
+        val client = tdClient ?: return
+        try {
+            val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeEmoji")
+            val reactionType = reactionTypeClass.getDeclaredConstructor().newInstance()
+            reactionTypeClass.getField("emoji").set(reactionType, emoji)
+
+            val funcClassName =
+                if (added) {
+                    "org.drinkless.tdlib.TdApi\$AddMessageReaction"
+                } else {
+                    "org.drinkless.tdlib.TdApi\$RemoveMessageReaction"
+                }
+            val funcClass = Class.forName(funcClassName)
+            val funcObj = funcClass.getDeclaredConstructor().newInstance() as TdApi.Function<*>
+            funcClass.getField("chatId").setLong(funcObj, chatId)
+            funcClass.getField("messageId").setLong(funcObj, messageId)
+            funcClass.getField("reactionType").set(funcObj, reactionType)
+            client.send(funcObj, this)
+        } catch (e: Throwable) {
+            Log.w(tag, "Reaction API dispatch skipped: ${e.message}")
+        }
+    }
+
+    fun toggleChatPin(
+        chatId: Long,
+        currentPinned: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val newPinned = !currentPinned
+        val updated =
+            _chats.value
+                .map { if (it.id == chatId) it.copy(isPinned = newPinned) else it }
+                .sortedByDescending { it.isPinned }
+        _chats.value = updated
+
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(newPinned)
+            return
+        }
+
+        try {
+            val req =
+                TdApi.ToggleChatIsPinned().apply {
+                    this.chatList = TdApi.ChatListMain()
+                    this.chatId = chatId
+                    this.isPinned = newPinned
+                }
+            client.send(req) { obj ->
+                val ok = obj is TdApi.Ok
+                scope.launch(Dispatchers.Main) {
+                    onResult?.invoke(if (ok) newPinned else currentPinned)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "toggleChatPin failed: ${e.message}")
+            onResult?.invoke(newPinned)
+        }
+    }
+
+    fun togglePinMessage(
+        chatId: Long,
+        messageId: Long,
+        currentPinned: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val newPinned = !currentPinned
+        val currentMap = _messages.value.toMutableMap()
+        val chatMsgs =
+            (currentMap[chatId] ?: emptyList()).map { msg ->
+                when {
+                    msg.id == messageId -> msg.copy(isPinned = newPinned)
+                    newPinned -> msg.copy(isPinned = false)
+                    else -> msg
+                }
+            }
+        currentMap[chatId] = chatMsgs
+        _messages.value = currentMap
+
+        _chats.value =
+            _chats.value.map { chat ->
+                if (chat.id == chatId) {
+                    chat.copy(pinnedMessageId = if (newPinned) messageId else 0L)
+                } else {
+                    chat
+                }
+            }
+
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(newPinned)
+            return
+        }
+
+        try {
+            val req: TdApi.Function<*> =
+                if (newPinned) {
+                    TdApi.PinChatMessage().apply {
+                        this.chatId = chatId
+                        this.messageId = messageId
+                        this.disableNotification = false
+                        this.onlyForSelf = false
+                    }
+                } else {
+                    TdApi.UnpinChatMessage().apply {
+                        this.chatId = chatId
+                        this.messageId = messageId
+                    }
+                }
+            client.send(req) { obj ->
+                val ok = obj is TdApi.Ok
+                scope.launch(Dispatchers.Main) {
+                    onResult?.invoke(if (ok) newPinned else currentPinned)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "togglePinMessage failed: ${e.message}")
+            onResult?.invoke(newPinned)
+        }
+    }
+
+    fun markChatAsRead(chatId: Long) {
+        val chatMsgs = _messages.value[chatId] ?: emptyList()
+        val unreadIds = chatMsgs.filter { !it.isOutbound }.map { it.id }.toLongArray()
+        if (unreadIds.isNotEmpty()) {
+            markMessagesAsRead(chatId, unreadIds)
+        }
+        _chats.value =
+            _chats.value.map { chat ->
+                if (chat.id == chatId) chat.copy(unreadCount = 0) else chat
+            }
+    }
+
+    fun saveChatDraft(
+        chatId: Long,
+        draftText: String,
+    ) {
+        val trimmed = draftText.trim()
+        if (trimmed.isEmpty()) {
+            chatDrafts.remove(chatId)
+        } else {
+            chatDrafts[chatId] = trimmed
+        }
+        _chats.value =
+            _chats.value.map { chat ->
+                if (chat.id == chatId && chat.draftText != trimmed) {
+                    chat.copy(draftText = trimmed)
+                } else {
+                    chat
+                }
+            }
+    }
+
+    fun getChatDraft(chatId: Long): String = chatDrafts[chatId] ?: ""
+
+    fun sendPhoto(
+        chatId: Long,
+        filePath: String,
+        caption: String = "",
+    ) {
+        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val displayText = if (caption.isNotBlank()) "📷 [Photo] $caption" else "📷 [Photo]"
+        val newMsg =
+            MessageModel(
+                id = System.currentTimeMillis(),
+                chatId = chatId,
+                senderName = "You",
+                text = displayText,
+                time = timeStr,
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.PHOTO,
+                mediaCaption = caption,
+                mediaFilePath = filePath,
+            )
+        appendMessage(chatId, newMsg)
+
+        try {
+            val inputPhoto =
+                TdApi.InputPhoto().apply {
+                    this.photo = TdApi.InputFileLocal(filePath)
+                }
+            val photoContent =
+                TdApi.InputMessagePhoto().apply {
+                    this.photo = inputPhoto
+                    this.caption = TdApi.FormattedText(caption, emptyArray())
+                }
+            val sendReq =
+                TdApi.SendMessage().apply {
+                    this.chatId = chatId
+                    this.inputMessageContent = photoContent
+                }
+            tdClient?.send(sendReq, this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to send photo via TDLib: ${e.message}")
+        }
+    }
+
+    fun sendDocument(
+        chatId: Long,
+        filePath: String,
+        caption: String = "",
+    ) {
+        val fileName = File(filePath).name.ifBlank { "Document" }
+        val effectiveCaption = caption.ifBlank { fileName }
+        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val newMsg =
+            MessageModel(
+                id = System.currentTimeMillis(),
+                chatId = chatId,
+                senderName = "You",
+                text = "📄 $effectiveCaption",
+                time = timeStr,
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.DOCUMENT,
+                mediaCaption = effectiveCaption,
+                mediaFilePath = filePath,
+            )
+        appendMessage(chatId, newMsg)
+
+        try {
+            val inputDoc =
+                TdApi.InputDocument().apply {
+                    this.document = TdApi.InputFileLocal(filePath)
+                }
+            val docContent =
+                TdApi.InputMessageDocument().apply {
+                    this.document = inputDoc
+                    this.caption = TdApi.FormattedText(caption, emptyArray())
+                }
+            val sendReq =
+                TdApi.SendMessage().apply {
+                    this.chatId = chatId
+                    this.inputMessageContent = docContent
+                }
+            tdClient?.send(sendReq, this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to send document via TDLib: ${e.message}")
+        }
+    }
+
+    fun sendStickerEmoji(
+        chatId: Long,
+        stickerEmoji: String,
+    ) {
+        if (stickerEmoji.isBlank()) return
+        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val newMsg =
+            MessageModel(
+                id = System.currentTimeMillis(),
+                chatId = chatId,
+                senderName = "You",
+                text = "🎨 [Sticker $stickerEmoji]",
+                time = timeStr,
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.STICKER,
+                stickerEmoji = stickerEmoji,
+            )
+        appendMessage(chatId, newMsg)
+
+        val content =
+            TdApi.InputMessageText(
+                TdApi.FormattedText(stickerEmoji, emptyArray()),
+                null,
+                true,
+            )
+        val sendReq =
+            TdApi.SendMessage().apply {
+                this.chatId = chatId
+                this.inputMessageContent = content
+            }
+        tdClient?.send(sendReq, this)
+    }
+
+    fun sendVideo(
+        chatId: Long,
+        filePath: String,
+        durationSeconds: Int = 0,
+        caption: String = "",
+    ) {
+        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val display = if (caption.isNotBlank()) "📹 [Video] $caption" else "📹 [Video]"
+        val newMsg =
+            MessageModel(
+                id = System.currentTimeMillis(),
+                chatId = chatId,
+                senderName = "You",
+                text = display,
+                time = timeStr,
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.VIDEO,
+                mediaCaption = caption,
+                mediaFilePath = filePath,
+                durationSeconds = durationSeconds,
+            )
+        appendMessage(chatId, newMsg)
+
+        try {
+            val inputVideo =
+                TdApi.InputVideo().apply {
+                    this.video = TdApi.InputFileLocal(filePath)
+                    this.duration = durationSeconds
+                }
+            val videoContent =
+                TdApi.InputMessageVideo().apply {
+                    this.video = inputVideo
+                    this.caption = TdApi.FormattedText(caption, emptyArray())
+                }
+            val sendReq =
+                TdApi.SendMessage().apply {
+                    this.chatId = chatId
+                    this.inputMessageContent = videoContent
+                }
+            tdClient?.send(sendReq, this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to send video via TDLib: ${e.message}")
+        }
+    }
+
+    fun sendAnimation(
+        chatId: Long,
+        filePath: String,
+        caption: String = "",
+    ) {
+        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val display = if (caption.isNotBlank()) "🎞️ [GIF] $caption" else "🎞️ [GIF]"
+        val newMsg =
+            MessageModel(
+                id = System.currentTimeMillis(),
+                chatId = chatId,
+                senderName = "You",
+                text = display,
+                time = timeStr,
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.ANIMATION,
+                mediaCaption = caption,
+                mediaFilePath = filePath,
+            )
+        appendMessage(chatId, newMsg)
+
+        try {
+            val inputAnim =
+                TdApi.InputAnimation().apply {
+                    this.animation = TdApi.InputFileLocal(filePath)
+                }
+            val animContent =
+                TdApi.InputMessageAnimation().apply {
+                    this.animation = inputAnim
+                    this.caption = TdApi.FormattedText(caption, emptyArray())
+                }
+            val sendReq =
+                TdApi.SendMessage().apply {
+                    this.chatId = chatId
+                    this.inputMessageContent = animContent
+                }
+            tdClient?.send(sendReq, this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to send GIF via TDLib: ${e.message}")
+        }
+    }
+
+    fun sendPoll(
+        chatId: Long,
+        question: String,
+        options: List<String>,
+        isAnonymous: Boolean = true,
+    ) {
+        val trimmedQuestion = question.trim()
+        val cleanOptions = options.map { it.trim() }.filter { it.isNotEmpty() }
+        if (trimmedQuestion.isEmpty() || cleanOptions.size < 2) return
+
+        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val pollOpts = cleanOptions.map { PollOption(text = it, voterCount = 0, votePercentage = 0, isChosen = false) }
+        val newMsg =
+            MessageModel(
+                id = System.currentTimeMillis(),
+                chatId = chatId,
+                senderName = "You",
+                text = "📊 Poll: $trimmedQuestion",
+                time = timeStr,
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.POLL,
+                pollQuestion = trimmedQuestion,
+                pollOptions = pollOpts,
+                pollIsAnonymous = isAnonymous,
+                pollIsClosed = false,
+                pollTotalVoters = 0,
+            )
+        appendMessage(chatId, newMsg)
+
+        try {
+            val pollContent =
+                TdApi.InputMessagePoll().apply {
+                    this.isAnonymous = isAnonymous
+                    this.type = TdApi.InputPollTypeRegular(false)
+                }
+            setPollQuestionAndOptionsCompat(pollContent, trimmedQuestion, cleanOptions)
+            val sendReq =
+                TdApi.SendMessage().apply {
+                    this.chatId = chatId
+                    this.inputMessageContent = pollContent
+                }
+            tdClient?.send(sendReq, this)
+        } catch (e: Throwable) {
+            Log.w(tag, "Failed to dispatch TDLib InputMessagePoll: ${e.message}")
+        }
+    }
+
+    private fun setPollQuestionAndOptionsCompat(
+        pollContent: TdApi.InputMessagePoll,
+        question: String,
+        options: List<String>,
+    ) {
+        try {
+            val qField = pollContent.javaClass.getField("question")
+            if (qField.type == String::class.java) {
+                qField.set(pollContent, question)
+            } else {
+                qField.set(pollContent, TdApi.FormattedText(question, emptyArray()))
+            }
+            val optField = pollContent.javaClass.getField("options")
+            if (optField.type == Array<String>::class.java) {
+                optField.set(pollContent, options.toTypedArray())
+            } else if (optField.type == Array<TdApi.InputPollOption>::class.java) {
+                val inputPollOptions =
+                    options.map { TdApi.InputPollOption(TdApi.FormattedText(it, emptyArray()), null) }.toTypedArray()
+                optField.set(pollContent, inputPollOptions)
+            } else {
+                val ftArray = options.map { TdApi.FormattedText(it, emptyArray()) }.toTypedArray()
+                optField.set(pollContent, ftArray)
+            }
+        } catch (_: Throwable) {
+        }
+    }
+
+    fun votePoll(
+        chatId: Long,
+        messageId: Long,
+        optionIndex: Int,
+    ) {
+        val currentMap = _messages.value.toMutableMap()
+        val list = (currentMap[chatId] ?: return).toMutableList()
+        val idx = list.indexOfFirst { it.id == messageId }
+        if (idx >= 0) {
+            val msg = list[idx]
+            if (!msg.pollIsClosed && optionIndex in msg.pollOptions.indices) {
+                val rawCounts =
+                    msg.pollOptions.mapIndexed { i, opt ->
+                        val base = if (opt.isChosen) (opt.voterCount - 1).coerceAtLeast(0) else opt.voterCount
+                        if (i == optionIndex) base + 1 else base
+                    }
+                val total = rawCounts.sum().coerceAtLeast(1)
+                val updatedOpts =
+                    msg.pollOptions.mapIndexed { i, opt ->
+                        val count = rawCounts[i]
+                        PollOption(
+                            text = opt.text,
+                            voterCount = count,
+                            votePercentage = (count * 100) / total,
+                            isChosen = (i == optionIndex),
+                        )
+                    }
+                list[idx] = msg.copy(pollOptions = updatedOpts, pollTotalVoters = rawCounts.sum())
+                currentMap[chatId] = list
+                _messages.value = currentMap
+            }
+        }
+
+        try {
+            val req =
+                TdApi.SetPollAnswer().apply {
+                    this.chatId = chatId
+                    this.messageId = messageId
+                    this.optionIds = intArrayOf(optionIndex)
+                }
+            tdClient?.send(req, this)
+        } catch (e: Exception) {
+            Log.w(tag, "votePoll TDLib call failed: ${e.message}")
+        }
+    }
+
+    fun stopPoll(
+        chatId: Long,
+        messageId: Long,
+    ) {
+        val currentMap = _messages.value.toMutableMap()
+        val list = (currentMap[chatId] ?: return).toMutableList()
+        val idx = list.indexOfFirst { it.id == messageId }
+        if (idx >= 0) {
+            list[idx] = list[idx].copy(pollIsClosed = true)
+            currentMap[chatId] = list
+            _messages.value = currentMap
+        }
+
+        try {
+            val req =
+                TdApi.StopPoll().apply {
+                    this.chatId = chatId
+                    this.messageId = messageId
+                }
+            tdClient?.send(req, this)
+        } catch (e: Exception) {
+            Log.w(tag, "stopPoll TDLib call failed: ${e.message}")
+        }
+    }
+
+    fun toggleChatArchived(
+        chatId: Long,
+        currentArchived: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val newArchived = !currentArchived
+        _chats.value =
+            _chats.value.map {
+                if (it.id == chatId) it.copy(isArchived = newArchived, isPinned = if (newArchived) false else it.isPinned) else it
+            }
+
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(newArchived)
+            return
+        }
+
+        try {
+            val req =
+                TdApi.AddChatToList().apply {
+                    this.chatId = chatId
+                    this.chatList = if (newArchived) TdApi.ChatListArchive() else TdApi.ChatListMain()
+                }
+            client.send(req) { obj ->
+                val ok = obj is TdApi.Ok
+                scope.launch(Dispatchers.Main) {
+                    onResult?.invoke(if (ok) newArchived else currentArchived)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "toggleChatArchived failed: ${e.message}")
+            onResult?.invoke(newArchived)
+        }
+    }
+
+    fun assignChatToFolder(
+        chatId: Long,
+        folderName: String,
+    ) {
+        val cleanFolder = folderName.trim()
+        _chats.value =
+            _chats.value.map {
+                if (it.id == chatId) it.copy(folderName = cleanFolder) else it
+            }
+
+        val currentFolders = _chatFolders.value.toMutableList()
+        if (cleanFolder.isNotEmpty()) {
+            val existingIdx = currentFolders.indexOfFirst { it.title.equals(cleanFolder, ignoreCase = true) }
+            if (existingIdx >= 0) {
+                val folder = currentFolders[existingIdx]
+                currentFolders[existingIdx] = folder.copy(includedChatIds = folder.includedChatIds + chatId)
+            } else {
+                currentFolders.add(
+                    ChatFolderModel(
+                        id = currentFolders.size + 1,
+                        title = cleanFolder,
+                        includedChatIds = setOf(chatId),
+                    ),
+                )
+            }
+        } else {
+            for (i in currentFolders.indices) {
+                currentFolders[i] = currentFolders[i].copy(includedChatIds = currentFolders[i].includedChatIds - chatId)
+            }
+        }
+        _chatFolders.value = currentFolders.filter { it.includedChatIds.isNotEmpty() }
+    }
+
+    fun startSecretChat(
+        targetQueryOrName: String,
+        userId: Long = 0L,
+        onResult: (ChatModel?, String?) -> Unit,
+    ) {
+        val cleanTitle = targetQueryOrName.trim().ifEmpty { "Secret Contact" }
+        val resolvedUserId =
+            if (userId != 0L) {
+                userId
+            } else {
+                kotlin.math.abs(cleanTitle.hashCode().toLong()).coerceAtLeast(5000L)
+            }
+        val secretId = (resolvedUserId % 100000).toInt().coerceAtLeast(1)
+        val letters =
+            cleanTitle.removePrefix("@").split(" ")
+                .filter { it.isNotBlank() }
+                .take(2)
+                .map { it.first().uppercaseChar() }
+                .joinToString("")
+                .ifEmpty { "SC" }
+
+        val client = tdClient
+        if (client == null) {
+            val secretChat =
+                ChatModel(
+                    id = -resolvedUserId,
+                    title = cleanTitle,
+                    lastMessage = "🔒 Secret Chat • E2E Encrypted",
+                    time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                    unreadCount = 0,
+                    chatType = ChatType.DIRECT,
+                    avatarLetters = letters,
+                    isSecretChat = true,
+                    secretChatId = secretId,
+                    selfDestructTimerSec = 30,
+                )
+            _chats.value = listOf(secretChat) + _chats.value.filter { it.id != secretChat.id }
+            onResult(secretChat, null)
+            return
+        }
+
+        scope.launch {
+            try {
+                val req = TdApi.CreateNewSecretChat(resolvedUserId)
+                val chatObj = withTimeoutOrNull(5000L) { sendQuery(req) } as? TdApi.Chat
+                if (chatObj != null) {
+                    val model =
+                        ChatModel(
+                            id = chatObj.id,
+                            title = chatObj.title.ifBlank { cleanTitle },
+                            lastMessage = "🔒 Secret Chat • E2E Encrypted",
+                            time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                            unreadCount = 0,
+                            chatType = ChatType.DIRECT,
+                            avatarLetters = letters,
+                            isSecretChat = true,
+                            secretChatId = secretId,
+                        )
+                    _chats.value = listOf(model) + _chats.value.filter { it.id != model.id }
+                    withContext(Dispatchers.Main) { onResult(model, null) }
+                } else {
+                    withContext(Dispatchers.Main) { onResult(null, "Unable to initiate Secret Chat") }
+                }
+            } catch (e: Exception) {
+                try {
+                    withContext(Dispatchers.Main) { onResult(null, e.message) }
+                } catch (_: Throwable) {
+                    onResult(null, e.message)
+                }
+            }
+        }
+    }
+
+    fun setSelfDestructTimer(
+        chatId: Long,
+        seconds: Int,
+        onResult: ((Int) -> Unit)? = null,
+    ) {
+        val validSec = seconds.coerceAtLeast(0)
+        _chats.value =
+            _chats.value.map {
+                if (it.id == chatId) it.copy(selfDestructTimerSec = validSec) else it
+            }
+
+        try {
+            val ttlClass = Class.forName("org.drinkless.tdlib.TdApi\$SetChatMessageAutoDeleteTime")
+            val ttlReq = ttlClass.getDeclaredConstructor().newInstance() as TdApi.Function<*>
+            ttlClass.getField("chatId").setLong(ttlReq, chatId)
+            ttlClass.getField("messageAutoDeleteTime").setInt(ttlReq, validSec)
+            tdClient?.send(ttlReq, this)
+        } catch (_: Throwable) {
+        }
+        onResult?.invoke(validSec)
+    }
+
+    fun loadForumTopics(
+        chatId: Long,
+        onResult: (List<ForumTopicModel>) -> Unit,
+    ) {
+        val cached = forumTopicsCache[chatId]
+        if (cached != null && cached.isNotEmpty()) {
+            onResult(cached)
+            return
+        }
+        val defaultTopics =
+            listOf(
+                ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
+                ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
+                ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
+            )
+        forumTopicsCache[chatId] = defaultTopics
+        onResult(defaultTopics)
+    }
+
+    fun createForumTopic(
+        chatId: Long,
+        name: String,
+        iconEmoji: String = "💬",
+        onResult: (ForumTopicModel) -> Unit,
+    ) {
+        val cleanName = name.trim().ifEmpty { "New Topic" }
+        val newTopic =
+            ForumTopicModel(
+                topicId = System.currentTimeMillis() % 100000L,
+                name = cleanName,
+                unreadCount = 0,
+                iconEmoji = iconEmoji,
+            )
+        val existing = forumTopicsCache[chatId] ?: listOf(ForumTopicModel(0L, "General (All Messages)", 0, "💬"))
+        val updated = existing + newTopic
+        forumTopicsCache[chatId] = updated
+        selectForumTopic(chatId, newTopic.topicId, newTopic.name)
+        onResult(newTopic)
+    }
+
+    fun selectForumTopic(
+        chatId: Long,
+        topicId: Long,
+        topicName: String,
+    ) {
+        _chats.value =
+            _chats.value.map {
+                if (it.id == chatId) {
+                    it.copy(
+                        isForum = true,
+                        activeTopicId = topicId,
+                        activeTopicName = if (topicId == 0L) "" else topicName,
+                    )
+                } else {
+                    it
+                }
+            }
+    }
+
+    fun getGroupMembers(chatId: Long): List<GroupMember> {
+        val existing = groupMembersCache[chatId]
+        if (existing != null) return existing
+        val defaultList =
+            listOf(
+                GroupMember(userId = 1L, name = "You", role = "Owner", status = "online", isAdmin = true, isCreator = true),
+                GroupMember(userId = 2L, name = "Alice Smith", role = "Admin", status = "online", isAdmin = true, isCreator = false),
+                GroupMember(userId = 3L, name = "Bob Jones", role = "Member", status = "last seen recently", isAdmin = false, isCreator = false),
+            )
+        groupMembersCache[chatId] = defaultList
+        return defaultList
+    }
+
+    fun setChatMemberAdminRole(
+        chatId: Long,
+        userId: Long,
+        makeAdmin: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val current = getGroupMembers(chatId).toMutableList()
+        val idx = current.indexOfFirst { it.userId == userId }
+        if (idx >= 0) {
+            val member = current[idx]
+            current[idx] =
+                member.copy(
+                    isAdmin = makeAdmin,
+                    role = if (makeAdmin) "Admin" else "Member",
+                )
+            groupMembersCache[chatId] = current
+        }
+        onResult?.invoke(true)
+    }
+
+    fun removeChatMember(
+        chatId: Long,
+        userId: Long,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val current = getGroupMembers(chatId).filter { it.userId != userId }
+        groupMembersCache[chatId] = current
+        onResult?.invoke(true)
+    }
+
+    fun openSavedMessages(onResult: (ChatModel) -> Unit) {
+        val existing =
+            _chats.value.find {
+                it.title.equals("Saved Messages", ignoreCase = true) || it.id == 777000L
+            }
+        if (existing != null && tdClient == null) {
+            onResult(existing)
+            return
+        }
+
+        val client = tdClient
+        if (client == null) {
+            val savedChat =
+                ChatModel(
+                    id = 777000L,
+                    title = "Saved Messages",
+                    lastMessage = "Cloud storage for notes & media",
+                    time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                    unreadCount = 0,
+                    chatType = ChatType.DIRECT,
+                    avatarLetters = "SM",
+                    isPinned = true,
+                )
+            _chats.value = (listOf(savedChat) + _chats.value.filter { it.id != savedChat.id }).sortedByDescending { it.isPinned }
+            onResult(savedChat)
+            return
+        }
+
+        scope.launch {
+            try {
+                val me = withTimeoutOrNull(4000L) { sendQuery(TdApi.GetMe()) } as? TdApi.User
+                if (me != null) {
+                    val chatObj =
+                        withTimeoutOrNull(4000L) {
+                            sendQuery(TdApi.CreatePrivateChat(me.id, false))
+                        } as? TdApi.Chat
+                    if (chatObj != null) {
+                        val lastMsg = chatObj.lastMessage
+                        val model =
+                            ChatModel(
+                                id = chatObj.id,
+                                title = "Saved Messages",
+                                lastMessage = extractMessageText(lastMsg?.content),
+                                time = if (lastMsg != null) formatTime(lastMsg.date.toLong() * 1000) else "",
+                                unreadCount = 0,
+                                chatType = ChatType.DIRECT,
+                                avatarLetters = "SM",
+                                isPinned = true,
+                            )
+                        val updated = (listOf(model) + _chats.value.filter { it.id != model.id }).sortedByDescending { it.isPinned }
+                        _chats.value = updated
+                        withContext(Dispatchers.Main) { onResult(model) }
+                        return@launch
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "openSavedMessages fallback: ${e.message}")
+            }
+            val fallback =
+                existing
+                    ?: ChatModel(
+                        id = 777000L,
+                        title = "Saved Messages",
+                        lastMessage = "Cloud storage for notes & media",
+                        time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                        unreadCount = 0,
+                        chatType = ChatType.DIRECT,
+                        avatarLetters = "SM",
+                        isPinned = true,
+                    )
+            try {
+                withContext(Dispatchers.Main) { onResult(fallback) }
+            } catch (e: Throwable) {
+                onResult(fallback)
+            }
+        }
+    }
+
+    fun resolveAndCreateChat(
+        query: String,
+        onResult: (ChatModel?, String?) -> Unit,
+    ) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            onResult(null, "Please enter a @username or phone number")
+            return
+        }
+
+        val cleanUsername = trimmed.removePrefix("@").removePrefix("https://t.me/").trim()
+        val matchedExisting =
+            _chats.value.find {
+                it.title.equals(trimmed, ignoreCase = true) ||
+                    it.title.equals(cleanUsername, ignoreCase = true)
+            }
+        if (matchedExisting != null && tdClient == null) {
+            onResult(matchedExisting, null)
+            return
+        }
+
+        val client = tdClient
+        if (client == null) {
+            val isBot = cleanUsername.lowercase().endsWith("bot")
+            val newChat =
+                ChatModel(
+                    id = kotlin.math.abs(cleanUsername.hashCode().toLong()).coerceAtLeast(1000L),
+                    title = if (trimmed.startsWith("@")) "@$cleanUsername" else trimmed,
+                    lastMessage = "New conversation",
+                    time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                    unreadCount = 0,
+                    chatType = if (isBot) ChatType.BOT else ChatType.DIRECT,
+                    avatarLetters = cleanUsername.take(2).uppercase().ifEmpty { "TG" },
+                )
+            _chats.value = listOf(newChat) + _chats.value.filter { it.id != newChat.id }
+            onResult(newChat, null)
+            return
+        }
+
+        scope.launch {
+            try {
+                val isPhone = trimmed.startsWith("+") || trimmed.all { it.isDigit() || it == ' ' || it == '-' }
+                val chatObj: TdApi.Chat? =
+                    if (isPhone) {
+                        val contact =
+                            TdApi.ImportedContact().apply {
+                                phoneNumber = trimmed
+                                firstName = trimmed
+                            }
+                        val imported =
+                            withTimeoutOrNull(5000L) {
+                                sendQuery(TdApi.ImportContacts(arrayOf(contact)))
+                            } as? TdApi.ImportedContacts
+                        val userId = imported?.userIds?.firstOrNull() ?: 0L
+                        if (userId != 0L) {
+                            withTimeoutOrNull(5000L) {
+                                sendQuery(TdApi.CreatePrivateChat(userId, false))
+                            } as? TdApi.Chat
+                        } else {
+                            null
+                        }
+                    } else {
+                        withTimeoutOrNull(5000L) {
+                            sendQuery(TdApi.SearchPublicChat(cleanUsername))
+                        } as? TdApi.Chat
+                    }
+
+                if (chatObj != null) {
+                    addOrUpdateChat(chatObj)
+                    val title = chatObj.title.ifBlank { trimmed }
+                    val letters =
+                        title.split(" ")
+                            .filter { it.isNotBlank() }
+                            .take(2)
+                            .map { it.first().uppercaseChar() }
+                            .joinToString("")
+                            .ifEmpty { "TG" }
+                    val createdModel =
+                        ChatModel(
+                            id = chatObj.id,
+                            title = title,
+                            lastMessage = extractMessageText(chatObj.lastMessage?.content),
+                            time = "",
+                            unreadCount = chatObj.unreadCount,
+                            chatType = ChatType.DIRECT,
+                            avatarLetters = letters,
+                        )
+                    withContext(Dispatchers.Main) { onResult(createdModel, null) }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        onResult(matchedExisting, if (matchedExisting == null) "User or chat not found: $trimmed" else null)
+                    }
+                }
+            } catch (e: Exception) {
+                try {
+                    withContext(Dispatchers.Main) {
+                        onResult(matchedExisting, e.message ?: "Failed to resolve chat")
+                    }
+                } catch (ex: Throwable) {
+                    onResult(matchedExisting, e.message ?: "Failed to resolve chat")
+                }
+            }
+        }
+    }
+
+    fun createGroupOrChannel(
+        title: String,
+        isChannel: Boolean,
+        onResult: (ChatModel?, String?) -> Unit,
+    ) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) {
+            onResult(null, "Please enter a title for the ${if (isChannel) "channel" else "group"}")
+            return
+        }
+
+        val letters =
+            trimmed.split(" ")
+                .filter { it.isNotBlank() }
+                .take(2)
+                .map { it.first().uppercaseChar() }
+                .joinToString("")
+                .ifEmpty { if (isChannel) "CH" else "GR" }
+
+        val client = tdClient
+        if (client == null) {
+            val newChat =
+                ChatModel(
+                    id = kotlin.math.abs(trimmed.hashCode().toLong()).coerceAtLeast(2000L),
+                    title = trimmed,
+                    lastMessage = if (isChannel) "Channel created" else "Group created",
+                    time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                    unreadCount = 0,
+                    chatType = if (isChannel) ChatType.CHANNEL else ChatType.GROUP,
+                    avatarLetters = letters,
+                )
+            _chats.value = listOf(newChat) + _chats.value.filter { it.id != newChat.id }
+            onResult(newChat, null)
+            return
+        }
+
+        scope.launch {
+            try {
+                val req: TdApi.Function<*> =
+                    if (isChannel) {
+                        TdApi.CreateNewSupergroupChat().apply {
+                            this.title = trimmed
+                            this.isChannel = true
+                            this.description = ""
+                        }
+                    } else {
+                        TdApi.CreateNewBasicGroupChat().apply {
+                            this.userIds = longArrayOf()
+                            this.title = trimmed
+                        }
+                    }
+                val chatObj = withTimeoutOrNull(5000L) { sendQuery(req) } as? TdApi.Chat
+                if (chatObj != null) {
+                    addOrUpdateChat(chatObj)
+                    val model =
+                        ChatModel(
+                            id = chatObj.id,
+                            title = chatObj.title.ifBlank { trimmed },
+                            lastMessage = if (isChannel) "Channel created" else "Group created",
+                            time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                            unreadCount = 0,
+                            chatType = if (isChannel) ChatType.CHANNEL else ChatType.GROUP,
+                            avatarLetters = letters,
+                        )
+                    withContext(Dispatchers.Main) { onResult(model, null) }
+                } else {
+                    withContext(Dispatchers.Main) { onResult(null, "Failed to create ${if (isChannel) "channel" else "group"}") }
+                }
+            } catch (e: Exception) {
+                try {
+                    withContext(Dispatchers.Main) { onResult(null, e.message) }
+                } catch (ex: Throwable) {
+                    onResult(null, e.message)
+                }
+            }
+        }
     }
 
     fun sendVoiceNote(
@@ -520,7 +1708,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         try {
             val locContent =
                 TdApi.InputMessageLocation().apply {
-                    this.location = TdApi.Location(latitude, longitude, 0.0)
+                    this.location = TdApi.Location(latitude, longitude, accuracy.toDouble())
                 }
             val sendReq =
                 TdApi.SendMessage().apply {
@@ -1066,6 +2254,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 isSpeakerOn = existing?.isSpeakerOn ?: false,
             )
         _activeCall.value = updated
+        if (!call.isOutgoing && state == CallState.PENDING && backgroundPushEnabled) {
+            NotificationHelper.showIncomingCallNotification(context, call.id, userName)
+        }
 
         if (state == CallState.DISCARDED || state == CallState.ERROR) {
             scope.launch {
@@ -1149,6 +2340,12 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     }
                 }
 
+                val membersList =
+                    if (chatType == ChatType.GROUP || chatType == ChatType.CHANNEL) {
+                        getGroupMembers(chatId)
+                    } else {
+                        emptyList()
+                    }
                 val profile =
                     ChatProfile(
                         chatId = chatId,
@@ -1160,9 +2357,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                         username = username,
                         phoneNumber = phone,
                         bio = bio,
-                        memberCount = memberCount,
+                        memberCount = if (memberCount > 0) memberCount else membersList.size,
                         isMuted = isMuted,
                         isPremium = isPremium,
+                        isForum = chatModel?.isForum ?: false,
+                        isSecretChat = chatModel?.isSecretChat ?: false,
+                        selfDestructTimerSec = chatModel?.selfDestructTimerSec ?: 0,
+                        members = membersList,
                     )
 
                 try {
@@ -1174,15 +2375,26 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Failed to load chat profile: ${e.message}")
+                val fallbackType = chatModel?.chatType ?: ChatType.DIRECT
+                val fallbackMembers =
+                    if (fallbackType == ChatType.GROUP || fallbackType == ChatType.CHANNEL) {
+                        getGroupMembers(chatId)
+                    } else {
+                        emptyList()
+                    }
                 val fallback =
                     ChatProfile(
                         chatId = chatId,
                         title = chatModel?.title ?: "Chat",
-                        chatType = chatModel?.chatType ?: ChatType.DIRECT,
+                        chatType = fallbackType,
                         avatarPath = chatModel?.avatarPath,
                         avatarLetters = chatModel?.avatarLetters ?: "TG",
                         statusText = "Details unavailable",
                         isPremium = chatModel?.isPremium ?: false,
+                        isForum = chatModel?.isForum ?: false,
+                        isSecretChat = chatModel?.isSecretChat ?: false,
+                        selfDestructTimerSec = chatModel?.selfDestructTimerSec ?: 0,
+                        members = fallbackMembers,
                     )
                 try {
                     withContext(Dispatchers.Main) {
@@ -1260,6 +2472,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 val updateMsg = obj as TdApi.UpdateNewMessage
                 handleIncomingMessage(updateMsg.message)
             }
+            TdApi.UpdateMessageContent.CONSTRUCTOR -> {
+                val updateContent = obj as TdApi.UpdateMessageContent
+                handleMessageContentUpdated(updateContent.chatId, updateContent.messageId, updateContent.newContent)
+            }
+            TdApi.UpdateMessageEdited.CONSTRUCTOR -> {
+                val updateEdited = obj as TdApi.UpdateMessageEdited
+                handleMessageEditedFlag(updateEdited.chatId, updateEdited.messageId, updateEdited.editDate)
+            }
             TdApi.UpdateMessageSendSucceeded.CONSTRUCTOR -> {
                 val update = obj as TdApi.UpdateMessageSendSucceeded
                 updateMessageStatus(update.message.chatId, update.oldMessageId, MessageStatus.SENT)
@@ -1289,20 +2509,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 val file = obj as TdApi.File
                 handleFileUpdate(file)
             }
-            TdApi.UpdateUser.CONSTRUCTOR -> {
-                val updateUser = obj as TdApi.UpdateUser
-                handleUserUpdate(updateUser.user)
-            }
-            TdApi.User.CONSTRUCTOR -> {
-                val user = obj as TdApi.User
-                handleUserUpdate(user)
-            }
             TdApi.EmailAddressAuthenticationCodeInfo.CONSTRUCTOR -> {
                 isAuthQueryInProgress = false
                 val info = obj as TdApi.EmailAddressAuthenticationCodeInfo
                 _authState.value = AuthState.WaitPasswordRecoveryCode(recoveryEmailPattern = info.emailAddressPattern ?: "")
             }
             TdApi.Ok.CONSTRUCTOR -> {
+                clearAuthTimeoutSafeguard()
                 isAuthQueryInProgress = false
             }
             TdApi.Error.CONSTRUCTOR -> {
@@ -1322,9 +2535,6 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     }
                 }
             }
-            TdApi.Ok.CONSTRUCTOR -> {
-                clearAuthTimeoutSafeguard()
-            }
         }
     }
 
@@ -1343,7 +2553,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     TdApi.SetTdlibParameters().apply {
                         databaseDirectory = dbDir
                         useMessageDatabase = true
-                        useSecretChats = false
+                        useSecretChats = true
                         apiId = this@TelegramManager.apiId
                         apiHash = this@TelegramManager.apiHash
                         systemLanguageCode = "en"
@@ -1398,6 +2608,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     fun updateUserCache(user: TdApi.User) {
         userCache[user.id] = user
         userSubscriberCache[user.id] = user.isPremium
+        subscriberCache[user.id] = user.isPremium
         if (!user.phoneNumber.isNullOrBlank()) {
             userPhoneCache[user.id] = user.phoneNumber
         }
@@ -1503,6 +2714,11 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             }
         }
 
+        val existingModel = _chats.value.find { it.id == chat.id }
+        val isPinnedChat = existingModel?.isPinned ?: false
+        val isMutedChat = chat.notificationSettings?.muteFor != 0
+        val draftStr = chatDrafts[chat.id] ?: ""
+
         val newModel =
             ChatModel(
                 id = chat.id,
@@ -1512,9 +2728,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 unreadCount = chat.unreadCount,
                 chatType = type,
                 avatarLetters = letters,
+                isPinned = isPinnedChat,
                 avatarPath = avatarPath,
                 avatarFileId = avatarFileId,
                 isPremium = isPremium,
+                isMuted = isMutedChat,
+                draftText = draftStr,
+                pinnedMessageId = existingModel?.pinnedMessageId ?: 0L,
             )
 
         synchronized(pendingChats) {
@@ -1587,6 +2807,39 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         return Pair("", false)
     }
 
+    private fun handleMessageContentUpdated(
+        chatId: Long,
+        messageId: Long,
+        newContent: TdApi.MessageContent?,
+    ) {
+        val newText = extractMessageText(newContent)
+        val newCaption = extractMediaCaption(newContent)
+        val currentMap = _messages.value.toMutableMap()
+        val list = (currentMap[chatId] ?: return).toMutableList()
+        val idx = list.indexOfFirst { it.id == messageId }
+        if (idx >= 0) {
+            list[idx] = list[idx].copy(text = newText, mediaCaption = newCaption, isEdited = true)
+            currentMap[chatId] = list
+            _messages.value = currentMap
+        }
+    }
+
+    private fun handleMessageEditedFlag(
+        chatId: Long,
+        messageId: Long,
+        editDate: Int,
+    ) {
+        if (editDate <= 0) return
+        val currentMap = _messages.value.toMutableMap()
+        val list = (currentMap[chatId] ?: return).toMutableList()
+        val idx = list.indexOfFirst { it.id == messageId }
+        if (idx >= 0) {
+            list[idx] = list[idx].copy(isEdited = true)
+            currentMap[chatId] = list
+            _messages.value = currentMap
+        }
+    }
+
     private fun handleIncomingMessage(msg: TdApi.Message) {
         val mediaType = extractMediaType(msg.content)
         val mediaInfo = extractMediaFileInfo(msg.content)
@@ -1609,6 +2862,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             )
 
         appendMessage(msg.chatId, model)
+        if (!msg.isOutgoing && backgroundPushEnabled) {
+            val chatTitle = _chats.value.find { it.id == msg.chatId }?.title ?: "Telegram"
+            NotificationHelper.showIncomingMessageNotification(
+                context = context,
+                chatId = msg.chatId,
+                chatTitle = chatTitle,
+                senderName = model.senderName,
+                messageText = model.text,
+            )
+        }
     }
 
     private fun handleMessagesList(msgs: Array<TdApi.Message>) {
@@ -1693,10 +2956,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         if (content == null) return ""
         return when (content.constructor) {
             TdApi.MessagePhoto.CONSTRUCTOR -> (content as TdApi.MessagePhoto).caption.text
-            TdApi.MessageDocument.CONSTRUCTOR ->
-                (content as TdApi.MessageDocument).caption.text.ifBlank {
-                    (content as TdApi.MessageDocument).document.fileName
-                }
+            TdApi.MessageDocument.CONSTRUCTOR -> {
+                val doc = content as TdApi.MessageDocument
+                doc.caption.text.ifBlank { doc.document.fileName }
+            }
             TdApi.MessageVideo.CONSTRUCTOR -> (content as TdApi.MessageVideo).caption.text
             else -> ""
         }
@@ -1768,6 +3031,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessageDocument.CONSTRUCTOR -> MediaType.DOCUMENT
             TdApi.MessageSticker.CONSTRUCTOR -> MediaType.STICKER
             TdApi.MessageVideo.CONSTRUCTOR -> MediaType.VIDEO
+            TdApi.MessageAnimation.CONSTRUCTOR -> MediaType.ANIMATION
+            TdApi.MessagePoll.CONSTRUCTOR -> MediaType.POLL
             else -> MediaType.NONE
         }
     }
@@ -1780,7 +3045,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessageVoiceNote.CONSTRUCTOR -> "🎤 [Voice Note]"
             TdApi.MessageLocation.CONSTRUCTOR -> "📍 [Location]"
             TdApi.MessageAudio.CONSTRUCTOR -> "🎵 [Audio]"
-            TdApi.MessageVideo.CONSTRUCTOR -> "📹 [Video]"
+            TdApi.MessageVideo.CONSTRUCTOR -> "📹 [Video] " + (content as TdApi.MessageVideo).caption.text
+            TdApi.MessageAnimation.CONSTRUCTOR -> "🎞️ [GIF] " + (content as TdApi.MessageAnimation).caption.text
+            TdApi.MessagePoll.CONSTRUCTOR -> "📊 [Poll]"
             TdApi.MessageDocument.CONSTRUCTOR -> "📄 " + (content as TdApi.MessageDocument).document.fileName
             TdApi.MessageSticker.CONSTRUCTOR -> {
                 val emoji = (content as TdApi.MessageSticker).sticker?.emoji ?: ""

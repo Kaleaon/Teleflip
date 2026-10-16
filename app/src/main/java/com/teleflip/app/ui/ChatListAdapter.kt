@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -48,6 +49,8 @@ class ChatListAdapter(
         private val tvAvatar: TextView = itemView.findViewById(R.id.tv_avatar)
         private val tvTitle: TextView = itemView.findViewById(R.id.tv_chat_title)
         private val tvStarBadge: TextView = itemView.findViewById(R.id.tv_star_badge)
+        private val tvMuteBadge: TextView? = itemView.findViewById(R.id.tv_mute_badge)
+        private val tvPinBadge: TextView? = itemView.findViewById(R.id.tv_pin_badge)
         private val tvTime: TextView = itemView.findViewById(R.id.tv_chat_time)
         private val tvLastMsg: TextView = itemView.findViewById(R.id.tv_last_message)
         private val tvUnread: TextView = itemView.findViewById(R.id.tv_unread_count)
@@ -56,7 +59,8 @@ class ChatListAdapter(
             chat: ChatModel,
             position: Int,
         ) {
-            ivAvatar.contentDescription = ContentDescriptionFormatter.getAvatarDescription(itemView.context, chat.title)
+            val context = itemView.context
+            ivAvatar.contentDescription = ContentDescriptionFormatter.getAvatarDescription(context, chat.title)
 
             // Keypad shortcut 1-9
             if (position < 9) {
@@ -69,10 +73,34 @@ class ChatListAdapter(
             // Render photo avatar or fallback to colored letter initials
             ivAvatar.loadCircularAvatarOrFallback(chat.avatarPath, chat.avatarLetters, tvAvatar)
 
-            tvTitle.text = chat.title
+            val titlePrefix =
+                buildString {
+                    if (chat.isSecretChat) append("🔒 ")
+                    if (chat.isForum) append("🧵 ")
+                }
+            tvTitle.text = "$titlePrefix${chat.title}"
             tvStarBadge.visibility = if (chat.isPremium) View.VISIBLE else View.GONE
+            tvMuteBadge?.visibility = if (chat.isMuted) View.VISIBLE else View.GONE
+
+            val showPinOrFolder = chat.isPinned || chat.folderName.isNotBlank() || chat.isArchived
+            tvPinBadge?.visibility = if (showPinOrFolder) View.VISIBLE else View.GONE
+            tvPinBadge?.text =
+                when {
+                    chat.isPinned -> "📌"
+                    chat.isArchived -> "📦"
+                    chat.folderName.isNotBlank() -> "📁"
+                    else -> ""
+                }
+
             tvTime.text = chat.time
-            tvLastMsg.text = chat.lastMessage
+
+            if (chat.draftText.isNotBlank()) {
+                tvLastMsg.text = "Draft: ${chat.draftText}"
+                tvLastMsg.setTextColor(ContextCompat.getColor(context, R.color.focus_highlight_gold))
+            } else {
+                tvLastMsg.text = chat.lastMessage
+                tvLastMsg.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            }
 
             if (chat.unreadCount > 0) {
                 tvUnread.visibility = View.VISIBLE
