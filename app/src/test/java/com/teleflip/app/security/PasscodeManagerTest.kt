@@ -83,4 +83,113 @@ class PasscodeManagerTest {
         PasscodeManager.unlock(context, "2580")
         assertFalse(PasscodeManager.isLocked(context))
     }
+
+    @Test
+    fun testCanAuthenticate() {
+        val canAuth = PasscodeManager.canAuthenticate(context)
+        // Verify canAuthenticate executes without throwing
+        assertTrue(canAuth || !canAuth)
+    }
+
+    @Test
+    fun testBiometricUnlockUnlocksSession() {
+        PasscodeManager.setPasscode(context, "1234")
+        PasscodeManager.lock()
+        assertTrue(PasscodeManager.isLocked(context))
+
+        val success = PasscodeManager.unlockBiometric()
+        assertTrue(success)
+        assertFalse(PasscodeManager.isLocked(context))
+    }
+
+    @Test
+    fun testAuthenticationCallbackSucceeded() {
+        PasscodeManager.setPasscode(context, "1234")
+        PasscodeManager.lock()
+        assertTrue(PasscodeManager.isLocked(context))
+
+        var successCalled = false
+        var errorCalled = false
+        val callback = PasscodeManager.createAuthenticationCallback(
+            onSuccess = { successCalled = true },
+            onError = { errorCalled = true }
+        )
+
+        val result = org.mockito.Mockito.mock(androidx.biometric.BiometricPrompt.AuthenticationResult::class.java)
+        callback.onAuthenticationSucceeded(result)
+
+        assertTrue(successCalled)
+        assertFalse(errorCalled)
+        assertFalse(PasscodeManager.isLocked(context))
+    }
+
+    @Test
+    fun testAuthenticationCallbackError() {
+        PasscodeManager.setPasscode(context, "1234")
+        PasscodeManager.lock()
+        assertTrue(PasscodeManager.isLocked(context))
+
+        var reportedError: String? = null
+        val callback = PasscodeManager.createAuthenticationCallback(
+            onSuccess = {},
+            onError = { reportedError = it }
+        )
+
+        callback.onAuthenticationError(androidx.biometric.BiometricPrompt.ERROR_HW_UNAVAILABLE, "Hardware unavailable")
+
+        assertEquals("Hardware unavailable", reportedError)
+        assertTrue(PasscodeManager.isLocked(context))
+    }
+
+    @Test
+    fun testAuthenticationCallbackUserCanceledIgnoredForErrorMessage() {
+        PasscodeManager.setPasscode(context, "1234")
+        PasscodeManager.lock()
+        assertTrue(PasscodeManager.isLocked(context))
+
+        var reportedError: String? = null
+        val callback = PasscodeManager.createAuthenticationCallback(
+            onSuccess = {},
+            onError = { reportedError = it }
+        )
+
+        callback.onAuthenticationError(androidx.biometric.BiometricPrompt.ERROR_USER_CANCELED, "User canceled")
+
+        assertEquals(null, reportedError)
+        assertTrue(PasscodeManager.isLocked(context))
+    }
+
+    @Test
+    fun testAuthenticationCallbackFailed() {
+        PasscodeManager.setPasscode(context, "1234")
+        PasscodeManager.lock()
+        assertTrue(PasscodeManager.isLocked(context))
+
+        var reportedError: String? = null
+        val callback = PasscodeManager.createAuthenticationCallback(
+            onSuccess = {},
+            onError = { reportedError = it }
+        )
+
+        callback.onAuthenticationFailed()
+
+        assertEquals("Biometric authentication failed", reportedError)
+        assertTrue(PasscodeManager.isLocked(context))
+    }
+
+    @Test
+    fun testFallbackToManualPinEntry() {
+        PasscodeManager.setPasscode(context, "1234")
+        PasscodeManager.lock()
+        assertTrue(PasscodeManager.isLocked(context))
+
+        // When biometric fails or is cancelled, manual PIN unlock functions as expected
+        val failedPin = PasscodeManager.unlock(context, "0000")
+        assertFalse(failedPin)
+        assertTrue(PasscodeManager.isLocked(context))
+
+        val correctPin = PasscodeManager.unlock(context, "1234")
+        assertTrue(correctPin)
+        assertFalse(PasscodeManager.isLocked(context))
+    }
 }

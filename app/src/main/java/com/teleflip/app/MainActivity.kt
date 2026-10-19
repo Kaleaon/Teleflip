@@ -2126,6 +2126,25 @@ class MainActivity : AppCompatActivity() {
                 }
             },
         )
+
+        if (PasscodeManager.canAuthenticate(this)) {
+            PasscodeManager.promptBiometricUnlock(
+                activity = this,
+                onSuccess = {
+                    tvPasscodeError?.text = ""
+                    if (telegramManager.authState.value is AuthState.Ready) {
+                        showChatListScreen()
+                    } else {
+                        showLoginScreen(telegramManager.authState.value)
+                    }
+                },
+                onError = { err ->
+                    if (err.isNotBlank()) {
+                        tvPasscodeError?.text = err
+                    }
+                },
+            )
+        }
     }
 
     private fun updatePasscodeDotsDisplay() {
