@@ -165,6 +165,21 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         const val DEFAULT_CHAT_BATCH_SIZE = 10
         private val customEmojiCache = java.util.concurrent.ConcurrentHashMap<String, StickerItem>()
 
+        @Volatile
+        private var instance: TelegramManager? = null
+
+        fun getInstance(context: Context): TelegramManager {
+            return instance ?: synchronized(this) {
+                instance ?: TelegramManager(context.applicationContext).also { instance = it }
+            }
+        }
+
+        fun resetInstanceForTesting() {
+            synchronized(this) {
+                instance = null
+            }
+        }
+
         fun registerCustomEmojiSticker(
             key: String,
             item: StickerItem,
@@ -305,20 +320,49 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    private val clientLock = Any()
+
+    @Volatile
+    private var isStartingClient = false
+
+    @Volatile
+    private var isClosingClient = false
+
+    @Volatile
+    private var reconnectPending = false
+
     fun start() {
+        synchronized(clientLock) {
+            if (tdClient != null || isStartingClient) {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib Client already active or starting; skipping start()")
+                return
+            }
+            if (isClosingClient) {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib Client is closing; queuing reconnect on close")
+                reconnectPending = true
+                return
+            }
+            isStartingClient = true
+        }
         scope.launch(Dispatchers.IO) {
             try {
                 _connectionState.value = "Connecting..."
                 com.teleflip.app.report.AdbReporter.reportInfo(tag, "Creating TDLib Client...")
                 val client = Client.create(this@TelegramManager, null, null)
-                if (client == null) {
-                    _connectionState.value = "Init error"
-                    com.teleflip.app.report.AdbReporter.reportError(tag, "Client.create returned null")
-                } else {
-                    tdClient = client
-                    applySavedProxy()
+                synchronized(clientLock) {
+                    isStartingClient = false
+                    if (client == null) {
+                        _connectionState.value = "Init error"
+                        com.teleflip.app.report.AdbReporter.reportError(tag, "Client.create returned null")
+                    } else {
+                        tdClient = client
+                        applySavedProxy()
+                    }
                 }
             } catch (e: Throwable) {
+                synchronized(clientLock) {
+                    isStartingClient = false
+                }
                 com.teleflip.app.report.AdbReporter.reportError(tag, "Client creation error: ${e.message}", e)
                 _connectionState.value = "Init error"
             }
@@ -328,15 +372,29 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     fun retryConnection() {
         clearAuthTimeoutSafeguard()
         isAuthQueryInProgress = false
+        val activeClient: Client?
+        synchronized(clientLock) {
+            activeClient = tdClient
+            if (activeClient == null && !isStartingClient) {
+                reconnectPending = false
+                start()
+                return
+            }
+            isClosingClient = true
+            reconnectPending = true
+        }
         scope.launch(Dispatchers.IO) {
             try {
-                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing previous TDLib client instance...")
-                tdClient?.send(TdApi.Close(), this@TelegramManager)
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing TDLib client for clean reconnection...")
+                activeClient?.send(TdApi.Close(), this@TelegramManager)
             } catch (e: Throwable) {
                 Log.w(tag, "Error during native client teardown: ${e.message}")
+                synchronized(clientLock) {
+                    isClosingClient = false
+                    tdClient = null
+                }
+                start()
             }
-            tdClient = null
-            start()
         }
     }
 
@@ -4046,6 +4104,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     }
 
     fun logOut() {
+        synchronized(clientLock) {
+            reconnectPending = false
+        }
         tdClient?.send(TdApi.LogOut(), this)
     }
 
@@ -4157,6 +4218,15 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 isAuthQueryInProgress = false
                 val err = obj as TdApi.Error
                 com.teleflip.app.report.AdbReporter.reportError(tag, "TDLib Server Error [Code: ${err.code}]: ${err.message}")
+                val msg = err.message ?: ""
+                if (msg.contains("lock file", ignoreCase = true) || msg.contains("already in use", ignoreCase = true)) {
+                    com.teleflip.app.report.AdbReporter.reportWarning(tag, "Database lock contention detected. Attempting clean retry after release...")
+                    scope.launch(Dispatchers.IO) {
+                        delay(1500L)
+                        retryConnection()
+                    }
+                    return
+                }
                 when (val curr = _authState.value) {
                     is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitOtherDeviceConfirmation -> _authState.value = curr.copy(errorMessage = err.message)
@@ -4231,8 +4301,18 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 loadScopeNotificationSettings()
             }
             TdApi.AuthorizationStateClosed.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "AuthorizationStateClosed received. Previous client released.")
+                val shouldRestart: Boolean
+                synchronized(clientLock) {
+                    tdClient = null
+                    isClosingClient = false
+                    shouldRestart = reconnectPending
+                    reconnectPending = false
+                }
                 _authState.value = AuthState.Initial
-                start()
+                if (shouldRestart) {
+                    start()
+                }
             }
         }
     }

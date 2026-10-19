@@ -229,7 +229,7 @@ class MainActivity : AppCompatActivity() {
             },
         )
 
-        telegramManager = TelegramManager(this)
+        telegramManager = TelegramManager.getInstance(this)
         voiceRecorder = VoiceRecorder(this)
         voicePlayer = VoicePlayer(this)
         locationHelper = LocationHelper(this)
@@ -4347,7 +4347,7 @@ class MainActivity : AppCompatActivity() {
                 telegramManager.apiId = idStr.toIntOrNull() ?: telegramManager.apiId
                 telegramManager.apiHash = hashStr
                 showToast("Saved! Reconnecting...")
-                telegramManager.start()
+                telegramManager.retryConnection()
                 showChatListScreen()
             } else {
                 showToast("Saved!")
