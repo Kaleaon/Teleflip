@@ -1,6 +1,5 @@
 package com.teleflip.app.ui
 
-import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
 import android.text.Editable
@@ -22,7 +21,7 @@ class SearchDialog(
     private val telegramManager: TelegramManager,
     private val onChatSelected: (ChatModel) -> Unit,
     private val onMessageSelected: (chatId: Long, messageId: Long) -> Unit,
-) : Dialog(context, R.style.Theme_TeleFlip) {
+) : BaseDialog(context) {
     enum class SearchTab {
         CHATS,
         CONTACTS,
