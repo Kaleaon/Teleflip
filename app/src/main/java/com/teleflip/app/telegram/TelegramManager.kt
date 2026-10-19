@@ -53,6 +53,8 @@ sealed class AuthState {
 
     data class WaitPhoneNumber(val errorMessage: String? = null) : AuthState()
 
+    data class WaitOtherDeviceConfirmation(val link: String = "", val errorMessage: String? = null) : AuthState()
+
     data class WaitCode(val info: String = "", val errorMessage: String? = null) : AuthState()
 
     data class WaitPassword(
@@ -342,6 +344,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     val timeoutMsg = "Request timed out after 15 seconds. Please try again."
                     when (val curr = _authState.value) {
                         is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = timeoutMsg)
+                        is AuthState.WaitOtherDeviceConfirmation -> _authState.value = curr.copy(errorMessage = timeoutMsg)
                         is AuthState.WaitCode -> _authState.value = curr.copy(errorMessage = timeoutMsg)
                         is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = timeoutMsg)
                         else -> _authState.value = AuthState.Error(timeoutMsg)
@@ -364,6 +367,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val msg = "Telegram client unavailable. Please check connection or tap Retry Connection."
         when (val curr = _authState.value) {
             is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = msg)
+            is AuthState.WaitOtherDeviceConfirmation -> _authState.value = curr.copy(errorMessage = msg)
             is AuthState.WaitCode -> _authState.value = curr.copy(errorMessage = msg)
             is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = msg)
             else -> _authState.value = AuthState.WaitPhoneNumber(errorMessage = msg)
@@ -392,6 +396,25 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 allowSmsRetrieverApi = false
             }
         tdClient?.send(TdApi.SetAuthenticationPhoneNumber(normalized, settings), this)
+    }
+
+    fun requestQrCodeLogin() {
+        if (isAuthQueryInProgress) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "requestQrCodeLogin ignored: authorization query already in flight")
+            return
+        }
+        if (!isClientActive()) {
+            handleClientUnavailable()
+            return
+        }
+        isAuthQueryInProgress = true
+        startAuthTimeoutSafeguard()
+        com.teleflip.app.report.AdbReporter.reportInfo(tag, "Requesting QR code authentication")
+        tdClient?.send(TdApi.RequestQrCodeAuthentication(longArrayOf()), this)
+    }
+
+    fun showPhoneNumberLogin() {
+        _authState.value = AuthState.WaitPhoneNumber()
     }
 
     fun checkCode(code: String) {
@@ -3556,6 +3579,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 com.teleflip.app.report.AdbReporter.reportError(tag, "TDLib Server Error [Code: ${err.code}]: ${err.message}")
                 when (val curr = _authState.value) {
                     is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = err.message)
+                    is AuthState.WaitOtherDeviceConfirmation -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitCode -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitPasswordRecoveryCode -> _authState.value = curr.copy(errorMessage = err.message)
@@ -3599,6 +3623,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             }
             TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR -> {
                 _authState.value = AuthState.WaitPhoneNumber()
+            }
+            TdApi.AuthorizationStateWaitOtherDeviceConfirmation.CONSTRUCTOR -> {
+                val waitOther = state as TdApi.AuthorizationStateWaitOtherDeviceConfirmation
+                _authState.value = AuthState.WaitOtherDeviceConfirmation(link = waitOther.link ?: "")
             }
             TdApi.AuthorizationStateWaitCode.CONSTRUCTOR -> {
                 _authState.value = AuthState.WaitCode()
