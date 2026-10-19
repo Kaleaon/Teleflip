@@ -212,3 +212,19 @@ data class SessionModel(
     val country: String,
     val activeDate: String,
 )
+
+enum class ProxyType {
+    SOCKS5,
+    MTPROTO,
+}
+
+data class ProxyItem(
+    val id: Int = 0,
+    val server: String = "",
+    val port: Int = 1080,
+    val type: ProxyType = ProxyType.SOCKS5,
+    val username: String = "",
+    val password: String = "",
+    val secret: String = "",
+    val isEnabled: Boolean = false,
+)
