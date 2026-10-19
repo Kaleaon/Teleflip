@@ -2,19 +2,14 @@ package com.teleflip.app.search
 
 import android.content.Context
 import android.content.SharedPreferences
-<<<<<<< HEAD
-import android.view.KeyEvent
-import android.widget.EditText
-import androidx.test.core.app.ApplicationProvider
-=======
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.View
 import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
->>>>>>> origin/stitch/debounce-search-stale-cancel-jm0-8044d5fd-291a-4ee7-b4e2-15f937bae310
 import com.teleflip.app.R
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
@@ -34,16 +29,10 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
-<<<<<<< HEAD
-import org.robolectric.RobolectricTestRunner
-
-@RunWith(RobolectricTestRunner::class)
-=======
 import org.robolectric.Shadows
 import java.time.Duration
 
 @RunWith(AndroidJUnit4::class)
->>>>>>> origin/stitch/debounce-search-stale-cancel-jm0-8044d5fd-291a-4ee7-b4e2-15f937bae310
 class SearchDialogTest {
 
     private fun <T> anyKotlin(): T {
