@@ -35,6 +35,7 @@ class TeleFlipNotificationService : Service() {
         }
     }
 
+    @android.annotation.SuppressLint("ForegroundServiceType")
     override fun onCreate() {
         super.onCreate()
         try {
@@ -59,7 +60,11 @@ class TeleFlipNotificationService : Service() {
                     .build()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(FG_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                startForeground(
+                    FG_NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+                )
             } else {
                 startForeground(FG_NOTIFICATION_ID, notification)
             }
