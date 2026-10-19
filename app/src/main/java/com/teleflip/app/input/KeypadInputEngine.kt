@@ -79,6 +79,7 @@ class KeypadInputEngine(
             },
         )
 
+        @Suppress("NewApi")
         val externalAccessibilityDelegate = editText.accessibilityDelegate
         editText.accessibilityDelegate =
             object : View.AccessibilityDelegate() {

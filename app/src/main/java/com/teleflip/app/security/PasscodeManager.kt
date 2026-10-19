@@ -38,6 +38,7 @@ object PasscodeManager {
             .putString(PREF_PASSCODE_HASH, hash)
             .apply()
         isUnlockedSession = true
+        lastBackgroundTimestamp = 0L
     }
 
     fun disablePasscode(context: Context) {
@@ -47,6 +48,7 @@ object PasscodeManager {
             .remove(PREF_PASSCODE_HASH)
             .apply()
         isUnlockedSession = true
+        lastBackgroundTimestamp = 0L
     }
 
     fun verifyPasscode(

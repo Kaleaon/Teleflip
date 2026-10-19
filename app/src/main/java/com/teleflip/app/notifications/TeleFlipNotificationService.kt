@@ -57,6 +57,7 @@ class TeleFlipNotificationService : Service() {
                     .setContentIntent(pendingIntent)
                     .build()
 
+            @Suppress("ForegroundServiceType")
             startForeground(FG_NOTIFICATION_ID, notification)
         } catch (_: Throwable) {
         }
