@@ -274,6 +274,7 @@ class MainActivity : AppCompatActivity() {
                 when (state) {
                     is AuthState.Initial, is AuthState.WaitParameters -> {}
                     is AuthState.WaitPhoneNumber,
+                    is AuthState.WaitOtherDeviceConfirmation,
                     is AuthState.WaitCode,
                     is AuthState.WaitPassword,
                     is AuthState.WaitPasswordRecoveryCode,
@@ -3088,11 +3089,24 @@ class MainActivity : AppCompatActivity() {
         etLoginInput = view.findViewById(R.id.et_login_input)
         val btnSubmit = view.findViewById<Button>(R.id.btn_login_submit)
 
+        val layoutInputContainer = view.findViewById<View>(R.id.layout_login_input_container)
+        val layoutQrContainer = view.findViewById<View>(R.id.layout_qr_container)
+        val ivQrCode = view.findViewById<ImageView>(R.id.iv_login_qr)
+        val btnPhoneLogin = view.findViewById<Button>(R.id.btn_phone_login)
+        val btnQrLogin = view.findViewById<Button>(R.id.btn_qr_login)
+
         val btnRetry = view.findViewById<Button>(R.id.btn_retry_connection)
         val btnForgotPassword = view.findViewById<Button>(R.id.btn_forgot_password)
         val btnResetAccount = view.findViewById<Button>(R.id.btn_reset_account)
         val btnUseSim = view.findViewById<Button>(R.id.btn_use_sim_number)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
+
+        btnQrLogin?.setOnClickListener {
+            telegramManager.requestQrCodeLogin()
+        }
+        btnPhoneLogin?.setOnClickListener {
+            telegramManager.showPhoneNumberLogin()
+        }
 
         loginInputEngine =
             KeypadInputEngine(
@@ -3111,6 +3125,10 @@ class MainActivity : AppCompatActivity() {
 
         when (state) {
             is AuthState.WaitPhoneNumber -> {
+                layoutInputContainer?.visibility = View.VISIBLE
+                layoutQrContainer?.visibility = View.GONE
+                btnSubmit.visibility = View.VISIBLE
+                btnQrLogin?.visibility = View.VISIBLE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_PHONE
                 etLoginInput?.typeface = tf
@@ -3153,7 +3171,33 @@ class MainActivity : AppCompatActivity() {
                     tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
                 }
             }
+            is AuthState.WaitOtherDeviceConfirmation -> {
+                layoutInputContainer?.visibility = View.GONE
+                layoutQrContainer?.visibility = View.VISIBLE
+                btnSubmit.visibility = View.GONE
+                btnUseSim?.visibility = View.GONE
+                btnQrLogin?.visibility = View.GONE
+
+                val qrBitmap = com.teleflip.app.ui.QrCodeGenerator.generateQrCodeBitmap(state.link)
+                if (qrBitmap != null) {
+                    ivQrCode?.setImageBitmap(qrBitmap)
+                }
+
+                if (state.errorMessage != null) {
+                    val errorMessage = "⚠️ Error: ${state.errorMessage}"
+                    tvStatus.text = errorMessage
+                    tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
+                    tvStatus.announceForAccessibility(errorMessage)
+                } else {
+                    tvStatus.text = "Scan QR code with Telegram on your main phone"
+                    tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+                }
+            }
             is AuthState.WaitCode -> {
+                layoutInputContainer?.visibility = View.VISIBLE
+                layoutQrContainer?.visibility = View.GONE
+                btnSubmit.visibility = View.VISIBLE
+                btnQrLogin?.visibility = View.GONE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_NUMBER
                 etLoginInput?.typeface = tf
@@ -3176,6 +3220,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitPassword -> {
+                layoutInputContainer?.visibility = View.VISIBLE
+                layoutQrContainer?.visibility = View.GONE
+                btnSubmit.visibility = View.VISIBLE
+                btnQrLogin?.visibility = View.GONE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
                 etLoginInput?.typeface = tf
@@ -3221,6 +3269,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitPasswordRecoveryCode -> {
+                layoutInputContainer?.visibility = View.VISIBLE
+                layoutQrContainer?.visibility = View.GONE
+                btnSubmit.visibility = View.VISIBLE
+                btnQrLogin?.visibility = View.GONE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_NUMBER
                 etLoginInput?.typeface = tf
@@ -3254,6 +3306,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.Error -> {
+                layoutInputContainer?.visibility = View.VISIBLE
+                layoutQrContainer?.visibility = View.GONE
+                btnSubmit.visibility = View.VISIBLE
+                btnQrLogin?.visibility = View.GONE
                 btnUseSim?.visibility = View.GONE
                 btnSubmit.nextFocusDownId = R.id.btn_config_credentials
                 btnConfig.nextFocusUpId = R.id.btn_login_submit
@@ -3316,6 +3372,7 @@ class MainActivity : AppCompatActivity() {
                 when (state) {
                     is AuthState.WaitCode, is AuthState.WaitPasswordRecoveryCode -> "Verify"
                     is AuthState.WaitPassword -> "Submit"
+                    is AuthState.WaitOtherDeviceConfirmation -> "Phone Login"
                     else -> "Send"
                 },
             right = "Exit",
@@ -3329,6 +3386,8 @@ class MainActivity : AppCompatActivity() {
             onCenter = {
                 if (currentFocus?.id == R.id.btn_retry_connection) {
                     telegramManager.retryConnection()
+                } else if (state is AuthState.WaitOtherDeviceConfirmation) {
+                    telegramManager.showPhoneNumberLogin()
                 } else {
                     doSubmit()
                 }
@@ -3350,6 +3409,7 @@ class MainActivity : AppCompatActivity() {
             val err =
                 when (currentAuth) {
                     is AuthState.WaitPhoneNumber -> currentAuth.errorMessage
+                    is AuthState.WaitOtherDeviceConfirmation -> currentAuth.errorMessage
                     is AuthState.WaitCode -> currentAuth.errorMessage
                     is AuthState.WaitPassword -> currentAuth.errorMessage
                     is AuthState.Error -> currentAuth.message
@@ -3378,6 +3438,7 @@ class MainActivity : AppCompatActivity() {
                 when (telegramManager.authState.value) {
                     is AuthState.WaitCode -> "Verify Code"
                     is AuthState.WaitPassword -> "Submit Password"
+                    is AuthState.WaitOtherDeviceConfirmation -> "Waiting for Scan..."
                     else -> "Send Code"
                 }
             btnSubmit.text = defaultText
