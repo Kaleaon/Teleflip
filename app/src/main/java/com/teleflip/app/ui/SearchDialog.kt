@@ -29,7 +29,7 @@ class SearchDialog(
         MESSAGES,
     }
 
-    private var currentTab: SearchTab = SearchTab.CHATS
+    internal var currentTab: SearchTab = SearchTab.CHATS
 
     private lateinit var etSearchInput: EditText
     private lateinit var tvInputMode: TextView
@@ -271,60 +271,72 @@ class SearchDialog(
             return true
         }
 
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-            val tabs = SearchTab.values()
-            val prevIndex = (currentTab.ordinal - 1 + tabs.size) % tabs.size
-            selectTab(tabs[prevIndex])
-            return true
-        }
-        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            val tabs = SearchTab.values()
-            val nextIndex = (currentTab.ordinal + 1) % tabs.size
-            selectTab(tabs[nextIndex])
-            return true
-        }
-
-        val isInputKey =
-            (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
-                keyCode == KeyEvent.KEYCODE_STAR ||
-                keyCode == KeyEvent.KEYCODE_POUND ||
-                keyCode == KeyEvent.KEYCODE_DEL
-        if (isInputKey && etSearchInput.hasFocus()) {
-            if (keypadEngine?.handleKeyEvent(keyCode, event) == true) {
+        if (etSearchInput.hasFocus()) {
+            val isInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL ||
+                    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+            if (isInputKey && keypadEngine?.handleKeyEvent(keyCode, event) == true) {
                 return true
             }
-        }
 
-        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-            val focused = currentFocus
-            if (focused != null && focused !== etSearchInput && focused !== tabChats && focused !== tabContacts && focused !== tabMessages) {
-                val itemView = rvResults.findContainingItemView(focused)
-                if (itemView != null) {
-                    val pos = rvResults.getChildAdapterPosition(itemView)
-                    if (pos != RecyclerView.NO_POSITION) {
-                        if (currentTab == SearchTab.MESSAGES) {
-                            val msgItem = messageSearchAdapter?.getItemAt(pos)
-                            if (msgItem != null) {
-                                dismiss()
-                                onMessageSelected(msgItem.chatId, msgItem.messageId)
-                                return true
-                            }
-                        } else {
-                            val chatItem = chatAdapter?.getItemAt(pos)
-                            if (chatItem != null) {
-                                dismiss()
-                                onChatSelected(chatItem)
-                                return true
+            keypadEngine?.commitCurrentChar()
+
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                if ((rvResults.adapter?.itemCount ?: 0) > 0) {
+                    rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                    return true
+                }
+            }
+
+            return super.onKeyDown(keyCode, event)
+        } else {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                val tabs = SearchTab.values()
+                val prevIndex = (currentTab.ordinal - 1 + tabs.size) % tabs.size
+                selectTab(tabs[prevIndex])
+                return true
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                val tabs = SearchTab.values()
+                val nextIndex = (currentTab.ordinal + 1) % tabs.size
+                selectTab(tabs[nextIndex])
+                return true
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                val focused = currentFocus
+                if (focused != null && focused !== etSearchInput && focused !== tabChats && focused !== tabContacts && focused !== tabMessages) {
+                    val itemView = rvResults.findContainingItemView(focused)
+                    if (itemView != null) {
+                        val pos = rvResults.getChildAdapterPosition(itemView)
+                        if (pos != RecyclerView.NO_POSITION) {
+                            if (currentTab == SearchTab.MESSAGES) {
+                                val msgItem = messageSearchAdapter?.getItemAt(pos)
+                                if (msgItem != null) {
+                                    dismiss()
+                                    onMessageSelected(msgItem.chatId, msgItem.messageId)
+                                    return true
+                                }
+                            } else {
+                                val chatItem = chatAdapter?.getItemAt(pos)
+                                if (chatItem != null) {
+                                    dismiss()
+                                    onChatSelected(chatItem)
+                                    return true
+                                }
                             }
                         }
                     }
+                } else if ((rvResults.adapter?.itemCount ?: 0) > 0) {
+                    rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                    return true
                 }
-            } else if ((rvResults.adapter?.itemCount ?: 0) > 0) {
-                rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-                return true
             }
-        }
 
-        return super.onKeyDown(keyCode, event)
+            return super.onKeyDown(keyCode, event)
+        }
     }
 }
