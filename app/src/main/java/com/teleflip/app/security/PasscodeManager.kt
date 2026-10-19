@@ -1,6 +1,10 @@
 package com.teleflip.app.security
 
 import android.content.Context
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import java.security.MessageDigest
 
 object PasscodeManager {
@@ -25,6 +29,17 @@ object PasscodeManager {
     fun isLocked(context: Context): Boolean {
         if (!isEnabled(context)) return false
         return !isUnlockedSession
+    }
+
+    fun canAuthenticate(context: Context): Boolean {
+        return try {
+            val biometricManager = BiometricManager.from(context)
+            biometricManager.canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
+            ) == BiometricManager.BIOMETRIC_SUCCESS
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun setPasscode(
@@ -70,6 +85,62 @@ object PasscodeManager {
             return true
         }
         return false
+    }
+
+    fun unlockBiometric(): Boolean {
+        isUnlockedSession = true
+        lastBackgroundTimestamp = 0L
+        return true
+    }
+
+    fun promptBiometricUnlock(
+        activity: FragmentActivity,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit = {},
+    ) {
+        if (!canAuthenticate(activity)) {
+            onError("Biometric authentication unavailable")
+            return
+        }
+        val executor = ContextCompat.getMainExecutor(activity)
+        val callback = createAuthenticationCallback(onSuccess, onError)
+
+        val biometricPrompt = BiometricPrompt(activity, executor, callback)
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Unlock Teleflip")
+            .setSubtitle("Log in using your biometric credential")
+            .setNegativeButtonText("Use PIN")
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
+    }
+
+    internal fun createAuthenticationCallback(
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit,
+    ): BiometricPrompt.AuthenticationCallback {
+        return object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                unlockBiometric()
+                onSuccess()
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                super.onAuthenticationError(errorCode, errString)
+                if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                    errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                    errorCode != BiometricPrompt.ERROR_CANCELED
+                ) {
+                    onError(errString.toString())
+                }
+            }
+
+            override fun onAuthenticationFailed() {
+                super.onAuthenticationFailed()
+                onError("Biometric authentication failed")
+            }
+        }
     }
 
     fun lock() {
