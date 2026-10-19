@@ -12,9 +12,11 @@ class VoicePlayerTest {
     @Test
     fun testVoicePlayerInitialStateAndSafeStop() {
         val player = VoicePlayer(dummyContext())
+        assertEquals(PlayerState.IDLE, player.currentState)
         assertFalse("VoicePlayer should not be playing initially", player.isPlayingPath("/fake/path.m4a"))
 
         player.stop()
+        assertEquals(PlayerState.IDLE, player.currentState)
         assertFalse("VoicePlayer should remain idle after stop", player.isPlayingPath("/fake/path.m4a"))
     }
 
