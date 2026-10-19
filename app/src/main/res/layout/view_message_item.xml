@@ -120,6 +120,38 @@
             android:textColor="@color/text_primary"
             android:textSize="14sp" />
 
+        <!-- Transcribe Button for Voice Messages -->
+        <TextView
+            android:id="@+id/btn_transcribe"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔤 Transcribe"
+            android:textColor="@color/focus_highlight"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_tab_indicator"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:focusable="true"
+            android:clickable="true"
+            android:visibility="gone"
+            android:layout_marginTop="3dp"
+            android:layout_marginBottom="3dp" />
+
+        <!-- Transcript Text View -->
+        <TextView
+            android:id="@+id/tv_transcript"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="italic"
+            android:visibility="gone"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp" />
+
         <!-- Emoji Reactions Row -->
         <TextView
             android:id="@+id/tv_reactions"
