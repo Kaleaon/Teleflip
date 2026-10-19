@@ -57,7 +57,15 @@ class TeleFlipNotificationService : Service() {
                     .setContentIntent(pendingIntent)
                     .build()
 
-            startForeground(FG_NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    FG_NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+                )
+            } else {
+                startForeground(FG_NOTIFICATION_ID, notification)
+            }
         } catch (_: Throwable) {
         }
     }
