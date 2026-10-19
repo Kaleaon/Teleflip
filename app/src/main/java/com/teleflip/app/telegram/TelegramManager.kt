@@ -1456,38 +1456,43 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val client = tdClient
         if (client != null) {
             try {
-                val req = TdApi.GetForumTopics().apply {
-                    this.chatId = chatId
-                    this.query = ""
-                    this.offsetDate = 0
-                    this.offsetMessageId = 0
-                    this.offsetForumTopicId = 0
-                    this.limit = 100
-                }
+                val req =
+                    TdApi.GetForumTopics().apply {
+                        this.chatId = chatId
+                        this.query = ""
+                        this.offsetDate = 0
+                        this.offsetMessageId = 0
+                        this.offsetForumTopicId = 0
+                        this.limit = 100
+                    }
                 client.send(req) { obj ->
-                    val topicsList = if (obj is TdApi.ForumTopics) {
-                        obj.topics.map { topic ->
-                            ForumTopicModel(
-                                topicId = topic.info.forumTopicId.toLong(),
-                                name = topic.info.name,
-                                unreadCount = topic.unreadCount,
-                                iconEmoji = "💬",
-                                isClosed = topic.info.isClosed,
-                                isPinned = topic.isPinned,
-                            )
-                        }.sortedByDescending { it.isPinned }
-                    } else null
+                    val topicsList =
+                        if (obj is TdApi.ForumTopics) {
+                            obj.topics.map { topic ->
+                                ForumTopicModel(
+                                    topicId = topic.info.forumTopicId.toLong(),
+                                    name = topic.info.name,
+                                    unreadCount = topic.unreadCount,
+                                    iconEmoji = "💬",
+                                    isClosed = topic.info.isClosed,
+                                    isPinned = topic.isPinned,
+                                )
+                            }.sortedByDescending { it.isPinned }
+                        } else {
+                            null
+                        }
 
                     scope.launch(Dispatchers.Main) {
                         if (!topicsList.isNullOrEmpty()) {
                             forumTopicsCache[chatId] = topicsList
                             onResult(topicsList)
                         } else {
-                            val defaultTopics = listOf(
-                                ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
-                                ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
-                                ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
-                            ).sortedByDescending { it.isPinned }
+                            val defaultTopics =
+                                listOf(
+                                    ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
+                                    ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
+                                    ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
+                                ).sortedByDescending { it.isPinned }
                             forumTopicsCache[chatId] = defaultTopics
                             onResult(defaultTopics)
                         }
@@ -1536,14 +1541,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         onResult: ((Boolean, String?) -> Unit)? = null,
     ) {
         val newPinned = !currentPinned
-        val existing = forumTopicsCache[chatId] ?: listOf(
-            ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
-            ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
-            ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
-        )
-        val updated = existing.map {
-            if (it.topicId == topicId) it.copy(isPinned = newPinned) else it
-        }.sortedByDescending { it.isPinned }
+        val existing =
+            forumTopicsCache[chatId] ?: listOf(
+                ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
+                ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
+                ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
+            )
+        val updated =
+            existing.map {
+                if (it.topicId == topicId) it.copy(isPinned = newPinned) else it
+            }.sortedByDescending { it.isPinned }
         forumTopicsCache[chatId] = updated
 
         val client = tdClient
@@ -1553,11 +1560,12 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
 
         try {
-            val req = TdApi.ToggleForumTopicIsPinned().apply {
-                this.chatId = chatId
-                this.forumTopicId = topicId.toInt()
-                this.isPinned = newPinned
-            }
+            val req =
+                TdApi.ToggleForumTopicIsPinned().apply {
+                    this.chatId = chatId
+                    this.forumTopicId = topicId.toInt()
+                    this.isPinned = newPinned
+                }
             client.send(req) { obj ->
                 if (obj is TdApi.Ok) {
                     scope.launch(Dispatchers.Main) {
@@ -1565,9 +1573,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     }
                 } else {
                     val errMsg = (obj as? TdApi.Error)?.message ?: "Failed to toggle topic pin"
-                    val reverted = existing.map {
-                        if (it.topicId == topicId) it.copy(isPinned = currentPinned) else it
-                    }.sortedByDescending { it.isPinned }
+                    val reverted =
+                        existing.map {
+                            if (it.topicId == topicId) it.copy(isPinned = currentPinned) else it
+                        }.sortedByDescending { it.isPinned }
                     forumTopicsCache[chatId] = reverted
                     scope.launch(Dispatchers.Main) {
                         onResult?.invoke(currentPinned, errMsg)
@@ -1576,9 +1585,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             }
         } catch (e: Exception) {
             Log.w(tag, "toggleForumTopicPin failed: ${e.message}")
-            val reverted = existing.map {
-                if (it.topicId == topicId) it.copy(isPinned = currentPinned) else it
-            }.sortedByDescending { it.isPinned }
+            val reverted =
+                existing.map {
+                    if (it.topicId == topicId) it.copy(isPinned = currentPinned) else it
+                }.sortedByDescending { it.isPinned }
             forumTopicsCache[chatId] = reverted
             onResult?.invoke(currentPinned, e.message)
         }
