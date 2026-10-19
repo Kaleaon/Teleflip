@@ -25,7 +25,11 @@ import com.teleflip.app.model.StickerItem
 import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.model.UserProfileModel
 import com.teleflip.app.notifications.NotificationHelper
+import com.teleflip.app.storage.ChatExportManager
+import com.teleflip.app.storage.ChatExportOptions
+import com.teleflip.app.storage.ChatExportProgress
 import com.teleflip.app.storage.ProxyStorage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,6 +49,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.coroutines.resume
 
 sealed class AuthState {
     object Initial : AuthState()
@@ -107,6 +113,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     var scopeGroupChatsMuted = false
     var scopeChannelChatsMuted = false
     private val prefMutedChatsKey = "teleflip_muted_chat_ids"
+    val fileDownloadWaiters =
+        java.util.concurrent.ConcurrentHashMap<Int, CopyOnWriteArrayList<CompletableDeferred<String?>>>()
 
     private val _chatFolders = MutableStateFlow<List<ChatFolderModel>>(emptyList())
     val chatFolders: StateFlow<List<ChatFolderModel>> = _chatFolders.asStateFlow()
@@ -2481,6 +2489,220 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         tdClient?.send(TdApi.GetChatHistory(chatId, fromMessageId, 0, limit, false), this)
     }
 
+    fun getSenderDisplayName(message: TdApi.Message): String {
+        if (message.isOutgoing) return "You"
+        when (val sender = message.senderId) {
+            is TdApi.MessageSenderUser -> {
+                val user = userCache[sender.userId]
+                if (user != null) {
+                    val fullName = "${user.firstName} ${user.lastName.orEmpty()}".trim()
+                    return if (fullName.isNotBlank()) fullName else "Contact"
+                }
+            }
+            is TdApi.MessageSenderChat -> {
+                val chat = _chats.value.find { it.id == sender.chatId }
+                if (chat != null) return chat.title
+            }
+        }
+        return "Contact"
+    }
+
+    suspend fun downloadFileSuspending(
+        fileId: Int,
+        timeoutMs: Long = 30_000L,
+    ): String? {
+        if (fileId == 0) return null
+        val client = tdClient ?: return null
+
+        val currentFile =
+            suspendCancellableCoroutine<TdApi.File?> { cont ->
+                client.send(TdApi.GetFile(fileId)) { res ->
+                    cont.resume(res as? TdApi.File)
+                }
+            }
+
+        if (currentFile != null && currentFile.local.isDownloadingCompleted && currentFile.local.path.isNotBlank()) {
+            return currentFile.local.path
+        }
+
+        val deferred = CompletableDeferred<String?>()
+        val list = fileDownloadWaiters.computeIfAbsent(fileId) { CopyOnWriteArrayList() }
+        list.add(deferred)
+
+        try {
+            client.send(TdApi.DownloadFile(fileId, 32, 0, 0, false)) { res ->
+                val f = res as? TdApi.File
+                if (f != null && f.local.isDownloadingCompleted && f.local.path.isNotBlank()) {
+                    deferred.complete(f.local.path)
+                }
+            }
+            return withTimeoutOrNull(timeoutMs) { deferred.await() }
+        } finally {
+            list.remove(deferred)
+            if (list.isEmpty()) {
+                fileDownloadWaiters.remove(fileId)
+            }
+        }
+    }
+
+    suspend fun fetchAllCloudMessages(
+        chatId: Long,
+        onProgress: ((loadedCount: Int) -> Unit)? = null,
+    ): List<TdApi.Message> {
+        val allMessages = mutableListOf<TdApi.Message>()
+        var fromMessageId = 0L
+        val client = tdClient ?: return emptyList()
+
+        while (true) {
+            val batch =
+                suspendCancellableCoroutine<Array<TdApi.Message>?> { cont ->
+                    client.send(TdApi.GetChatHistory(chatId, fromMessageId, 0, 100, false)) { result ->
+                        if (result is TdApi.Messages) {
+                            cont.resume(result.messages)
+                        } else {
+                            cont.resume(null)
+                        }
+                    }
+                }
+
+            if (batch.isNullOrEmpty()) {
+                break
+            }
+
+            allMessages.addAll(batch)
+            onProgress?.invoke(allMessages.size)
+
+            val oldest = batch.last()
+            if (oldest.id == fromMessageId || batch.size < 100) {
+                break
+            }
+            fromMessageId = oldest.id
+        }
+
+        return allMessages
+    }
+
+    suspend fun importChatHistoryFromCloud(
+        chatId: Long,
+        autoDownloadMedia: Boolean = true,
+        onProgress: ((loadedMessages: Int, queuedMedia: Int) -> Unit)? = null,
+    ): Pair<Int, Int> {
+        val rawMessages =
+            fetchAllCloudMessages(chatId) { count ->
+                onProgress?.invoke(count, 0)
+            }
+
+        val convertedList =
+            rawMessages.map { msg ->
+                val mediaInfo = extractMediaFileInfo(msg.content)
+                val stickerInfo = extractStickerInfo(msg.content)
+                MessageModel(
+                    id = msg.id,
+                    chatId = msg.chatId,
+                    senderName = getSenderDisplayName(msg),
+                    text = extractMessageText(msg.content),
+                    time = formatTime(msg.date.toLong() * 1000),
+                    isOutbound = msg.isOutgoing,
+                    status = MessageStatus.READ,
+                    mediaType = extractMediaType(msg.content),
+                    mediaCaption = extractMediaCaption(msg.content),
+                    mediaFilePath = mediaInfo.second,
+                    mediaFileId = mediaInfo.first,
+                    stickerEmoji = stickerInfo.first,
+                    isPremiumSticker = stickerInfo.second,
+                    transcript = extractVoiceTranscript(msg.content),
+                )
+            }
+
+        withContext(Dispatchers.Main) {
+            val currentMap = _messages.value.toMutableMap()
+            val existing = currentMap[chatId] ?: emptyList()
+            val merged = (convertedList + existing).distinctBy { it.id }.sortedBy { it.id }
+            currentMap[chatId] = merged
+            _messages.value = currentMap
+        }
+
+        var queuedMediaCount = 0
+        if (autoDownloadMedia) {
+            for (msg in rawMessages) {
+                val mediaInfo = extractMediaFileInfo(msg.content)
+                if (mediaInfo.first != 0 && mediaInfo.second.isNullOrBlank()) {
+                    tdClient?.send(TdApi.DownloadFile(mediaInfo.first, 1, 0, 0, false), this)
+                    queuedMediaCount++
+                    onProgress?.invoke(rawMessages.size, queuedMediaCount)
+                }
+            }
+        }
+
+        return Pair(rawMessages.size, queuedMediaCount)
+    }
+
+    suspend fun exportChatHistory(
+        chatId: Long,
+        chatTitle: String,
+        options: ChatExportOptions,
+        onProgress: ((ChatExportProgress) -> Unit)? = null,
+    ): Result<File> {
+        onProgress?.invoke(
+            ChatExportProgress(
+                stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
+                statusText = "Syncing complete cloud history for \"$chatTitle\"...",
+            ),
+        )
+
+        val rawMessages =
+            if (tdClient != null) {
+                fetchAllCloudMessages(chatId) { count ->
+                    onProgress?.invoke(
+                        ChatExportProgress(
+                            stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
+                            messagesProcessed = count,
+                            totalMessages = count,
+                            statusText = "Loaded $count cloud messages...",
+                        ),
+                    )
+                }
+            } else {
+                emptyList()
+            }
+
+        val messagesToExport =
+            if (rawMessages.isNotEmpty()) {
+                rawMessages.reversed().map { msg ->
+                    val mediaInfo = extractMediaFileInfo(msg.content)
+                    val stickerInfo = extractStickerInfo(msg.content)
+                    MessageModel(
+                        id = msg.id,
+                        chatId = msg.chatId,
+                        senderName = getSenderDisplayName(msg),
+                        text = extractMessageText(msg.content),
+                        time = formatTime(msg.date.toLong() * 1000),
+                        isOutbound = msg.isOutgoing,
+                        status = MessageStatus.READ,
+                        mediaType = extractMediaType(msg.content),
+                        mediaCaption = extractMediaCaption(msg.content),
+                        mediaFilePath = mediaInfo.second,
+                        mediaFileId = mediaInfo.first,
+                        stickerEmoji = stickerInfo.first,
+                        isPremiumSticker = stickerInfo.second,
+                        transcript = extractVoiceTranscript(msg.content),
+                    )
+                }
+            } else {
+                _messages.value[chatId] ?: emptyList()
+            }
+
+        return ChatExportManager.exportChat(
+            context = context,
+            chatId = chatId,
+            chatTitle = chatTitle,
+            messages = messagesToExport,
+            options = options,
+            fileDownloader = { fileId -> downloadFileSuspending(fileId) },
+            onProgress = onProgress,
+        )
+    }
+
     fun searchChats(
         query: String,
         onResult: (List<ChatModel>) -> Unit,
@@ -4359,6 +4581,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     private fun handleFileUpdate(file: TdApi.File) {
         if (!file.local.isDownloadingCompleted || file.local.path.isBlank()) return
+
+        fileDownloadWaiters.remove(file.id)?.forEach { deferred ->
+            deferred.complete(file.local.path)
+        }
 
         synchronized(pendingChats) {
             for ((id, chat) in pendingChats) {

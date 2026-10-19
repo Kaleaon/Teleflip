@@ -54,10 +54,14 @@ import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.notifications.NotificationHelper
 import com.teleflip.app.notifications.TeleFlipNotificationService
 import com.teleflip.app.security.PasscodeManager
+import com.teleflip.app.storage.ChatExportProgress
+import com.teleflip.app.storage.ExportStage
 import com.teleflip.app.storage.StorageLocationType
 import com.teleflip.app.storage.StorageManager
 import com.teleflip.app.telegram.AuthState
 import com.teleflip.app.telegram.TelegramManager
+import com.teleflip.app.ui.ChatExportDialog
+import com.teleflip.app.ui.ChatExportProgressDialog
 import com.teleflip.app.ui.ChatListAdapter
 import com.teleflip.app.ui.MediaViewerDialog
 import com.teleflip.app.ui.MenuOption
@@ -1808,6 +1812,16 @@ class MainActivity : AppCompatActivity() {
             },
         )
         options.add(
+            MenuOption(options.size + 1, "📥 Import History from Cloud") {
+                showImportCloudHistoryDialog(chat)
+            },
+        )
+        options.add(
+            MenuOption(options.size + 1, "💾 Download Chat to SD Card / Storage...") {
+                showExportChatHistoryDialog(chat)
+            },
+        )
+        options.add(
             MenuOption(options.size + 1, "🗑️ Clear Chat History") {
                 showClearChatHistoryDialog(chat)
             },
@@ -2223,6 +2237,92 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
             .show()
+    }
+
+    private fun showImportCloudHistoryDialog(chat: ChatModel) {
+        commitActiveInputEngines()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("📥 Import History from Cloud")
+            .setMessage("Fetch all previous messages and media for \"${chat.title}\" directly from Telegram cloud servers?")
+            .setPositiveButton("Import All") { dialog, _ ->
+                dialog.dismiss()
+                val progressDialog = ChatExportProgressDialog(this) {}
+                progressDialog.show()
+                lifecycleScope.launch {
+                    try {
+                        val result =
+                            telegramManager.importChatHistoryFromCloud(
+                                chatId = chat.id,
+                                autoDownloadMedia = true,
+                                onProgress = { loadedMsgs, queuedMedia ->
+                                    progressDialog.updateProgress(
+                                        ChatExportProgress(
+                                            stage = ExportStage.FETCHING_CLOUD_HISTORY,
+                                            messagesProcessed = loadedMsgs,
+                                            totalMessages = loadedMsgs,
+                                            mediaDownloaded = queuedMedia,
+                                            totalMedia = queuedMedia,
+                                            statusText = "Imported $loadedMsgs messages ($queuedMedia media queued)...",
+                                        ),
+                                    )
+                                },
+                            )
+                        progressDialog.dismiss()
+                        showToast("✅ Imported ${result.first} messages from cloud (${result.second} media syncing)")
+                        val updated = telegramManager.messages.value[chat.id] ?: emptyList()
+                        messageAdapter?.submitList(updated)
+                        if (updated.isNotEmpty()) {
+                            rvMessages?.scrollToPosition(updated.size - 1)
+                        }
+                    } catch (e: Exception) {
+                        progressDialog.dismiss()
+                        showToast("Failed to import history: ${e.message}")
+                    }
+                }
+            }
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .show()
+    }
+
+    private fun showExportChatHistoryDialog(chat: ChatModel) {
+        commitActiveInputEngines()
+        ChatExportDialog(this, chat.id, chat.title) { options ->
+            var exportJob: Job? = null
+            val progressDialog =
+                ChatExportProgressDialog(this) {
+                    exportJob?.cancel()
+                }
+            progressDialog.show()
+
+            exportJob =
+                lifecycleScope.launch {
+                    val result =
+                        telegramManager.exportChatHistory(
+                            chatId = chat.id,
+                            chatTitle = chat.title,
+                            options = options,
+                            onProgress = { progress ->
+                                progressDialog.updateProgress(progress)
+                            },
+                        )
+                    if (result.isSuccess) {
+                        val exportDir = result.getOrNull()
+                        progressDialog.dismiss()
+                        val targetName = if (options.targetStorageType == StorageLocationType.SD_CARD) "SD Card" else "Internal Storage"
+                        androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                            .setTitle("✅ Chat Downloaded to $targetName")
+                            .setMessage("Chat \"${chat.title}\" was successfully exported to:\n\n${exportDir?.absolutePath}\n\nContains messages.html, messages.txt, messages.json, and downloaded media.")
+                            .setPositiveButton("OK") { d, _ -> d.dismiss() }
+                            .show()
+                    } else {
+                        progressDialog.dismiss()
+                        val err = result.exceptionOrNull()
+                        if (err !is kotlinx.coroutines.CancellationException) {
+                            showToast("Download failed: ${err?.message}")
+                        }
+                    }
+                }
+        }.show()
     }
 
     private fun showContactsMenu() {
