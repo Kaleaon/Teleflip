@@ -141,6 +141,11 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         _connectionState.value = state
     }
 
+    @androidx.annotation.VisibleForTesting
+    internal fun setChatFoldersForTesting(folders: List<ChatFolderModel>) {
+        _chatFolders.value = folders
+    }
+
     var chatBatchSize: Int = DEFAULT_CHAT_BATCH_SIZE
 
     companion object {
@@ -2408,6 +2413,51 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         tdClient?.send(TdApi.GetChats(TdApi.ChatListMain(), currentCount + step), this)
     }
 
+    fun loadChatFolders() {
+        tdClient?.send(TdApi.GetChatFolder(0), this)
+    }
+
+    private fun handleUpdateChatFolders(chatFolderInfos: Array<TdApi.ChatFolderInfo>?) {
+        if (chatFolderInfos == null) return
+        val currentFolders = _chatFolders.value.toMutableList()
+        chatFolderInfos.forEach { info ->
+            val folderName = info.name?.text?.text.orEmpty()
+            if (folderName.isNotBlank()) {
+                val idx = currentFolders.indexOfFirst { it.id == info.id || it.title.equals(folderName, ignoreCase = true) }
+                if (idx < 0) {
+                    currentFolders.add(ChatFolderModel(id = info.id, title = folderName, includedChatIds = emptySet()))
+                }
+            }
+            tdClient?.send(TdApi.GetChatFolder(info.id), this)
+        }
+        _chatFolders.value = currentFolders
+    }
+
+    private fun handleChatFolderReceived(folder: TdApi.ChatFolder) {
+        val title = folder.name?.text?.text.orEmpty()
+        if (title.isBlank()) return
+        val includedSet = folder.includedChatIds?.toSet() ?: emptySet()
+        val currentFolders = _chatFolders.value.toMutableList()
+        val idx = currentFolders.indexOfFirst { it.title.equals(title, ignoreCase = true) }
+        if (idx >= 0) {
+            currentFolders[idx] = currentFolders[idx].copy(includedChatIds = includedSet)
+        } else {
+            currentFolders.add(ChatFolderModel(id = currentFolders.size + 1, title = title, includedChatIds = includedSet))
+        }
+        _chatFolders.value = currentFolders
+
+        if (includedSet.isNotEmpty()) {
+            _chats.value =
+                _chats.value.map { chat ->
+                    if (includedSet.contains(chat.id)) {
+                        chat.copy(folderName = title)
+                    } else {
+                        chat
+                    }
+                }
+        }
+    }
+
     fun loadMessages(
         chatId: Long,
         fromMessageId: Long = 0,
@@ -3662,6 +3712,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.Chat.CONSTRUCTOR -> {
                 addOrUpdateChat(obj as TdApi.Chat)
             }
+            TdApi.UpdateChatFolders.CONSTRUCTOR -> {
+                val updateFolders = obj as TdApi.UpdateChatFolders
+                handleUpdateChatFolders(updateFolders.chatFolders)
+            }
+            TdApi.ChatFolder.CONSTRUCTOR -> {
+                val folder = obj as TdApi.ChatFolder
+                handleChatFolderReceived(folder)
+            }
             TdApi.Messages.CONSTRUCTOR -> {
                 val msgs = (obj as TdApi.Messages).messages
                 handleMessagesList(msgs)
@@ -3758,6 +3816,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 _authState.value = AuthState.Ready
                 loadChats()
                 loadCurrentUser()
+                loadChatFolders()
             }
             TdApi.AuthorizationStateClosed.CONSTRUCTOR -> {
                 _authState.value = AuthState.Initial
