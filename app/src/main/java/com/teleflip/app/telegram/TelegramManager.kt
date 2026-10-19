@@ -25,7 +25,11 @@ import com.teleflip.app.model.StickerItem
 import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.model.UserProfileModel
 import com.teleflip.app.notifications.NotificationHelper
+import com.teleflip.app.storage.ChatExportManager
+import com.teleflip.app.storage.ChatExportOptions
+import com.teleflip.app.storage.ChatExportProgress
 import com.teleflip.app.storage.ProxyStorage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,6 +49,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.coroutines.resume
 
 sealed class AuthState {
     object Initial : AuthState()
@@ -103,6 +109,13 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
     val chatDrafts = java.util.concurrent.ConcurrentHashMap<Long, String>()
     val forumTopicsCache = java.util.concurrent.ConcurrentHashMap<Long, List<ForumTopicModel>>()
     val groupMembersCache = java.util.concurrent.ConcurrentHashMap<Long, List<GroupMember>>()
+    val chatNotificationSettingsCache = java.util.concurrent.ConcurrentHashMap<Long, TdApi.ChatNotificationSettings>()
+    var scopePrivateChatsMuted = false
+    var scopeGroupChatsMuted = false
+    var scopeChannelChatsMuted = false
+    private val prefMutedChatsKey = "teleflip_muted_chat_ids"
+    val fileDownloadWaiters =
+        java.util.concurrent.ConcurrentHashMap<Int, CopyOnWriteArrayList<CompletableDeferred<String?>>>()
 
     private val _chatFolders = MutableStateFlow<List<ChatFolderModel>>(emptyList())
     val chatFolders: StateFlow<List<ChatFolderModel>> = _chatFolders.asStateFlow()
@@ -151,6 +164,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
 
     companion object {
         const val DEFAULT_CHAT_BATCH_SIZE = 10
+
         @Volatile
         private var instance: TelegramManager? = null
 
@@ -162,12 +176,23 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
 
         @androidx.annotation.VisibleForTesting
         internal fun resetInstance() {
-            instance = null
+            synchronized(this) {
+                instance = null
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        internal fun resetInstanceForTesting() {
+            synchronized(this) {
+                instance = null
+            }
         }
 
         @androidx.annotation.VisibleForTesting
         internal fun setInstanceForTesting(manager: TelegramManager?) {
-            instance = manager
+            synchronized(this) {
+                instance = manager
+            }
         }
 
         private val customEmojiCache = java.util.concurrent.ConcurrentHashMap<String, StickerItem>()
@@ -315,24 +340,49 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         }
     }
 
+    private val clientLock = Any()
+
+    @Volatile
+    private var isStartingClient = false
+
+    @Volatile
+    private var isClosingClient = false
+
+    @Volatile
+    private var reconnectPending = false
+
     fun start() {
-        if (tdClient != null) {
-            Log.d(tag, "TDLib client already active, skipping duplicate creation.")
-            return
+        synchronized(clientLock) {
+            if (tdClient != null || isStartingClient) {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib Client already active or starting; skipping start()")
+                return
+            }
+            if (isClosingClient) {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib Client is closing; queuing reconnect on close")
+                reconnectPending = true
+                return
+            }
+            isStartingClient = true
         }
         scope.launch(Dispatchers.IO) {
             try {
                 _connectionState.value = "Connecting..."
                 com.teleflip.app.report.AdbReporter.reportInfo(tag, "Creating TDLib Client...")
                 val client = Client.create(this@TelegramManager, null, null)
-                if (client == null) {
-                    _connectionState.value = "Init error"
-                    com.teleflip.app.report.AdbReporter.reportError(tag, "Client.create returned null")
-                } else {
-                    tdClient = client
-                    applySavedProxy()
+                synchronized(clientLock) {
+                    isStartingClient = false
+                    if (client == null) {
+                        _connectionState.value = "Init error"
+                        com.teleflip.app.report.AdbReporter.reportError(tag, "Client.create returned null")
+                    } else {
+                        tdClient = client
+                        applySavedProxy()
+                    }
                 }
             } catch (e: Throwable) {
+                synchronized(clientLock) {
+                    isStartingClient = false
+                }
                 com.teleflip.app.report.AdbReporter.reportError(tag, "Client creation error: ${e.message}", e)
                 _connectionState.value = "Init error"
             }
@@ -357,15 +407,29 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
     fun retryConnection() {
         clearAuthTimeoutSafeguard()
         isAuthQueryInProgress = false
+        val activeClient: Client?
+        synchronized(clientLock) {
+            activeClient = tdClient
+            if (activeClient == null && !isStartingClient) {
+                reconnectPending = false
+                start()
+                return
+            }
+            isClosingClient = true
+            reconnectPending = true
+        }
         scope.launch(Dispatchers.IO) {
             try {
-                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing previous TDLib client instance...")
-                tdClient?.send(TdApi.Close(), this@TelegramManager)
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing TDLib client for clean reconnection...")
+                activeClient?.send(TdApi.Close(), this@TelegramManager)
             } catch (e: Throwable) {
                 Log.w(tag, "Error during native client teardown: ${e.message}")
+                synchronized(clientLock) {
+                    isClosingClient = false
+                    tdClient = null
+                }
+                start()
             }
-            tdClient = null
-            start()
         }
     }
 
@@ -2518,6 +2582,220 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         tdClient?.send(TdApi.GetChatHistory(chatId, fromMessageId, 0, limit, false), this)
     }
 
+    fun getSenderDisplayName(message: TdApi.Message): String {
+        if (message.isOutgoing) return "You"
+        when (val sender = message.senderId) {
+            is TdApi.MessageSenderUser -> {
+                val user = userCache[sender.userId]
+                if (user != null) {
+                    val fullName = "${user.firstName} ${user.lastName.orEmpty()}".trim()
+                    return if (fullName.isNotBlank()) fullName else "Contact"
+                }
+            }
+            is TdApi.MessageSenderChat -> {
+                val chat = _chats.value.find { it.id == sender.chatId }
+                if (chat != null) return chat.title
+            }
+        }
+        return "Contact"
+    }
+
+    suspend fun downloadFileSuspending(
+        fileId: Int,
+        timeoutMs: Long = 30_000L,
+    ): String? {
+        if (fileId == 0) return null
+        val client = tdClient ?: return null
+
+        val currentFile =
+            suspendCancellableCoroutine<TdApi.File?> { cont ->
+                client.send(TdApi.GetFile(fileId)) { res ->
+                    cont.resume(res as? TdApi.File)
+                }
+            }
+
+        if (currentFile != null && currentFile.local.isDownloadingCompleted && currentFile.local.path.isNotBlank()) {
+            return currentFile.local.path
+        }
+
+        val deferred = CompletableDeferred<String?>()
+        val list = fileDownloadWaiters.computeIfAbsent(fileId) { CopyOnWriteArrayList() }
+        list.add(deferred)
+
+        try {
+            client.send(TdApi.DownloadFile(fileId, 32, 0, 0, false)) { res ->
+                val f = res as? TdApi.File
+                if (f != null && f.local.isDownloadingCompleted && f.local.path.isNotBlank()) {
+                    deferred.complete(f.local.path)
+                }
+            }
+            return withTimeoutOrNull(timeoutMs) { deferred.await() }
+        } finally {
+            list.remove(deferred)
+            if (list.isEmpty()) {
+                fileDownloadWaiters.remove(fileId)
+            }
+        }
+    }
+
+    suspend fun fetchAllCloudMessages(
+        chatId: Long,
+        onProgress: ((loadedCount: Int) -> Unit)? = null,
+    ): List<TdApi.Message> {
+        val allMessages = mutableListOf<TdApi.Message>()
+        var fromMessageId = 0L
+        val client = tdClient ?: return emptyList()
+
+        while (true) {
+            val batch =
+                suspendCancellableCoroutine<Array<TdApi.Message>?> { cont ->
+                    client.send(TdApi.GetChatHistory(chatId, fromMessageId, 0, 100, false)) { result ->
+                        if (result is TdApi.Messages) {
+                            cont.resume(result.messages)
+                        } else {
+                            cont.resume(null)
+                        }
+                    }
+                }
+
+            if (batch.isNullOrEmpty()) {
+                break
+            }
+
+            allMessages.addAll(batch)
+            onProgress?.invoke(allMessages.size)
+
+            val oldest = batch.last()
+            if (oldest.id == fromMessageId || batch.size < 100) {
+                break
+            }
+            fromMessageId = oldest.id
+        }
+
+        return allMessages
+    }
+
+    suspend fun importChatHistoryFromCloud(
+        chatId: Long,
+        autoDownloadMedia: Boolean = true,
+        onProgress: ((loadedMessages: Int, queuedMedia: Int) -> Unit)? = null,
+    ): Pair<Int, Int> {
+        val rawMessages =
+            fetchAllCloudMessages(chatId) { count ->
+                onProgress?.invoke(count, 0)
+            }
+
+        val convertedList =
+            rawMessages.map { msg ->
+                val mediaInfo = extractMediaFileInfo(msg.content)
+                val stickerInfo = extractStickerInfo(msg.content)
+                MessageModel(
+                    id = msg.id,
+                    chatId = msg.chatId,
+                    senderName = getSenderDisplayName(msg),
+                    text = extractMessageText(msg.content),
+                    time = formatTime(msg.date.toLong() * 1000),
+                    isOutbound = msg.isOutgoing,
+                    status = MessageStatus.READ,
+                    mediaType = extractMediaType(msg.content),
+                    mediaCaption = extractMediaCaption(msg.content),
+                    mediaFilePath = mediaInfo.second,
+                    mediaFileId = mediaInfo.first,
+                    stickerEmoji = stickerInfo.first,
+                    isPremiumSticker = stickerInfo.second,
+                    transcript = extractVoiceTranscript(msg.content),
+                )
+            }
+
+        withContext(Dispatchers.Main) {
+            val currentMap = _messages.value.toMutableMap()
+            val existing = currentMap[chatId] ?: emptyList()
+            val merged = (convertedList + existing).distinctBy { it.id }.sortedBy { it.id }
+            currentMap[chatId] = merged
+            _messages.value = currentMap
+        }
+
+        var queuedMediaCount = 0
+        if (autoDownloadMedia) {
+            for (msg in rawMessages) {
+                val mediaInfo = extractMediaFileInfo(msg.content)
+                if (mediaInfo.first != 0 && mediaInfo.second.isNullOrBlank()) {
+                    tdClient?.send(TdApi.DownloadFile(mediaInfo.first, 1, 0, 0, false), this)
+                    queuedMediaCount++
+                    onProgress?.invoke(rawMessages.size, queuedMediaCount)
+                }
+            }
+        }
+
+        return Pair(rawMessages.size, queuedMediaCount)
+    }
+
+    suspend fun exportChatHistory(
+        chatId: Long,
+        chatTitle: String,
+        options: ChatExportOptions,
+        onProgress: ((ChatExportProgress) -> Unit)? = null,
+    ): Result<File> {
+        onProgress?.invoke(
+            ChatExportProgress(
+                stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
+                statusText = "Syncing complete cloud history for \"$chatTitle\"...",
+            ),
+        )
+
+        val rawMessages =
+            if (tdClient != null) {
+                fetchAllCloudMessages(chatId) { count ->
+                    onProgress?.invoke(
+                        ChatExportProgress(
+                            stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
+                            messagesProcessed = count,
+                            totalMessages = count,
+                            statusText = "Loaded $count cloud messages...",
+                        ),
+                    )
+                }
+            } else {
+                emptyList()
+            }
+
+        val messagesToExport =
+            if (rawMessages.isNotEmpty()) {
+                rawMessages.reversed().map { msg ->
+                    val mediaInfo = extractMediaFileInfo(msg.content)
+                    val stickerInfo = extractStickerInfo(msg.content)
+                    MessageModel(
+                        id = msg.id,
+                        chatId = msg.chatId,
+                        senderName = getSenderDisplayName(msg),
+                        text = extractMessageText(msg.content),
+                        time = formatTime(msg.date.toLong() * 1000),
+                        isOutbound = msg.isOutgoing,
+                        status = MessageStatus.READ,
+                        mediaType = extractMediaType(msg.content),
+                        mediaCaption = extractMediaCaption(msg.content),
+                        mediaFilePath = mediaInfo.second,
+                        mediaFileId = mediaInfo.first,
+                        stickerEmoji = stickerInfo.first,
+                        isPremiumSticker = stickerInfo.second,
+                        transcript = extractVoiceTranscript(msg.content),
+                    )
+                }
+            } else {
+                _messages.value[chatId] ?: emptyList()
+            }
+
+        return ChatExportManager.exportChat(
+            context = context,
+            chatId = chatId,
+            chatTitle = chatTitle,
+            messages = messagesToExport,
+            options = options,
+            fileDownloader = { fileId -> downloadFileSuspending(fileId) },
+            onProgress = onProgress,
+        )
+    }
+
     fun searchChats(
         query: String,
         onResult: (List<ChatModel>) -> Unit,
@@ -3441,7 +3719,10 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 val avatarPath = chatModel?.avatarPath
                 val avatarLetters = chatModel?.avatarLetters ?: "TG"
                 val isPremium = chatModel?.isPremium ?: false
-                val isMuted = chatObj?.notificationSettings?.muteFor != 0
+                val isMuted =
+                    chatObj?.notificationSettings?.let {
+                        isNotificationSettingsMuted(it, chatType)
+                    } ?: isChatMuted(chatId)
 
                 var username = ""
                 var phone = ""
@@ -3577,12 +3858,144 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         setChatNotificationMute(chatId, muteFor, onResult)
     }
 
+    fun getPersistedMutedChatIds(): MutableSet<String> {
+        val raw =
+            try {
+                prefs.getStringSet(prefMutedChatsKey, null)
+            } catch (_: Exception) {
+                null
+            } ?: emptySet()
+        return raw.toMutableSet()
+    }
+
+    fun persistChatMuted(
+        chatId: Long,
+        isMuted: Boolean,
+    ) {
+        val currentSet = getPersistedMutedChatIds()
+        val idStr = chatId.toString()
+        val changed =
+            if (isMuted) {
+                currentSet.add(idStr)
+            } else {
+                currentSet.remove(idStr)
+            }
+        if (changed) {
+            prefs.edit()?.putStringSet(prefMutedChatsKey, HashSet(currentSet))?.apply()
+        }
+    }
+
+    fun isNotificationSettingsMuted(
+        settings: TdApi.ChatNotificationSettings?,
+        chatType: ChatType = ChatType.DIRECT,
+    ): Boolean {
+        if (settings == null) return false
+        return if (!settings.useDefaultMuteFor) {
+            settings.muteFor > 0
+        } else {
+            when (chatType) {
+                ChatType.DIRECT, ChatType.BOT -> scopePrivateChatsMuted
+                ChatType.GROUP -> scopeGroupChatsMuted
+                ChatType.CHANNEL -> scopeChannelChatsMuted
+            }
+        }
+    }
+
+    fun isChatMuted(chatId: Long): Boolean {
+        val chat = _chats.value.find { it.id == chatId }
+        if (chat != null) {
+            return chat.isMuted
+        }
+        val settings = chatNotificationSettingsCache[chatId]
+        if (settings != null) {
+            return isNotificationSettingsMuted(settings, ChatType.DIRECT)
+        }
+        return getPersistedMutedChatIds().contains(chatId.toString())
+    }
+
+    fun handleChatNotificationSettingsUpdated(
+        chatId: Long,
+        notificationSettings: TdApi.ChatNotificationSettings,
+    ) {
+        chatNotificationSettingsCache[chatId] = notificationSettings
+        val existingChat = _chats.value.find { it.id == chatId }
+        val chatType = existingChat?.chatType ?: ChatType.DIRECT
+        val isMuted = isNotificationSettingsMuted(notificationSettings, chatType)
+        persistChatMuted(chatId, isMuted)
+        if (isMuted) {
+            NotificationHelper.cancelMessageNotification(context, chatId)
+        }
+        _chats.value =
+            _chats.value.map { chat ->
+                if (chat.id == chatId) {
+                    if (chat.isMuted != isMuted) chat.copy(isMuted = isMuted) else chat
+                } else {
+                    chat
+                }
+            }
+    }
+
+    fun handleScopeNotificationSettingsUpdated(
+        scope: TdApi.NotificationSettingsScope,
+        notificationSettings: TdApi.ScopeNotificationSettings,
+    ) {
+        val isScopeMuted = notificationSettings.muteFor > 0
+        when (scope.constructor) {
+            TdApi.NotificationSettingsScopePrivateChats.CONSTRUCTOR -> {
+                scopePrivateChatsMuted = isScopeMuted
+            }
+            TdApi.NotificationSettingsScopeGroupChats.CONSTRUCTOR -> {
+                scopeGroupChatsMuted = isScopeMuted
+            }
+            TdApi.NotificationSettingsScopeChannelChats.CONSTRUCTOR -> {
+                scopeChannelChatsMuted = isScopeMuted
+            }
+        }
+        _chats.value =
+            _chats.value.map { chat ->
+                val cached = chatNotificationSettingsCache[chat.id]
+                if (cached != null && cached.useDefaultMuteFor) {
+                    val newMuted = isNotificationSettingsMuted(cached, chat.chatType)
+                    persistChatMuted(chat.id, newMuted)
+                    if (newMuted) {
+                        NotificationHelper.cancelMessageNotification(context, chat.id)
+                    }
+                    if (chat.isMuted != newMuted) chat.copy(isMuted = newMuted) else chat
+                } else {
+                    chat
+                }
+            }
+    }
+
+    fun loadScopeNotificationSettings() {
+        val client = tdClient ?: return
+        client.send(TdApi.GetScopeNotificationSettings(TdApi.NotificationSettingsScopePrivateChats())) { obj ->
+            if (obj is TdApi.ScopeNotificationSettings) {
+                handleScopeNotificationSettingsUpdated(TdApi.NotificationSettingsScopePrivateChats(), obj)
+            }
+        }
+        client.send(TdApi.GetScopeNotificationSettings(TdApi.NotificationSettingsScopeGroupChats())) { obj ->
+            if (obj is TdApi.ScopeNotificationSettings) {
+                handleScopeNotificationSettingsUpdated(TdApi.NotificationSettingsScopeGroupChats(), obj)
+            }
+        }
+        client.send(TdApi.GetScopeNotificationSettings(TdApi.NotificationSettingsScopeChannelChats())) { obj ->
+            if (obj is TdApi.ScopeNotificationSettings) {
+                handleScopeNotificationSettingsUpdated(TdApi.NotificationSettingsScopeChannelChats(), obj)
+            }
+        }
+    }
+
     fun setChatNotificationMute(
         chatId: Long,
         muteForSeconds: Int,
         onResult: ((Boolean) -> Unit)? = null,
     ) {
         val isMuted = muteForSeconds > 0
+        persistChatMuted(chatId, isMuted)
+        if (isMuted) {
+            NotificationHelper.cancelMessageNotification(context, chatId)
+        }
         _chats.value =
             _chats.value.map {
                 if (it.id == chatId) it.copy(isMuted = isMuted) else it
@@ -3592,16 +4005,42 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
             onResult?.invoke(isMuted)
             return
         }
+        val currentSettings = chatNotificationSettingsCache[chatId]
         val settings =
             TdApi.ChatNotificationSettings().apply {
+                if (currentSettings != null) {
+                    this.useDefaultSound = currentSettings.useDefaultSound
+                    this.soundId = currentSettings.soundId
+                    this.useDefaultShowPreview = currentSettings.useDefaultShowPreview
+                    this.showPreview = currentSettings.showPreview
+                    this.useDefaultMuteStories = currentSettings.useDefaultMuteStories
+                    this.muteStories = currentSettings.muteStories
+                    this.useDefaultDisablePinnedMessageNotifications = currentSettings.useDefaultDisablePinnedMessageNotifications
+                    this.disablePinnedMessageNotifications = currentSettings.disablePinnedMessageNotifications
+                    this.useDefaultDisableMentionNotifications = currentSettings.useDefaultDisableMentionNotifications
+                    this.disableMentionNotifications = currentSettings.disableMentionNotifications
+                }
                 this.useDefaultMuteFor = false
                 this.muteFor = muteForSeconds
             }
+        chatNotificationSettingsCache[chatId] = settings
         val req = TdApi.SetChatNotificationSettings(chatId, settings)
         client.send(req) { obj ->
             val success = obj is TdApi.Ok
-            scope.launch(Dispatchers.Main) {
-                onResult?.invoke(if (success) isMuted else !isMuted)
+            if (!success) {
+                val revertedMuted = !isMuted
+                persistChatMuted(chatId, revertedMuted)
+                scope.launch(Dispatchers.Main) {
+                    _chats.value =
+                        _chats.value.map {
+                            if (it.id == chatId) it.copy(isMuted = revertedMuted) else it
+                        }
+                    onResult?.invoke(revertedMuted)
+                }
+            } else {
+                scope.launch(Dispatchers.Main) {
+                    onResult?.invoke(isMuted)
+                }
             }
         }
     }
@@ -3700,6 +4139,9 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
     }
 
     fun logOut() {
+        synchronized(clientLock) {
+            reconnectPending = false
+        }
         tdClient?.send(TdApi.LogOut(), this)
     }
 
@@ -3739,6 +4181,14 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 val updateDraft = obj as TdApi.UpdateChatDraftMessage
                 val draftText = (updateDraft.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
                 handleChatDraftUpdated(updateDraft.chatId, draftText)
+            }
+            TdApi.UpdateChatNotificationSettings.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateChatNotificationSettings
+                handleChatNotificationSettingsUpdated(update.chatId, update.notificationSettings)
+            }
+            TdApi.UpdateScopeNotificationSettings.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateScopeNotificationSettings
+                handleScopeNotificationSettingsUpdated(update.scope, update.notificationSettings)
             }
             TdApi.UpdateNewMessage.CONSTRUCTOR -> {
                 val updateMsg = obj as TdApi.UpdateNewMessage
@@ -3803,6 +4253,15 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 isAuthQueryInProgress = false
                 val err = obj as TdApi.Error
                 com.teleflip.app.report.AdbReporter.reportError(tag, "TDLib Server Error [Code: ${err.code}]: ${err.message}")
+                val msg = err.message ?: ""
+                if (msg.contains("lock file", ignoreCase = true) || msg.contains("already in use", ignoreCase = true)) {
+                    com.teleflip.app.report.AdbReporter.reportWarning(tag, "Database lock contention detected. Attempting clean retry after release...")
+                    scope.launch(Dispatchers.IO) {
+                        delay(1500L)
+                        retryConnection()
+                    }
+                    return
+                }
                 when (val curr = _authState.value) {
                     is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitOtherDeviceConfirmation -> _authState.value = curr.copy(errorMessage = err.message)
@@ -3874,10 +4333,21 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 loadChats()
                 loadCurrentUser()
                 loadChatFolders()
+                loadScopeNotificationSettings()
             }
             TdApi.AuthorizationStateClosed.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "AuthorizationStateClosed received. Previous client released.")
+                val shouldRestart: Boolean
+                synchronized(clientLock) {
+                    tdClient = null
+                    isClosingClient = false
+                    shouldRestart = reconnectPending
+                    reconnectPending = false
+                }
                 _authState.value = AuthState.Initial
-                start()
+                if (shouldRestart) {
+                    start()
+                }
             }
         }
     }
@@ -4007,7 +4477,14 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
 
         val existingModel = _chats.value.find { it.id == chat.id }
         val isPinnedChat = existingModel?.isPinned ?: false
-        val isMutedChat = chat.notificationSettings?.muteFor != 0
+        chat.notificationSettings?.let {
+            chatNotificationSettingsCache[chat.id] = it
+        }
+        val isMutedChat =
+            chat.notificationSettings?.let {
+                isNotificationSettingsMuted(it, type)
+            } ?: (existingModel?.isMuted ?: getPersistedMutedChatIds().contains(chat.id.toString()))
+        persistChatMuted(chat.id, isMutedChat)
         val cloudDraft = (chat.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
         if (cloudDraft.isNotEmpty() && !chatDrafts.containsKey(chat.id)) {
             chatDrafts[chat.id] = cloudDraft
@@ -4172,8 +4649,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
 
         appendMessage(msg.chatId, model)
         if (!msg.isOutgoing && backgroundPushEnabled) {
-            val targetChat = _chats.value.find { it.id == msg.chatId }
-            if (targetChat?.isMuted != true) {
+            if (!isChatMuted(msg.chatId)) {
+                val targetChat = _chats.value.find { it.id == msg.chatId }
                 val chatTitle = targetChat?.title ?: "Telegram"
                 NotificationHelper.showIncomingMessageNotification(
                     context = context,
@@ -4219,6 +4696,10 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
 
     private fun handleFileUpdate(file: TdApi.File) {
         if (!file.local.isDownloadingCompleted || file.local.path.isBlank()) return
+
+        fileDownloadWaiters.remove(file.id)?.forEach { deferred ->
+            deferred.complete(file.local.path)
+        }
 
         synchronized(pendingChats) {
             for ((id, chat) in pendingChats) {
