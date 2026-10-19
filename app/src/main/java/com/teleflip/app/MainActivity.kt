@@ -2139,6 +2139,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
         tvPasscodeDots?.text = dots.toString()
+        val enteredCount = passcodeEntry.length
+        tvPasscodeDots?.contentDescription = "$enteredCount of $PASSCODE_PIN_LENGTH digits entered"
         if (passcodeEntry.isEmpty()) {
             tvPasscodeError?.text = ""
         }
@@ -2156,7 +2158,9 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             updatePasscodeDotsDisplay()
-            tvPasscodeError?.text = "Incorrect PIN. Try again."
+            val errorMsg = "Incorrect PIN. Try again."
+            tvPasscodeError?.text = errorMsg
+            tvPasscodeError?.announceForAccessibility(errorMsg)
         }
     }
 

@@ -56,6 +56,22 @@ class LayoutAccessibilityXmlTest {
         assertEquals("polite", liveRegion)
     }
 
+    @Test
+    fun testPasscodeLockLiveRegions() {
+        val file = getLayoutFile("view_passcode_lock.xml")
+        val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
+
+        val dotsNode = findNodeById(doc, "@+id/tv_passcode_dots")
+        assertNotNull("tv_passcode_dots should exist in view_passcode_lock.xml", dotsNode)
+        val dotsLiveRegion = dotsNode?.attributes?.getNamedItemNS(androidNs, "accessibilityLiveRegion")?.nodeValue
+        assertEquals("polite", dotsLiveRegion)
+
+        val errorNode = findNodeById(doc, "@+id/tv_passcode_error")
+        assertNotNull("tv_passcode_error should exist in view_passcode_lock.xml", errorNode)
+        val errorLiveRegion = errorNode?.attributes?.getNamedItemNS(androidNs, "accessibilityLiveRegion")?.nodeValue
+        assertEquals("assertive", errorLiveRegion)
+    }
+
     private fun findNodeById(
         node: org.w3c.dom.Node,
         targetId: String,
