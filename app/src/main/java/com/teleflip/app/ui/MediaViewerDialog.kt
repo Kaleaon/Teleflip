@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.VideoView
+import androidx.core.view.ViewCompat
 import coil.load
 import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
@@ -142,11 +143,15 @@ class MediaViewerDialog(
             vvVideo?.start()
             isVideoPlaying = true
             tvZoomBadge?.text = if (isLoopingGif) "GIF ▶" else "Playing ▶"
+            val playingDesc = context.getString(R.string.cd_video_state_playing)
+            vvVideo?.let { ViewCompat.setStateDescription(it, playingDesc) }
         }
         vvVideo?.setOnCompletionListener {
             if (!isLoopingGif) {
                 isVideoPlaying = false
                 tvZoomBadge?.text = "Ended ■"
+                val endedDesc = context.getString(R.string.cd_video_state_ended)
+                vvVideo?.let { ViewCompat.setStateDescription(it, endedDesc) }
             }
         }
         vvVideo?.setOnErrorListener { _, _, _ ->
@@ -211,6 +216,9 @@ class MediaViewerDialog(
         ivPhoto?.translationX = panX
         ivPhoto?.translationY = panY
         tvZoomBadge?.text = String.format(Locale.US, "%.1fx", zoomLevel)
+        val zoomDesc = ContentDescriptionFormatter.getZoomDescription(context, zoomLevel)
+        ivPhoto?.let { ViewCompat.setStateDescription(it, zoomDesc) }
+        tvZoomBadge?.let { ViewCompat.setStateDescription(it, zoomDesc) }
     }
 
     private fun toggleVideoPlayback() {
@@ -219,10 +227,14 @@ class MediaViewerDialog(
             vv.pause()
             isVideoPlaying = false
             tvZoomBadge?.text = "Paused ⏸"
+            val pausedDesc = context.getString(R.string.cd_video_state_paused)
+            ViewCompat.setStateDescription(vv, pausedDesc)
         } else {
             vv.start()
             isVideoPlaying = true
             tvZoomBadge?.text = "Playing ▶"
+            val playingDesc = context.getString(R.string.cd_video_state_playing)
+            ViewCompat.setStateDescription(vv, playingDesc)
         }
     }
 
