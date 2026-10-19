@@ -43,20 +43,22 @@ class MessageSearchTest {
 
         telegramManager = TelegramManager(mockContext)
 
-        val testChats = listOf(
-            ChatModel(1L, "Alice Smith", "Hello", "12:00", 0, ChatType.DIRECT, "AS"),
-            ChatModel(2L, "Team Channel", "Update", "12:05", 0, ChatType.CHANNEL, "TC")
-        )
+        val testChats =
+            listOf(
+                ChatModel(1L, "Alice Smith", "Hello", "12:00", 0, ChatType.DIRECT, "AS"),
+                ChatModel(2L, "Team Channel", "Update", "12:05", 0, ChatType.CHANNEL, "TC"),
+            )
         telegramManager.setChatsForTesting(testChats)
     }
 
     @Test
     fun testSearchMessagesOfflineTitleResolutionAndFallback() {
-        val testMessages = mapOf(
-            1L to listOf(MessageModel(101L, 1L, "Alice Smith", "hello from Alice", "12:00", false, MessageStatus.READ)),
-            2L to listOf(MessageModel(102L, 2L, "Team Channel", "hello team", "12:05", false, MessageStatus.READ)),
-            3L to listOf(MessageModel(103L, 3L, "Unknown User", "hello stranger", "12:10", false, MessageStatus.READ))
-        )
+        val testMessages =
+            mapOf(
+                1L to listOf(MessageModel(101L, 1L, "Alice Smith", "hello from Alice", "12:00", false, MessageStatus.READ)),
+                2L to listOf(MessageModel(102L, 2L, "Team Channel", "hello team", "12:05", false, MessageStatus.READ)),
+                3L to listOf(MessageModel(103L, 3L, "Unknown User", "hello stranger", "12:10", false, MessageStatus.READ)),
+            )
         telegramManager.setMessagesForTesting(testMessages)
 
         var searchResults: List<MessageSearchResult>? = null
@@ -75,10 +77,11 @@ class MessageSearchTest {
 
     @Test
     fun testSearchChatMessagesOfflineTitleResolutionAndFallback() {
-        val testMessages = mapOf(
-            1L to listOf(MessageModel(101L, 1L, "Alice Smith", "meeting at 5", "12:00", false, MessageStatus.READ)),
-            99L to listOf(MessageModel(102L, 99L, "Stranger", "meeting at 6", "12:05", false, MessageStatus.READ))
-        )
+        val testMessages =
+            mapOf(
+                1L to listOf(MessageModel(101L, 1L, "Alice Smith", "meeting at 5", "12:00", false, MessageStatus.READ)),
+                99L to listOf(MessageModel(102L, 99L, "Stranger", "meeting at 6", "12:05", false, MessageStatus.READ)),
+            )
         telegramManager.setMessagesForTesting(testMessages)
 
         var knownResults: List<MessageSearchResult>? = null
@@ -107,30 +110,34 @@ class MessageSearchTest {
             val req = invocation.getArgument<TdApi.Function<*>>(0)
             val handler = invocation.getArgument<Client.ResultHandler>(1)
             if (req is TdApi.SearchMessages) {
-                val foundMessages = TdApi.FoundMessages().apply {
-                    totalCount = 2
-                    nextOffset = ""
-                    messages = arrayOf(
-                        TdApi.Message().apply {
-                            id = 201L
-                            chatId = 1L
-                            date = 1600000000
-                            content = TdApi.MessageText().apply {
-                                text = TdApi.FormattedText("online search match 1", emptyArray())
-                            }
-                            isOutgoing = false
-                        },
-                        TdApi.Message().apply {
-                            id = 202L
-                            chatId = 888L
-                            date = 1600000000
-                            content = TdApi.MessageText().apply {
-                                text = TdApi.FormattedText("online search match 2", emptyArray())
-                            }
-                            isOutgoing = true
-                        }
-                    )
-                }
+                val foundMessages =
+                    TdApi.FoundMessages().apply {
+                        totalCount = 2
+                        nextOffset = ""
+                        messages =
+                            arrayOf(
+                                TdApi.Message().apply {
+                                    id = 201L
+                                    chatId = 1L
+                                    date = 1600000000
+                                    content =
+                                        TdApi.MessageText().apply {
+                                            text = TdApi.FormattedText("online search match 1", emptyArray())
+                                        }
+                                    isOutgoing = false
+                                },
+                                TdApi.Message().apply {
+                                    id = 202L
+                                    chatId = 888L
+                                    date = 1600000000
+                                    content =
+                                        TdApi.MessageText().apply {
+                                            text = TdApi.FormattedText("online search match 2", emptyArray())
+                                        }
+                                    isOutgoing = true
+                                },
+                            )
+                    }
                 handler.onResult(foundMessages)
             }
             null
@@ -159,20 +166,23 @@ class MessageSearchTest {
             val req = invocation.getArgument<TdApi.Function<*>>(0)
             val handler = invocation.getArgument<Client.ResultHandler>(1)
             if (req is TdApi.SearchChatMessages) {
-                val foundChatMessages = TdApi.FoundChatMessages().apply {
-                    totalCount = 1
-                    messages = arrayOf(
-                        TdApi.Message().apply {
-                            id = 301L
-                            chatId = req.chatId
-                            date = 1600000000
-                            content = TdApi.MessageText().apply {
-                                text = TdApi.FormattedText("in chat search match", emptyArray())
-                            }
-                            isOutgoing = false
-                        }
-                    )
-                }
+                val foundChatMessages =
+                    TdApi.FoundChatMessages().apply {
+                        totalCount = 1
+                        messages =
+                            arrayOf(
+                                TdApi.Message().apply {
+                                    id = 301L
+                                    chatId = req.chatId
+                                    date = 1600000000
+                                    content =
+                                        TdApi.MessageText().apply {
+                                            text = TdApi.FormattedText("in chat search match", emptyArray())
+                                        }
+                                    isOutgoing = false
+                                },
+                            )
+                    }
                 handler.onResult(foundChatMessages)
             }
             null
