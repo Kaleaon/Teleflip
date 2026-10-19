@@ -30,6 +30,10 @@ class MessageAdapter(
     private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
     private val customEmojiResolver: ((String) -> String?)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
+    companion object {
+        const val PAYLOAD_PLAYBACK_STATE = "PAYLOAD_PLAYBACK_STATE"
+    }
+
     private var playingMessageId: Long? = null
     private var currentSpeed: Float = 1.0f
 
@@ -41,17 +45,27 @@ class MessageAdapter(
         id: Long?,
         speed: Float = currentSpeed,
     ) {
+        val previousId = playingMessageId
         playingMessageId = id
         currentSpeed = speed
-        if (currentList.isNotEmpty()) {
-            notifyItemRangeChanged(0, currentList.size)
+
+        val previousPos = previousId?.let { getPositionForMessageId(it) } ?: -1
+        val currentPos = id?.let { getPositionForMessageId(it) } ?: -1
+
+        if (previousPos != -1) {
+            notifyItemChanged(previousPos, PAYLOAD_PLAYBACK_STATE)
+        }
+        if (currentPos != -1 && currentPos != previousPos) {
+            notifyItemChanged(currentPos, PAYLOAD_PLAYBACK_STATE)
         }
     }
 
     fun setPlaybackSpeed(speed: Float) {
         currentSpeed = speed
-        if (currentList.isNotEmpty()) {
-            notifyItemRangeChanged(0, currentList.size)
+        val activeId = playingMessageId ?: return
+        val activePos = getPositionForMessageId(activeId)
+        if (activePos != -1) {
+            notifyItemChanged(activePos, PAYLOAD_PLAYBACK_STATE)
         }
     }
 
@@ -78,6 +92,27 @@ class MessageAdapter(
         holder.bind(getItem(position))
     }
 
+    override fun onBindViewHolder(
+        holder: MessageViewHolder,
+        position: Int,
+        payloads: MutableList<Any>,
+    ) {
+        if (payloads.isEmpty()) {
+            super.onBindViewHolder(holder, position, payloads)
+        } else {
+            var handled = false
+            for (payload in payloads) {
+                if (payload == PAYLOAD_PLAYBACK_STATE) {
+                    holder.bindPlaybackState(getItem(position))
+                    handled = true
+                }
+            }
+            if (!handled) {
+                super.onBindViewHolder(holder, position, payloads)
+            }
+        }
+    }
+
     override fun onViewRecycled(holder: MessageViewHolder) {
         super.onViewRecycled(holder)
         holder.clearImage()
@@ -97,6 +132,16 @@ class MessageAdapter(
         private val tvReactions: TextView? = itemView.findViewById(R.id.tv_reactions)
         private val tvTime: TextView = itemView.findViewById(R.id.tv_message_time)
         private val tvStatus: TextView = itemView.findViewById(R.id.tv_read_status)
+
+        fun bindPlaybackState(message: MessageModel) {
+            if (message.mediaType == MediaType.VOICE) {
+                tvMedia.visibility = View.VISIBLE
+                val isPlaying = (playingMessageId == message.id)
+                val speedStr = String.format(Locale.US, "%.1fx", currentSpeed)
+                val icon = if (isPlaying) "⏸ Playing ($speedStr)" else "▶ Play (${message.durationSeconds}s)"
+                tvMedia.text = "🎤 [Voice Message] $icon"
+            }
+        }
 
         fun bind(message: MessageModel) {
             val context = itemView.context
