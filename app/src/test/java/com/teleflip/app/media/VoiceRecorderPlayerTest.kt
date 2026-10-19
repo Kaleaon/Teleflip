@@ -2,12 +2,16 @@ package com.teleflip.app.media
 
 import android.content.Context
 import android.media.MediaPlayer
+import android.media.MediaRecorder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import java.io.File
 
 class VoiceRecorderPlayerTest {
     @Test
@@ -18,6 +22,20 @@ class VoiceRecorderPlayerTest {
         // Ensure safe stop on non-playing instance does not throw exceptions
         player.stop()
         assertFalse("VoicePlayer should remain idle after stop", player.isPlayingPath("/fake/path.m4a"))
+    }
+
+    @Test
+    fun testVoicePlayerStopHaltsActiveSessionAndResetsState() {
+        val player = VoicePlayer(dummyContext())
+        val mockMediaPlayer = mock(MediaPlayer::class.java)
+        player.mediaPlayer = mockMediaPlayer
+
+        player.stop()
+
+        assertNull("VoicePlayer mediaPlayer should be null after stop", player.mediaPlayer)
+        assertFalse("VoicePlayer should not be playing any path after stop", player.isPlayingPath("/fake/path.m4a"))
+        verify(mockMediaPlayer).stop()
+        verify(mockMediaPlayer).release()
     }
 
     @Test
@@ -66,6 +84,30 @@ class VoiceRecorderPlayerTest {
         // Ensure cancelRecording on idle recorder executes without errors
         recorder.cancelRecording()
         assertFalse("VoiceRecorder should remain idle after cancel", recorder.isRecording())
+    }
+
+    @Test
+    fun testVoiceRecorderCancelRecordingHaltsActiveSessionAndResetsState() {
+        val recorder = VoiceRecorder(dummyContext())
+        val mockMediaRecorder = mock(MediaRecorder::class.java)
+        val tempFile = File.createTempFile("test_voice_recording", ".m4a")
+
+        recorder.recorder = mockMediaRecorder
+        recorder.currentFile = tempFile
+        recorder.isRecording = true
+
+        assertTrue("VoiceRecorder should be recording initially", recorder.isRecording())
+        assertTrue("Temp recording file should exist initially", tempFile.exists())
+
+        recorder.cancelRecording()
+
+        assertFalse("VoiceRecorder should not be recording after cancelRecording", recorder.isRecording())
+        assertNull("VoiceRecorder recorder should be null after cancelRecording", recorder.recorder)
+        assertNull("VoiceRecorder currentFile should be null after cancelRecording", recorder.currentFile)
+        assertFalse("Temp recording file should be deleted on cancelRecording", tempFile.exists())
+
+        verify(mockMediaRecorder).stop()
+        verify(mockMediaRecorder).release()
     }
 
     private fun dummyContext(): Context {
