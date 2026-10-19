@@ -96,6 +96,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingTargetMessageId: Long? = null
     private var callTimerJob: Job? = null
     private var callDurationSec: Int = 0
+    private var lastHandledCallId: Int? = null
 
     // Chat List State
     private var currentChatTypeFilter: ChatType? = null
@@ -204,9 +205,7 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         Screen.IN_CALL -> {
-                            telegramManager.activeCall.value?.let { call ->
-                                telegramManager.discardCall(call.callId, callDurationSec)
-                            }
+                            minimizeCall()
                         }
                         Screen.SETTINGS -> {
                             if (telegramManager.authState.value is AuthState.Ready) {
@@ -394,18 +393,27 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             telegramManager.activeCall.collectLatest { call ->
-                if (call != null) {
-                    if (currentScreen != Screen.IN_CALL) {
+                if (call != null && call.state != CallState.DISCARDED && call.state != CallState.ERROR) {
+                    if (currentScreen == Screen.IN_CALL) {
+                        updateInCallUI(call)
+                    } else if (lastHandledCallId != call.callId) {
+                        lastHandledCallId = call.callId
                         showInCallScreen(call)
                     } else {
-                        updateInCallUI(call)
+                        updateActiveCallOverlay()
                     }
-                } else if (currentScreen == Screen.IN_CALL) {
+                } else {
+                    lastHandledCallId = null
                     cleanupInCallAudio()
-                    if (activeChat != null) {
-                        openConversation(activeChat!!)
+                    updateActiveCallOverlay()
+                    if (currentScreen == Screen.IN_CALL) {
+                        if (activeChat != null) {
+                            openConversation(activeChat!!)
+                        } else {
+                            showChatListScreen()
+                        }
                     } else {
-                        showChatListScreen()
+                        restoreCurrentScreenSoftkeys()
                     }
                 }
             }
@@ -504,6 +512,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         applyChatFilterAndDebounce(currentChatTypeFilter)
+        updateActiveCallOverlay()
     }
 
     private fun isTabViewFocused(): Boolean {
@@ -673,6 +682,7 @@ class MainActivity : AppCompatActivity() {
     fun onDialogShown() {
         activeDialogCount++
         softkeyManager.setSoftkeyBarVisible(false)
+        updateActiveCallOverlay()
     }
 
     fun onDialogDismissed() {
@@ -681,6 +691,7 @@ class MainActivity : AppCompatActivity() {
             activeDialogCount = 0
             softkeyManager.setSoftkeyBarVisible(true)
         }
+        updateActiveCallOverlay()
     }
 
     private fun getFocusedOrTopChat(): ChatModel? {
@@ -1094,6 +1105,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         etComposeInput?.requestFocus()
+        updateActiveCallOverlay()
     }
 
     private var lastResendTimestamp = 0L
@@ -1213,6 +1225,7 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
+        updateActiveCallOverlay()
     }
 
     private fun handleMessageActionClick(msg: MessageModel) {
@@ -3754,6 +3767,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         etId.requestFocus()
+        updateActiveCallOverlay()
     }
 
     // =========================================================================
@@ -3763,6 +3777,8 @@ class MainActivity : AppCompatActivity() {
         commitActiveInputEngines()
         currentScreen = Screen.IN_CALL
         mainContainer.removeAllViews()
+
+        findViewById<View>(R.id.layout_active_call_overlay)?.visibility = View.GONE
 
         val view = LayoutInflater.from(this).inflate(R.layout.view_in_call, mainContainer, true)
         setupInCallAudio()
@@ -3797,6 +3813,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateInCallUI(call: ActiveCall) {
+        findViewById<View>(R.id.layout_active_call_overlay)?.visibility = View.GONE
         val tvStatus = findViewById<TextView>(R.id.tv_call_status) ?: return
         val tvMuteInd = findViewById<TextView>(R.id.tv_call_mute_indicator)
         val tvSpeakerInd = findViewById<TextView>(R.id.tv_call_speaker_indicator)
@@ -3849,11 +3866,11 @@ class MainActivity : AppCompatActivity() {
             )
         } else {
             softkeyManager.update(
-                left = if (call.isMuted) "Unmute" else "Mute",
-                center = if (call.isSpeakerOn) "Earpiece" else "Speaker",
+                left = "Minimize",
+                center = if (call.isMuted) "Unmute" else "Mute",
                 right = "End Call",
-                onLeft = { toggleInCallMute() },
-                onCenter = { toggleInCallSpeaker() },
+                onLeft = { minimizeCall() },
+                onCenter = { toggleInCallMute() },
                 onRight = { telegramManager.discardCall(call.callId, callDurationSec) },
             )
         }
@@ -3877,6 +3894,11 @@ class MainActivity : AppCompatActivity() {
         audioManager.isMicrophoneMute = newMute
         telegramManager.updateCallAudioState(isMuted = newMute)
         showToast(if (newMute) "Microphone Muted" else "Microphone Unmuted")
+        if (currentScreen == Screen.IN_CALL) {
+            telegramManager.activeCall.value?.let { updateInCallUI(it) }
+        } else {
+            updateActiveCallOverlay()
+        }
     }
 
     private fun toggleInCallSpeaker() {
@@ -3910,6 +3932,7 @@ class MainActivity : AppCompatActivity() {
                     telegramManager.updateCallDuration(callDurationSec)
                     val tvStatus = findViewById<TextView>(R.id.tv_call_status)
                     tvStatus?.text = "In Call • ${formatCallDuration(callDurationSec)}"
+                    updateActiveCallOverlay()
                 }
             }
     }
@@ -3923,6 +3946,87 @@ class MainActivity : AppCompatActivity() {
         val mins = seconds / 60
         val secs = seconds % 60
         return String.format(Locale.US, "%02d:%02d", mins, secs)
+    }
+
+    private fun minimizeCall() {
+        if (currentScreen == Screen.IN_CALL) {
+            if (activeChat != null) {
+                openConversation(activeChat!!)
+            } else {
+                showChatListScreen()
+            }
+        }
+    }
+
+    private fun returnToCall() {
+        val call = telegramManager.activeCall.value
+        if (call != null && call.state != CallState.DISCARDED && call.state != CallState.ERROR) {
+            showInCallScreen(call)
+        }
+    }
+
+    private fun updateActiveCallOverlay() {
+        val overlayView = findViewById<View>(R.id.layout_active_call_overlay) ?: return
+        val call = telegramManager.activeCall.value
+
+        if (call != null &&
+            call.state != CallState.DISCARDED &&
+            call.state != CallState.ERROR &&
+            currentScreen != Screen.IN_CALL &&
+            activeDialogCount <= 0 &&
+            currentScreen != Screen.PASSCODE_LOCK &&
+            currentScreen != Screen.LOGIN
+        ) {
+            overlayView.visibility = View.VISIBLE
+            val tvName = overlayView.findViewById<TextView>(R.id.tv_overlay_name)
+            val tvStatus = overlayView.findViewById<TextView>(R.id.tv_overlay_status)
+
+            tvName?.text = call.userName
+            val statusText =
+                when (call.state) {
+                    CallState.PENDING -> if (call.isOutgoing) "Calling..." else "Incoming Telegram Call..."
+                    CallState.EXCHANGING_KEYS -> "Exchanging encryption keys..."
+                    CallState.READY -> "In Call • ${formatCallDuration(callDurationSec)}"
+                    CallState.HANGING_UP -> "Hanging up..."
+                    CallState.DISCARDED -> "Call Ended"
+                    CallState.ERROR -> "Call Failed"
+                }
+            tvStatus?.text = statusText
+
+            overlayView.setOnClickListener {
+                returnToCall()
+            }
+
+            softkeyManager.update(
+                left = "Return to Call",
+                center = if (call.isMuted) "Unmute" else "Mute",
+                right = "End Call",
+                onLeft = { returnToCall() },
+                onCenter = { toggleInCallMute() },
+                onRight = { telegramManager.discardCall(call.callId, callDurationSec) },
+            )
+        } else {
+            overlayView.visibility = View.GONE
+        }
+    }
+
+    private fun restoreCurrentScreenSoftkeys() {
+        if (activeDialogCount > 0) return
+        when (currentScreen) {
+            Screen.CHAT_LIST -> {
+                showChatListScreen()
+            }
+            Screen.CONVERSATION -> {
+                activeChat?.let { restoreConversationSoftkeys(it) }
+            }
+            Screen.SETTINGS -> {
+                showSettingsScreen()
+            }
+            Screen.PROFILE -> {
+                activeChat?.let { showProfileScreen(it) }
+            }
+            else -> {}
+        }
     }
 
     // =========================================================================
@@ -4025,6 +4129,7 @@ class MainActivity : AppCompatActivity() {
                 }
             },
         )
+        updateActiveCallOverlay()
 
         telegramManager.loadChatProfile(chat.id) { profile ->
             tvTitle.text = profile.title
@@ -4143,13 +4248,17 @@ class MainActivity : AppCompatActivity() {
 
         // Dedicated Call button: Start call in direct chat or accept if incoming call
         if (keyCode == KeyEvent.KEYCODE_CALL && event.action == KeyEvent.ACTION_DOWN) {
-            if (currentScreen == Screen.IN_CALL) {
-                val call = telegramManager.activeCall.value
-                if (call != null && !call.isOutgoing && call.state == CallState.PENDING) {
+            val call = telegramManager.activeCall.value
+            if (call != null && call.state != CallState.DISCARDED && call.state != CallState.ERROR) {
+                if (!call.isOutgoing && call.state == CallState.PENDING) {
                     telegramManager.acceptCall(call.callId)
                     return true
+                } else if (currentScreen != Screen.IN_CALL) {
+                    returnToCall()
+                    return true
                 }
-            } else if (currentScreen == Screen.PROFILE) {
+            }
+            if (currentScreen == Screen.PROFILE) {
                 activeChat?.let { chat ->
                     if (chat.chatType == ChatType.DIRECT) {
                         val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
@@ -4173,11 +4282,9 @@ class MainActivity : AppCompatActivity() {
 
         // Dedicated End Call button
         if (keyCode == KeyEvent.KEYCODE_ENDCALL && event.action == KeyEvent.ACTION_DOWN) {
-            if (currentScreen == Screen.IN_CALL) {
-                telegramManager.activeCall.value?.let { call ->
-                    telegramManager.discardCall(call.callId, callDurationSec)
-                    return true
-                }
+            telegramManager.activeCall.value?.let { call ->
+                telegramManager.discardCall(call.callId, callDurationSec)
+                return true
             }
         }
 
