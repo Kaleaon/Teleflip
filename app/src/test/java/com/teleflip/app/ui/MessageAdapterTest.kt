@@ -28,51 +28,55 @@ class MessageAdapterTest {
     private lateinit var adapter: MessageAdapter
     private lateinit var mockObserver: RecyclerView.AdapterDataObserver
 
-    private val msg1Text = MessageModel(
-        id = 101L,
-        chatId = 1L,
-        senderName = "Alice",
-        text = "Hello world",
-        time = "10:00 AM",
-        isOutbound = false,
-        status = MessageStatus.READ,
-        mediaType = MediaType.NONE,
-    )
+    private val msg1Text =
+        MessageModel(
+            id = 101L,
+            chatId = 1L,
+            senderName = "Alice",
+            text = "Hello world",
+            time = "10:00 AM",
+            isOutbound = false,
+            status = MessageStatus.READ,
+            mediaType = MediaType.NONE,
+        )
 
-    private val msg2Voice = MessageModel(
-        id = 102L,
-        chatId = 1L,
-        senderName = "Bob",
-        text = "",
-        time = "10:01 AM",
-        isOutbound = false,
-        status = MessageStatus.READ,
-        mediaType = MediaType.VOICE,
-        durationSeconds = 15,
-    )
+    private val msg2Voice =
+        MessageModel(
+            id = 102L,
+            chatId = 1L,
+            senderName = "Bob",
+            text = "",
+            time = "10:01 AM",
+            isOutbound = false,
+            status = MessageStatus.READ,
+            mediaType = MediaType.VOICE,
+            durationSeconds = 15,
+        )
 
-    private val msg3Photo = MessageModel(
-        id = 103L,
-        chatId = 1L,
-        senderName = "Alice",
-        text = "Photo caption",
-        time = "10:02 AM",
-        isOutbound = false,
-        status = MessageStatus.READ,
-        mediaType = MediaType.PHOTO,
-    )
+    private val msg3Photo =
+        MessageModel(
+            id = 103L,
+            chatId = 1L,
+            senderName = "Alice",
+            text = "Photo caption",
+            time = "10:02 AM",
+            isOutbound = false,
+            status = MessageStatus.READ,
+            mediaType = MediaType.PHOTO,
+        )
 
-    private val msg4Voice = MessageModel(
-        id = 104L,
-        chatId = 1L,
-        senderName = "Bob",
-        text = "",
-        time = "10:03 AM",
-        isOutbound = false,
-        status = MessageStatus.READ,
-        mediaType = MediaType.VOICE,
-        durationSeconds = 30,
-    )
+    private val msg4Voice =
+        MessageModel(
+            id = 104L,
+            chatId = 1L,
+            senderName = "Bob",
+            text = "",
+            time = "10:03 AM",
+            isOutbound = false,
+            status = MessageStatus.READ,
+            mediaType = MediaType.VOICE,
+            durationSeconds = 30,
+        )
 
     @Before
     fun setUp() {
