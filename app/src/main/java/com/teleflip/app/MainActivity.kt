@@ -28,6 +28,9 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -91,6 +94,27 @@ class MainActivity : AppCompatActivity() {
     private lateinit var voicePlayer: VoicePlayer
     private lateinit var locationHelper: LocationHelper
 
+    private val photoPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "jpg", "Photo sent!") { id, path, caption ->
+                telegramManager.sendPhoto(id, path, caption)
+            }
+        }
+
+    private val videoPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "mp4", "Video sent!") { id, path, caption ->
+                telegramManager.sendVideo(id, path, 0, caption)
+            }
+        }
+
+    private val documentPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "bin", "File sent!") { id, path, caption ->
+                telegramManager.sendDocument(id, path, caption)
+            }
+        }
+
     private var currentScreen: Screen = Screen.CHAT_LIST
     private var activeChat: ChatModel? = null
     private var pendingTargetMessageId: Long? = null
@@ -136,9 +160,6 @@ class MainActivity : AppCompatActivity() {
         private const val REQ_AUDIO_PERM = 1001
         private const val REQ_LOC_PERM = 1002
         private const val REQ_PHONE_PERM = 1003
-        private const val REQ_PICK_PHOTO = 1004
-        private const val REQ_PICK_DOCUMENT = 1005
-        private const val REQ_PICK_VIDEO = 1006
         private const val BYTES_PER_MB = 1024 * 1024L
         private const val MUTE_1_HOUR_SEC = 3600
         private const val MUTE_8_HOURS_SEC = 28800
@@ -1610,7 +1631,7 @@ class MainActivity : AppCompatActivity() {
                             type = "video/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }
-                    startActivityForResult(intent, REQ_PICK_VIDEO)
+                    videoPickerLauncher.launch(intent)
                 } catch (e: Exception) {
                     showToast("System video picker unavailable", isError = true)
                 }
@@ -2531,7 +2552,11 @@ class MainActivity : AppCompatActivity() {
                             type = if (isPhoto) "image/*" else "*/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }
-                    startActivityForResult(intent, if (isPhoto) REQ_PICK_PHOTO else REQ_PICK_DOCUMENT)
+                    if (isPhoto) {
+                        photoPickerLauncher.launch(intent)
+                    } else {
+                        documentPickerLauncher.launch(intent)
+                    }
                 } catch (e: Exception) {
                     showToast("System file picker unavailable on this device", isError = true)
                 }
@@ -4316,24 +4341,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?,
+    private fun handlePickerResult(
+        result: ActivityResult,
+        ext: String,
+        successToast: String,
+        sendAction: (chatId: Long, path: String, caption: String) -> Unit,
     ) {
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != RESULT_OK || data?.data == null) return
-        val uri = data.data ?: return
+        if (result.resultCode != RESULT_OK || result.data?.data == null) return
+        val uri = result.data?.data ?: return
         val chat = activeChat ?: return
         try {
-            val ext =
-                when (requestCode) {
-                    REQ_PICK_PHOTO -> "jpg"
-                    REQ_PICK_VIDEO -> "mp4"
-                    else -> "bin"
-                }
             val tempFile = File(cacheDir, "upload_${System.currentTimeMillis()}.$ext")
             contentResolver.openInputStream(uri)?.use { input ->
                 tempFile.outputStream().use { output ->
@@ -4342,20 +4359,8 @@ class MainActivity : AppCompatActivity() {
             }
             if (tempFile.exists() && tempFile.length() > 0L) {
                 val caption = etComposeInput?.text?.toString()?.trim().orEmpty()
-                when (requestCode) {
-                    REQ_PICK_PHOTO -> {
-                        telegramManager.sendPhoto(chat.id, tempFile.absolutePath, caption)
-                        showToast("Photo sent!")
-                    }
-                    REQ_PICK_VIDEO -> {
-                        telegramManager.sendVideo(chat.id, tempFile.absolutePath, 0, caption)
-                        showToast("Video sent!")
-                    }
-                    else -> {
-                        telegramManager.sendDocument(chat.id, tempFile.absolutePath, caption)
-                        showToast("File sent!")
-                    }
-                }
+                sendAction(chat.id, tempFile.absolutePath, caption)
+                showToast(successToast)
                 if (caption.isNotEmpty()) {
                     etComposeInput?.setText("")
                 }
@@ -4382,9 +4387,5 @@ class MainActivity : AppCompatActivity() {
                 showLoginScreen(telegramManager.authState.value)
             }
         }
-    }
-
-    override fun onBackPressed() {
-        super.onBackPressed()
     }
 }
