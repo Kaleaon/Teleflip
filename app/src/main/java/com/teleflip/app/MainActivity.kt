@@ -35,6 +35,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.teleflip.app.export.ExportFormat
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.location.LocationHelper
 import com.teleflip.app.media.VoicePlayer
@@ -55,6 +56,7 @@ import com.teleflip.app.storage.StorageLocationType
 import com.teleflip.app.storage.StorageManager
 import com.teleflip.app.telegram.AuthState
 import com.teleflip.app.telegram.TelegramManager
+import com.teleflip.app.ui.ChatExportProgressDialog
 import com.teleflip.app.ui.ChatListAdapter
 import com.teleflip.app.ui.MediaViewerDialog
 import com.teleflip.app.ui.MenuOption
@@ -814,6 +816,11 @@ class MainActivity : AppCompatActivity() {
                     },
                 )
             }
+            options.add(
+                MenuOption(options.size + 1, "📥 Export Chat History") {
+                    showChatExportFormatDialog(focusedChat.id, focusedChat.title)
+                },
+            )
         }
 
         options.add(
@@ -838,6 +845,53 @@ class MainActivity : AppCompatActivity() {
             },
         )
         OptionsMenuDialog(this, "Chat Options", options).show()
+    }
+
+    private fun showChatExportFormatDialog(
+        chatId: Long,
+        chatTitle: String,
+    ) {
+        commitActiveInputEngines()
+        val options = listOf(
+            MenuOption(1, "📄 JSON Format (.json)") {
+                startChatExport(chatId, chatTitle, ExportFormat.JSON)
+            },
+            MenuOption(2, "🌐 HTML Format (.html)") {
+                startChatExport(chatId, chatTitle, ExportFormat.HTML)
+            },
+            MenuOption(3, "📦 Both Formats (JSON & HTML)") {
+                startChatExport(chatId, chatTitle, ExportFormat.BOTH)
+            },
+        )
+        OptionsMenuDialog(this, "Select Export Format", options).show()
+    }
+
+    private fun startChatExport(
+        chatId: Long,
+        chatTitle: String,
+        format: ExportFormat,
+    ) {
+        ChatExportProgressDialog(
+            context = this,
+            scope = lifecycleScope,
+            telegramManager = telegramManager,
+            chatId = chatId,
+            chatTitle = chatTitle,
+            format = format,
+            onCompleteCallback = { result ->
+                result.onSuccess { files ->
+                    val names = files.joinToString(", ") { it.name }
+                    val dirPath = files.firstOrNull()?.parent ?: ""
+                    showToast("Export completed! Saved $names to $dirPath")
+                }.onFailure { err ->
+                    if (err is java.util.concurrent.CancellationException) {
+                        showToast("Chat export cancelled")
+                    } else {
+                        showToast(err.message ?: "Chat export failed", isError = true)
+                    }
+                }
+            },
+        ).show()
     }
 
     private fun showSearchDialog() {
@@ -1564,6 +1618,11 @@ class MainActivity : AppCompatActivity() {
         options.add(
             MenuOption(options.size + 1, "🗑️ Clear Chat History") {
                 showClearChatHistoryDialog(chat)
+            },
+        )
+        options.add(
+            MenuOption(options.size + 1, "📥 Export Chat History") {
+                showChatExportFormatDialog(chat.id, chat.title)
             },
         )
         OptionsMenuDialog(this, "Attach & Actions", options).show()
@@ -3958,6 +4017,11 @@ class MainActivity : AppCompatActivity() {
         val btnSendMsg = view.findViewById<Button>(R.id.btn_profile_send_msg)
         val btnToggleMute = view.findViewById<Button>(R.id.btn_profile_toggle_mute)
         val btnSearch = view.findViewById<Button>(R.id.btn_profile_search)
+        val btnExportHistory = view.findViewById<Button>(R.id.btn_profile_export_history)
+
+        btnExportHistory?.setOnClickListener {
+            showChatExportFormatDialog(chat.id, chat.title)
+        }
 
         if (chat.chatType == ChatType.DIRECT) {
             btnSecretChat?.visibility = if (chat.isSecretChat) View.GONE else View.VISIBLE
