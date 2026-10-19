@@ -3457,7 +3457,7 @@ class MainActivity : AppCompatActivity() {
                         if (!activeList.isNullOrEmpty()) {
                             for (sub in activeList) {
                                 try {
-                                    @Suppress("MissingPermission")
+                                    @Suppress("MissingPermission", "NewApi")
                                     val raw = sm.getPhoneNumber(sub.subscriptionId)
                                     val formatted = cleanAndFormatPhoneNumber(raw)
                                     if (formatted != null) return formatted
@@ -3478,7 +3478,7 @@ class MainActivity : AppCompatActivity() {
 
                     // Fallback to DEFAULT_SUBSCRIPTION_ID on API 33+
                     try {
-                        @Suppress("MissingPermission")
+                        @Suppress("MissingPermission", "NewApi")
                         val raw = sm.getPhoneNumber(SubscriptionManager.DEFAULT_SUBSCRIPTION_ID)
                         val formatted = cleanAndFormatPhoneNumber(raw)
                         if (formatted != null) return formatted
