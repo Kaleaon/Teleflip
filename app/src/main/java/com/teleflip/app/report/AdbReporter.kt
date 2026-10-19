@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
+import java.io.RandomAccessFile
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -162,21 +163,89 @@ object AdbReporter {
         writeLog("FATAL CRASH", contextInfo, throwable.message ?: "null", throwable = throwable, bannerChar = '!', syncFlush = true)
     }
 
+    private const val BLOCK_SIZE = 4096
+
     @JvmStatic
     @JvmOverloads
     fun getRecentLogs(maxLines: Int = 30): List<String> {
+        if (maxLines <= 0) return emptyList()
         return try {
             flushSync()
-            val file = logFile
-            if (file != null && file.exists()) {
-                synchronized(fileLock) {
-                    file.readLines().takeLast(maxLines)
+            synchronized(fileLock) {
+                val file = logFile
+                if (file != null && file.exists() && file.length() > 0L) {
+                    val lines = readTailLines(file, maxLines)
+                    if (lines.isNotEmpty()) lines else listOf("No errors recorded.")
+                } else {
+                    listOf("No errors recorded.")
                 }
-            } else {
-                listOf("No errors recorded.")
             }
         } catch (e: Exception) {
             listOf("Error reading log: ${e.message}")
+        }
+    }
+
+    private fun readTailLines(
+        file: File,
+        maxLines: Int,
+    ): List<String> {
+        RandomAccessFile(file, "r").use { raf ->
+            val fileLength = raf.length()
+            if (fileLength == 0L) {
+                return emptyList()
+            }
+
+            raf.seek(fileLength - 1)
+            val lastByte = raf.readByte()
+            val targetNewlines = if (lastByte == '\n'.code.toByte()) maxLines + 1 else maxLines
+
+            var newlinesFound = 0
+            var targetNewlinePos = -1L
+            var currentPos = fileLength
+            val buffer = ByteArray(BLOCK_SIZE)
+
+            while (currentPos > 0 && newlinesFound < targetNewlines) {
+                val readSize = minOf(currentPos, BLOCK_SIZE.toLong()).toInt()
+                val blockStart = currentPos - readSize
+                raf.seek(blockStart)
+                var bytesRead = 0
+                while (bytesRead < readSize) {
+                    val r = raf.read(buffer, bytesRead, readSize - bytesRead)
+                    if (r <= 0) break
+                    bytesRead += r
+                }
+
+                for (i in bytesRead - 1 downTo 0) {
+                    if (buffer[i] == '\n'.code.toByte()) {
+                        newlinesFound++
+                        if (newlinesFound == targetNewlines) {
+                            targetNewlinePos = blockStart + i
+                            break
+                        }
+                    }
+                }
+
+                currentPos = blockStart
+            }
+
+            val startOffset = if (targetNewlinePos >= 0) targetNewlinePos + 1 else 0L
+            val bytesToRead = (fileLength - startOffset).toInt()
+            if (bytesToRead <= 0) {
+                return emptyList()
+            }
+
+            val tailBytes = ByteArray(bytesToRead)
+            raf.seek(startOffset)
+            var readTotal = 0
+            while (readTotal < bytesToRead) {
+                val r = raf.read(tailBytes, readTotal, bytesToRead - readTotal)
+                if (r <= 0) break
+                readTotal += r
+            }
+
+            val text = String(tailBytes, 0, readTotal, Charsets.UTF_8)
+            val lines = text.reader().readLines()
+            return if (lines.size > maxLines) lines.takeLast(maxLines) else lines
         }
     }
 
