@@ -17,12 +17,15 @@ import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.model.PollOption
+import com.teleflip.app.model.ProxyItem
+import com.teleflip.app.model.ProxyType
 import com.teleflip.app.model.SavedGifItem
 import com.teleflip.app.model.SessionModel
 import com.teleflip.app.model.StickerItem
 import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.model.UserProfileModel
 import com.teleflip.app.notifications.NotificationHelper
+import com.teleflip.app.storage.ProxyStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -273,6 +276,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     com.teleflip.app.report.AdbReporter.reportError(tag, "Client.create returned null")
                 } else {
                     tdClient = client
+                    applySavedProxy()
                 }
             } catch (e: Throwable) {
                 com.teleflip.app.report.AdbReporter.reportError(tag, "Client creation error: ${e.message}", e)
@@ -3414,12 +3418,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     }
 
     private fun handleConnectionState(state: TdApi.ConnectionState) {
+        val isProxyActive = getEnabledProxy() != null || activeProxyId != 0
         val label =
             when (state.constructor) {
-                TdApi.ConnectionStateConnecting.CONSTRUCTOR -> "Connecting..."
+                TdApi.ConnectionStateConnecting.CONSTRUCTOR -> if (isProxyActive) "Connecting via Proxy..." else "Connecting..."
                 TdApi.ConnectionStateConnectingToProxy.CONSTRUCTOR -> "Proxy..."
                 TdApi.ConnectionStateUpdating.CONSTRUCTOR -> "Updating..."
-                TdApi.ConnectionStateReady.CONSTRUCTOR -> "Online"
+                TdApi.ConnectionStateReady.CONSTRUCTOR -> if (isProxyActive) "Online via Proxy" else "Online"
                 else -> "Waiting for network"
             }
         _connectionState.value = label
@@ -3932,5 +3937,195 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     private fun formatTime(millis: Long): String {
         val df = SimpleDateFormat("HH:mm", Locale.getDefault())
         return df.format(Date(millis))
+    }
+
+    var activeProxyId: Int = 0
+
+    fun getProxies(): List<ProxyItem> {
+        return ProxyStorage.getProxies(context)
+    }
+
+    fun getEnabledProxy(): ProxyItem? {
+        return ProxyStorage.getEnabledProxy(context)
+    }
+
+    private fun buildTdApiProxy(proxyItem: ProxyItem): TdApi.Proxy {
+        val proxyType: TdApi.ProxyType =
+            when (proxyItem.type) {
+                ProxyType.SOCKS5 -> TdApi.ProxyTypeSocks5(proxyItem.username, proxyItem.password)
+                ProxyType.MTPROTO -> TdApi.ProxyTypeMtproto(proxyItem.secret)
+            }
+        return TdApi.Proxy(proxyItem.server, proxyItem.port, proxyType)
+    }
+
+    fun applySavedProxy() {
+        val enabledProxy = ProxyStorage.getEnabledProxy(context) ?: return
+        scope.launch {
+            try {
+                val tdProxy = buildTdApiProxy(enabledProxy)
+                val result = sendQuery(TdApi.AddProxy(tdProxy, true, ""))
+                if (result is TdApi.AddedProxy) {
+                    activeProxyId = result.id
+                    sendQuery(TdApi.EnableProxy(result.id))
+                    val updatedItem = enabledProxy.copy(id = result.id, isEnabled = true)
+                    ProxyStorage.saveProxy(context, updatedItem)
+                    com.teleflip.app.report.AdbReporter.reportInfo(
+                        tag,
+                        "Applied saved proxy id=${result.id} (${enabledProxy.server}:${enabledProxy.port})",
+                    )
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Failed to apply saved proxy: ${e.message}")
+            }
+        }
+    }
+
+    fun addProxy(
+        server: String,
+        port: Int,
+        type: ProxyType,
+        username: String = "",
+        password: String = "",
+        secret: String = "",
+        enableNow: Boolean = true,
+        callback: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val newItem =
+            ProxyItem(
+                server = server,
+                port = port,
+                type = type,
+                username = username,
+                password = password,
+                secret = secret,
+                isEnabled = enableNow,
+            )
+        val saved = ProxyStorage.saveProxy(context, newItem)
+
+        if (tdClient == null) {
+            callback?.invoke(true, "Proxy saved locally (client offline)")
+            return
+        }
+
+        scope.launch {
+            try {
+                val tdProxy = buildTdApiProxy(saved)
+                val addResult = sendQuery(TdApi.AddProxy(tdProxy, enableNow, ""))
+                if (addResult is TdApi.AddedProxy) {
+                    val realId = addResult.id
+                    val updatedSaved = saved.copy(id = realId, isEnabled = enableNow)
+                    ProxyStorage.saveProxy(context, updatedSaved)
+
+                    if (enableNow) {
+                        activeProxyId = realId
+                        sendQuery(TdApi.EnableProxy(realId))
+                        if (_connectionState.value == "Online" || _connectionState.value == "Connecting...") {
+                            _connectionState.value = "Online via Proxy"
+                        }
+                    }
+                    callback?.invoke(true, null)
+                } else {
+                    callback?.invoke(false, "Unexpected result from AddProxy")
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Error adding proxy: ${e.message}")
+                callback?.invoke(false, e.message ?: "Failed to add proxy")
+            }
+        }
+    }
+
+    fun enableProxy(
+        proxyId: Int,
+        callback: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        ProxyStorage.enableProxy(context, proxyId)
+        val item = ProxyStorage.getProxies(context).find { it.id == proxyId }
+        if (item == null) {
+            callback?.invoke(false, "Proxy not found")
+            return
+        }
+
+        if (tdClient == null) {
+            activeProxyId = proxyId
+            callback?.invoke(true, "Proxy enabled locally")
+            return
+        }
+
+        scope.launch {
+            try {
+                val tdProxy = buildTdApiProxy(item)
+                val addResult = sendQuery(TdApi.AddProxy(tdProxy, true, ""))
+                val realId = if (addResult is TdApi.AddedProxy) addResult.id else proxyId
+                val enableResult = sendQuery(TdApi.EnableProxy(realId))
+                if (enableResult is TdApi.Ok) {
+                    activeProxyId = realId
+                    if (_connectionState.value == "Online" || _connectionState.value == "Connecting...") {
+                        _connectionState.value = "Online via Proxy"
+                    }
+                    callback?.invoke(true, null)
+                } else {
+                    callback?.invoke(false, "Failed to enable proxy in TDLib")
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Error enabling proxy: ${e.message}")
+                callback?.invoke(false, e.message ?: "Failed to enable proxy")
+            }
+        }
+    }
+
+    fun disableProxy(callback: ((Boolean, String?) -> Unit)? = null) {
+        ProxyStorage.disableAllProxies(context)
+        activeProxyId = 0
+        if (_connectionState.value == "Online via Proxy") {
+            _connectionState.value = "Online"
+        }
+
+        if (tdClient == null) {
+            callback?.invoke(true, null)
+            return
+        }
+
+        scope.launch {
+            try {
+                val result = sendQuery(TdApi.DisableProxy())
+                if (result is TdApi.Ok) {
+                    callback?.invoke(true, null)
+                } else {
+                    callback?.invoke(false, "Failed to disable proxy")
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Error disabling proxy: ${e.message}")
+                callback?.invoke(false, e.message ?: "Failed to disable proxy")
+            }
+        }
+    }
+
+    fun deleteProxy(
+        proxyId: Int,
+        callback: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val item = ProxyStorage.getProxies(context).find { it.id == proxyId }
+        if (item?.isEnabled == true) {
+            disableProxy()
+        }
+        ProxyStorage.deleteProxy(context, proxyId)
+
+        if (tdClient == null) {
+            callback?.invoke(true, null)
+            return
+        }
+
+        scope.launch {
+            try {
+                val result = sendQuery(TdApi.RemoveProxy(proxyId))
+                if (result is TdApi.Ok) {
+                    callback?.invoke(true, null)
+                } else {
+                    callback?.invoke(true, null)
+                }
+            } catch (e: Exception) {
+                callback?.invoke(true, null)
+            }
+        }
     }
 }

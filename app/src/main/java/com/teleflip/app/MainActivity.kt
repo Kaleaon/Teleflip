@@ -3529,7 +3529,7 @@ class MainActivity : AppCompatActivity() {
                         if (!activeList.isNullOrEmpty()) {
                             for (sub in activeList) {
                                 try {
-                                    @Suppress("MissingPermission")
+                                    @Suppress("MissingPermission", "NewApi", "InlinedApi")
                                     val raw = sm.getPhoneNumber(sub.subscriptionId)
                                     val formatted = cleanAndFormatPhoneNumber(raw)
                                     if (formatted != null) return formatted
@@ -3550,7 +3550,7 @@ class MainActivity : AppCompatActivity() {
 
                     // Fallback to DEFAULT_SUBSCRIPTION_ID on API 33+
                     try {
-                        @Suppress("MissingPermission")
+                        @Suppress("MissingPermission", "NewApi", "InlinedApi")
                         val raw = sm.getPhoneNumber(SubscriptionManager.DEFAULT_SUBSCRIPTION_ID)
                         val formatted = cleanAndFormatPhoneNumber(raw)
                         if (formatted != null) return formatted
@@ -3666,6 +3666,7 @@ class MainActivity : AppCompatActivity() {
         val btnActiveSessions = view.findViewById<Button>(R.id.btn_active_sessions)
         val btnBlockedUsers = view.findViewById<Button>(R.id.btn_blocked_users)
         val btnPasscodeLock = view.findViewById<Button>(R.id.btn_passcode_lock)
+        val btnProxySettings = view.findViewById<Button>(R.id.btn_proxy_settings)
         val btnStorageLocation = view.findViewById<Button>(R.id.btn_storage_location)
         val btnAutoDownload = view.findViewById<Button>(R.id.btn_auto_download)
         val btnKeepMedia = view.findViewById<Button>(R.id.btn_keep_media)
@@ -3726,6 +3727,22 @@ class MainActivity : AppCompatActivity() {
             showPasscodeSettingsDialog {
                 updatePasscodeLabel()
             }
+        }
+
+        fun updateProxyLabel() {
+            val enabledProxy = telegramManager.getEnabledProxy()
+            btnProxySettings?.text =
+                if (enabledProxy != null) {
+                    "🌐 Proxy: [${enabledProxy.type.name}] ${enabledProxy.server}:${enabledProxy.port}"
+                } else {
+                    "🌐 Proxy Settings: Disabled"
+                }
+        }
+        updateProxyLabel()
+        btnProxySettings?.setOnClickListener {
+            com.teleflip.app.ui.ProxySettingsDialog(this, telegramManager, telegramManager.keypadTimeoutMs) {
+                updateProxyLabel()
+            }.show()
         }
 
         btnStorageLocation?.setOnClickListener { showStorageLocationDialog { updateStorageLabels() } }
