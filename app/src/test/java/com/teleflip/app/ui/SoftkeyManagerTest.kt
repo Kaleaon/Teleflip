@@ -3,7 +3,6 @@ package com.teleflip.app.ui
 import android.view.KeyEvent
 import android.widget.TextView
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
