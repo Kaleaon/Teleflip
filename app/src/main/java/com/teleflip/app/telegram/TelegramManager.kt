@@ -752,6 +752,44 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     chat
                 }
             }
+
+        val draftMessage =
+            if (trimmed.isNotEmpty()) {
+                TdApi.DraftMessage(
+                    null,
+                    (System.currentTimeMillis() / 1000).toInt(),
+                    TdApi.DraftMessageContentText(
+                        TdApi.FormattedText(trimmed, emptyArray()),
+                        null,
+                    ),
+                    0L,
+                    null,
+                )
+            } else {
+                null
+            }
+        val req = TdApi.SetChatDraftMessage(chatId, null, draftMessage)
+        tdClient?.send(req, this)
+    }
+
+    fun handleChatDraftUpdated(
+        chatId: Long,
+        draftText: String,
+    ) {
+        val trimmed = draftText.trim()
+        if (trimmed.isEmpty()) {
+            chatDrafts.remove(chatId)
+        } else {
+            chatDrafts[chatId] = trimmed
+        }
+        _chats.value =
+            _chats.value.map { chat ->
+                if (chat.id == chatId && chat.draftText != trimmed) {
+                    chat.copy(draftText = trimmed)
+                } else {
+                    chat
+                }
+            }
     }
 
     fun getChatDraft(chatId: Long): String = chatDrafts[chatId] ?: ""
@@ -3197,6 +3235,11 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 val updateLast = obj as TdApi.UpdateChatLastMessage
                 updateChatLastMessage(updateLast.chatId, updateLast.lastMessage)
             }
+            TdApi.UpdateChatDraftMessage.CONSTRUCTOR -> {
+                val updateDraft = obj as TdApi.UpdateChatDraftMessage
+                val draftText = (updateDraft.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
+                handleChatDraftUpdated(updateDraft.chatId, draftText)
+            }
             TdApi.UpdateNewMessage.CONSTRUCTOR -> {
                 val updateMsg = obj as TdApi.UpdateNewMessage
                 handleIncomingMessage(updateMsg.message)
@@ -3450,7 +3493,11 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val existingModel = _chats.value.find { it.id == chat.id }
         val isPinnedChat = existingModel?.isPinned ?: false
         val isMutedChat = chat.notificationSettings?.muteFor != 0
-        val draftStr = chatDrafts[chat.id] ?: ""
+        val cloudDraft = (chat.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
+        if (cloudDraft.isNotEmpty() && !chatDrafts.containsKey(chat.id)) {
+            chatDrafts[chat.id] = cloudDraft
+        }
+        val draftStr = chatDrafts[chat.id] ?: cloudDraft
 
         val newModel =
             ChatModel(

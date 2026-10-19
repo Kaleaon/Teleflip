@@ -7,12 +7,15 @@ import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
+import org.drinkless.tdlib.Client
+import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import org.mockito.Mockito.mock
 
@@ -129,6 +132,46 @@ class TelegramParityFeaturesTest {
 
         telegramManager.sendMessage(5L, "Working on reply...")
         assertEquals("", telegramManager.getChatDraft(5L))
+    }
+
+    @Test
+    fun testSaveAndClearChatDraftTriggersTdLibSync() {
+        val mockClient = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(mockClient)
+        val chat = ChatModel(5L, "Charlie", "Hello", "09:00", 2, ChatType.DIRECT, "CH")
+        telegramManager.setChatsForTesting(listOf(chat))
+
+        telegramManager.saveChatDraft(5L, "Working on reply...")
+        assertEquals("Working on reply...", telegramManager.getChatDraft(5L))
+
+        val captor = ArgumentCaptor.forClass(TdApi.SetChatDraftMessage::class.java)
+        Mockito.verify(mockClient).send(captor.capture(), Mockito.any())
+        assertEquals(5L, captor.value.chatId)
+        assertNotNull(captor.value.draftMessage)
+        val content = captor.value.draftMessage.content as TdApi.DraftMessageContentText
+        assertEquals("Working on reply...", content.text.text)
+
+        Mockito.reset(mockClient)
+        telegramManager.saveChatDraft(5L, "")
+        assertEquals("", telegramManager.getChatDraft(5L))
+        Mockito.verify(mockClient).send(captor.capture(), Mockito.any())
+        assertEquals(5L, captor.value.chatId)
+        org.junit.Assert.assertNull(captor.value.draftMessage)
+    }
+
+    @Test
+    fun testUpdateChatDraftMessageSyncsCloudDraftToLocal() {
+        val chat = ChatModel(5L, "Charlie", "Hello", "09:00", 2, ChatType.DIRECT, "CH")
+        telegramManager.setChatsForTesting(listOf(chat))
+
+        val content = TdApi.DraftMessageContentText(TdApi.FormattedText("Synced cloud draft", emptyArray()), null)
+        val draft = TdApi.DraftMessage(null, 12345, content, 0L, null)
+        val update = TdApi.UpdateChatDraftMessage(5L, draft, emptyArray())
+
+        telegramManager.onResult(update)
+
+        assertEquals("Synced cloud draft", telegramManager.getChatDraft(5L))
+        assertEquals("Synced cloud draft", telegramManager.chats.value.first().draftText)
     }
 
     @Test
