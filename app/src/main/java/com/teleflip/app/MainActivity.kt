@@ -3447,7 +3447,7 @@ class MainActivity : AppCompatActivity() {
         val sdkInt = Build.VERSION.SDK_INT
 
         // Branch 1: API Level 33 and newer (Android 13+ / TIRAMISU+)
-        if (sdkInt >= Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             try {
                 val sm = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
                 if (sm != null) {
