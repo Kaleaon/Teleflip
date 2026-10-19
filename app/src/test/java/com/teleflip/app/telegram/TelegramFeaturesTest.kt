@@ -34,7 +34,7 @@ class TelegramFeaturesTest {
                 isPremium = true
             }
 
-        telegramManager.handleUserUpdate(user)
+        telegramManager.updateUserCache(user)
 
         assertEquals("+15551234567", telegramManager.getUserPhoneNumber(555L))
         assertEquals(555L, telegramManager.getDirectChatUserId(555L))
@@ -70,7 +70,6 @@ class TelegramFeaturesTest {
         telegramManager.sendTypingAction(1L)
         telegramManager.cancelTypingAction(1L)
         telegramManager.loadSponsoredMessages(1L)
-        telegramManager.clickSponsoredMessage(1L, 999L)
         telegramManager.downloadFilePriority(123)
     }
 
@@ -170,19 +169,5 @@ class TelegramFeaturesTest {
         assertEquals(1L, profileLoaded?.chatId)
         assertEquals("Telegram News", profileLoaded?.title)
         assertEquals("Details unavailable", profileLoaded?.statusText)
-    }
-
-    @Test
-    fun testToggleChatMuteWithoutActiveClient() {
-        var toggledResult: Boolean? = null
-        telegramManager.toggleChatMute(1L, currentMuted = false) { newMuted ->
-            toggledResult = newMuted
-        }
-        assertEquals(false, toggledResult)
-
-        telegramManager.toggleChatMute(1L, currentMuted = true) { newMuted ->
-            toggledResult = newMuted
-        }
-        assertEquals(true, toggledResult)
     }
 }

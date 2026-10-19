@@ -107,11 +107,4 @@ class SoftkeyManagerTest {
         assertTrue(handled)
         assertTrue(centerClicked)
     }
-
-    @Test
-    @Suppress("DEPRECATION")
-    fun testHandleBack() {
-        val handled = softkeyManager.handleBack()
-        assertFalse(handled)
-    }
 }

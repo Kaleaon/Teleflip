@@ -80,11 +80,6 @@ class SoftkeyAndBackNavigationTest {
         val handled = softkeyManager.handleKeyEvent(KeyEvent.KEYCODE_BACK, event)
         assertFalse("KEYCODE_BACK should NOT be handled by SoftkeyManager", handled)
         assertFalse("KEYCODE_BACK should NOT trigger Right Softkey callback", rightTriggered)
-
-        @Suppress("DEPRECATION")
-        val backHandled = softkeyManager.handleBack()
-        assertFalse("handleBack() should return false and NOT trigger softkey callback", backHandled)
-        assertFalse("handleBack() should NOT trigger Right Softkey action", rightTriggered)
     }
 
     @Test
