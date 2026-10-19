@@ -16,6 +16,12 @@ import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import java.io.File
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MediaViewerDialog(
     context: Context,
@@ -23,6 +29,9 @@ class MediaViewerDialog(
     private val onSaveMedia: (MessageModel) -> Unit,
     private val onRequestDownload: (Int) -> Unit,
 ) : BaseDialog(context) {
+    private val dialogJob = SupervisorJob()
+    private val dialogScope = CoroutineScope(Dispatchers.Main + dialogJob)
+
     private var ivPhoto: ImageView? = null
     private var vvVideo: VideoView? = null
     private var tvZoomBadge: TextView? = null
@@ -106,16 +115,28 @@ class MediaViewerDialog(
             return
         }
 
-        val bmp = BitmapFactory.decodeFile(filePath)
-        if (bmp != null) {
-            ivPhoto?.setImageBitmap(bmp)
-            ivPhoto?.visibility = View.VISIBLE
-            tvStatus?.visibility = View.GONE
-            applyPhotoTransform()
-        } else {
-            ivPhoto?.visibility = View.GONE
-            tvStatus?.visibility = View.VISIBLE
-            tvStatus?.text = "Unable to decode photo file."
+        ivPhoto?.visibility = View.GONE
+        tvStatus?.visibility = View.VISIBLE
+        tvStatus?.text = "Loading photo..."
+
+        val displayMetrics = context.resources.displayMetrics
+        val reqWidth = displayMetrics.widthPixels
+        val reqHeight = displayMetrics.heightPixels
+
+        dialogScope.launch {
+            val bmp = withContext(Dispatchers.IO) {
+                decodeSampledBitmapFromFile(filePath, reqWidth, reqHeight)
+            }
+            if (bmp != null) {
+                ivPhoto?.setImageBitmap(bmp)
+                ivPhoto?.visibility = View.VISIBLE
+                tvStatus?.visibility = View.GONE
+                applyPhotoTransform()
+            } else {
+                ivPhoto?.visibility = View.GONE
+                tvStatus?.visibility = View.VISIBLE
+                tvStatus?.text = "Unable to decode photo file."
+            }
         }
     }
 
@@ -238,6 +259,7 @@ class MediaViewerDialog(
             vvVideo?.stopPlayback()
         } catch (_: Exception) {
         }
+        dialogJob.cancelChildren()
         super.onStop()
     }
 

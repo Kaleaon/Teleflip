@@ -129,4 +129,47 @@ class ImageExtensionsTest {
 
         assertEquals(View.GONE, imageView.visibility)
     }
+
+    @Test
+    fun calculateInSampleSize_withLargeImage_calculatesPowerOfTwo() {
+        val options = android.graphics.BitmapFactory.Options().apply {
+            outWidth = 2000
+            outHeight = 1000
+        }
+        val sampleSize = calculateInSampleSize(options, 500, 500)
+        assertEquals(2, sampleSize)
+    }
+
+    @Test
+    fun calculateInSampleSize_withSmallImage_returnsOne() {
+        val options = android.graphics.BitmapFactory.Options().apply {
+            outWidth = 400
+            outHeight = 300
+        }
+        val sampleSize = calculateInSampleSize(options, 800, 600)
+        assertEquals(1, sampleSize)
+    }
+
+    @Test
+    fun calculateInSampleSize_withZeroOrNegativeTarget_returnsOne() {
+        val options = android.graphics.BitmapFactory.Options().apply {
+            outWidth = 1000
+            outHeight = 1000
+        }
+        assertEquals(1, calculateInSampleSize(options, 0, 500))
+        assertEquals(1, calculateInSampleSize(options, 500, -10))
+    }
+
+    @Test
+    fun decodeSampledBitmapFromFile_withValidPath_returnsBitmap() {
+        val bmp = decodeSampledBitmapFromFile(sampleImagePath, 100, 100)
+        assertNotNull(bmp)
+    }
+
+    @Test
+    fun decodeSampledBitmapFromFile_withNonExistentPath_returnsNull() {
+        val invalidPath = File(tempFolder.root, "non_existent_image.png").absolutePath
+        val bmp = decodeSampledBitmapFromFile(invalidPath, 100, 100)
+        org.junit.Assert.assertNull(bmp)
+    }
 }
