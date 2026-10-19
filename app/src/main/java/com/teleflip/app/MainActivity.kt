@@ -258,11 +258,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        cancelActiveVoiceOperations()
         PasscodeManager.onAppBackgrounded()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        cancelActiveVoiceOperations()
         voiceRecorder.cancelRecording()
         voicePlayer.stop()
         cleanupInCallAudio()
@@ -1355,12 +1357,19 @@ class MainActivity : AppCompatActivity() {
         restoreConversationSoftkeys(chat)
     }
 
+    internal fun cancelActiveVoiceOperations(targetChat: ChatModel? = activeChat) {
+        if (voiceRecorder.isRecording()) {
+            voiceRecorder.cancelRecording()
+            layoutVoiceRecording?.visibility = View.GONE
+            layoutCompose?.visibility = View.VISIBLE
+            (targetChat ?: activeChat)?.let { restoreConversationSoftkeys(it) }
+        }
+        voicePlayer.stop()
+    }
+
     private fun cancelVoiceRecordingUI(chat: ChatModel) {
-        voiceRecorder.cancelRecording()
-        layoutVoiceRecording?.visibility = View.GONE
-        layoutCompose?.visibility = View.VISIBLE
+        cancelActiveVoiceOperations(chat)
         showToast("Recording discarded")
-        restoreConversationSoftkeys(chat)
     }
 
     private fun restoreConversationSoftkeys(chat: ChatModel) {
