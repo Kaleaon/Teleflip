@@ -13,6 +13,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -196,34 +197,61 @@ class MessageAdapter(
                     val speedStr = String.format(Locale.US, "%.1fx", currentSpeed)
                     val icon = if (isPlaying) "⏸ Playing ($speedStr)" else "▶ Play (${message.durationSeconds}s)"
                     tvMedia.text = "🎤 [Voice Message] $icon"
+
+                    val stateDesc =
+                        ContentDescriptionFormatter.getVoiceStateDescription(
+                            context,
+                            isPlaying,
+                            speedStr,
+                            message.durationSeconds,
+                        )
+                    ViewCompat.setStateDescription(tvMedia, stateDesc)
+                    tvMedia.contentDescription =
+                        ContentDescriptionFormatter.getVoiceMessageDescription(
+                            context, isPlaying, message.durationSeconds,
+                        )
                 }
                 MediaType.LOCATION -> {
+                    ViewCompat.setStateDescription(tvMedia, null)
+                    tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
                     tvMedia.text = "📍 [Location: ${String.format("%.4f, %.4f", message.latitude, message.longitude)}]"
                 }
                 MediaType.PHOTO -> {
+                    ViewCompat.setStateDescription(tvMedia, null)
+                    tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
                     tvMedia.text = if (message.mediaCaption.isNotBlank()) "📷 ${message.mediaCaption}" else "📷 [Photo • OK to Zoom]"
                 }
                 MediaType.DOCUMENT -> {
+                    ViewCompat.setStateDescription(tvMedia, null)
+                    tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
                     tvMedia.text = "📄 [File] ${message.mediaCaption}"
                 }
                 MediaType.STICKER -> {
+                    ViewCompat.setStateDescription(tvMedia, null)
+                    tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
                     val emoji = message.stickerEmoji.ifBlank { message.mediaCaption }
                     tvMedia.text = if (emoji.isNotBlank()) "🎨 [Sticker $emoji]" else "🎨 [Sticker]"
                 }
                 MediaType.VIDEO -> {
+                    ViewCompat.setStateDescription(tvMedia, null)
+                    tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
                     val dur = if (message.durationSeconds > 0) " (${message.durationSeconds}s)" else ""
                     tvMedia.text = "📹 [Video$dur] ▶ Press OK to Play"
                 }
                 MediaType.ANIMATION -> {
+                    ViewCompat.setStateDescription(tvMedia, null)
+                    tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
                     tvMedia.text = "🎞️ [GIF] ▶ Press OK to Play"
                 }
                 MediaType.POLL -> {
+                    ViewCompat.setStateDescription(tvMedia, null)
+                    tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
                     val statusTag =
                         if (message.pollIsClosed) {
@@ -236,6 +264,8 @@ class MessageAdapter(
                     tvMedia.text = "📊 [$statusTag • Press OK to Vote]"
                 }
                 MediaType.NONE -> {
+                    ViewCompat.setStateDescription(tvMedia, null)
+                    tvMedia.contentDescription = null
                     tvMedia.visibility = View.GONE
                 }
             }
