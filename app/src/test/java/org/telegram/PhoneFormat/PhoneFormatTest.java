@@ -68,4 +68,34 @@ public class PhoneFormatTest {
             assertEquals("+7 (912) 345-67-89", formattedRU);
         }
     }
+
+    @Test
+    public void testRuleSetFormatDirect() {
+        RuleSet ruleSet = new RuleSet();
+        ruleSet.matchLen = 3;
+
+        PhoneRule rule = new PhoneRule();
+        rule.minVal = 202;
+        rule.maxVal = 202;
+        rule.maxLen = 10;
+        rule.format = "(###) ###-####";
+
+        ruleSet.rules.add(rule);
+
+        // Matching number prefix "202"
+        String formatted = ruleSet.format("2025550123", null, null, false);
+        assertEquals("(202) 555-0123", formatted);
+
+        // Non-matching prefix "203"
+        String nonMatching = ruleSet.format("2035550123", null, null, false);
+        assertNull(nonMatching);
+
+        // String shorter than matchLen
+        String shortStr = ruleSet.format("20", null, null, false);
+        assertNull(shortStr);
+
+        // Prefix with leading non-digit character "+202" -> matchLen 3 slice "+20" parses to 20
+        String nonDigitPrefix = ruleSet.format("+2025550123", null, null, false);
+        assertNull(nonDigitPrefix);
+    }
 }
