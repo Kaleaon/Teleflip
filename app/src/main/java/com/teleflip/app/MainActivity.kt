@@ -1694,10 +1694,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCustomScheduleDelayDialog(chat: ChatModel) {
-        val input = android.widget.EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            hint = "Minutes (e.g. 15)"
-        }
+        val input =
+            android.widget.EditText(this).apply {
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                hint = "Minutes (e.g. 15)"
+            }
         androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("Schedule Delay (Minutes)")
             .setView(input)
@@ -3594,7 +3595,7 @@ class MainActivity : AppCompatActivity() {
         val sdkInt = Build.VERSION.SDK_INT
 
         // Branch 1: API Level 33 and newer (Android 13+ / TIRAMISU+)
-        if (sdkInt >= Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             try {
                 val sm = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
                 if (sm != null) {
