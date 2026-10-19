@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/bg_dark_card">
+
+    <TextView
+        android:id="@+id/tv_progress_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📥 Downloading Chat History"
+        android:textColor="@color/focus_highlight_gold"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:paddingBottom="6dp" />
+
+    <TextView
+        android:id="@+id/tv_progress_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Connecting to cloud..."
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:paddingBottom="10dp" />
+
+    <ProgressBar
+        android:id="@+id/pb_export_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="12dp"
+        android:max="100"
+        android:progress="0"
+        android:layout_marginBottom="12dp" />
+
+    <TextView
+        android:id="@+id/tv_progress_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="0 messages processed"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:paddingBottom="14dp" />
+
+    <Button
+        android:id="@+id/btn_cancel_progress"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:text="Cancel"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:background="@drawable/bg_button_selector" />
+</LinearLayout>
