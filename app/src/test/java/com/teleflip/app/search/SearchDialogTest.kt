@@ -2,22 +2,49 @@ package com.teleflip.app.search
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Looper
+import android.view.View
+import android.widget.EditText
+import android.widget.ProgressBar
+import android.widget.TextView
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.teleflip.app.R
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.telegram.TelegramManager
+import com.teleflip.app.ui.SearchDialog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
+import org.robolectric.Shadows
+import java.time.Duration
 
+@RunWith(AndroidJUnit4::class)
 class SearchDialogTest {
+
+    private fun <T> anyKotlin(): T {
+        org.mockito.Mockito.any<T>()
+        @Suppress("UNCHECKED_CAST")
+        return null as T
+    }
+
+    private fun <T> eqKotlin(obj: T): T {
+        org.mockito.Mockito.eq(obj)
+        @Suppress("UNCHECKED_CAST")
+        return null as T
+    }
+
     private fun createTelegramManager(): TelegramManager {
         val context = mock(Context::class.java)
         val prefs = mock(SharedPreferences::class.java)
@@ -139,5 +166,169 @@ class SearchDialogTest {
 
         assertNotNull(messageResults)
         assertTrue("Result count should be <= 50 entries", messageResults!!.size <= 50)
+    }
+
+    @Test
+    fun testSearchInputDebouncesBy300ms() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+        var searchCallCount = 0
+        var lastSearchQuery = ""
+
+        val tm = mock(TelegramManager::class.java)
+        doAnswer { invocation ->
+            searchCallCount++
+            lastSearchQuery = invocation.getArgument(0) as String
+            @Suppress("UNCHECKED_CAST")
+            val callback = invocation.getArgument(1) as (List<ChatModel>) -> Unit
+            callback(emptyList())
+            null
+        }.`when`(tm).searchChats(anyString(), anyKotlin())
+
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        input.setText("News")
+
+        // Before 300ms delay: no search should be dispatched
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200))
+        assertEquals("Search should not be dispatched before 300ms", 0, searchCallCount)
+
+        // After 300ms delay total: search should be dispatched
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(150))
+        assertEquals("Search should be dispatched after 300ms", 1, searchCallCount)
+        assertEquals("News", lastSearchQuery)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testRapidTypingCancelsPendingDebouncedJob() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+        val searchedQueries = mutableListOf<String>()
+
+        val tm = mock(TelegramManager::class.java)
+        doAnswer { invocation ->
+            val q = invocation.getArgument(0) as String
+            searchedQueries.add(q)
+            @Suppress("UNCHECKED_CAST")
+            val callback = invocation.getArgument(1) as (List<ChatModel>) -> Unit
+            callback(emptyList())
+            null
+        }.`when`(tm).searchChats(anyString(), anyKotlin())
+
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+
+        // Rapid keypresses
+        input.setText("N")
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+
+        input.setText("Ne")
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+
+        input.setText("News")
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+
+        // No queries dispatched yet
+        assertTrue("Intermediate queries should be debounced", searchedQueries.isEmpty())
+
+        // Wait until 300ms after last keypress
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(250))
+
+        assertEquals("Only final query should be dispatched", 1, searchedQueries.size)
+        assertEquals("News", searchedQueries.first())
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testStaleSearchResponsesAreDropped() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        var pendingCallback: ((List<ChatModel>) -> Unit)? = null
+        var secondCallback: ((List<ChatModel>) -> Unit)? = null
+
+        val tm = mock(TelegramManager::class.java)
+        doAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            pendingCallback = invocation.getArgument(1) as (List<ChatModel>) -> Unit
+            null
+        }.`when`(tm).searchChats(eqKotlin("Query1"), anyKotlin())
+
+        doAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            secondCallback = invocation.getArgument(1) as (List<ChatModel>) -> Unit
+            null
+        }.`when`(tm).searchChats(eqKotlin("Query2"), anyKotlin())
+
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val progressBar = dialog.findViewById<ProgressBar>(R.id.progress_search)
+
+        // First query
+        input.setText("Query1")
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(350))
+        assertNotNull("Callback for Query1 should be captured", pendingCallback)
+
+        // Second query before first callback returns
+        input.setText("Query2")
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(350))
+        assertNotNull("Callback for Query2 should be captured", secondCallback)
+
+        // Now invoke first (stale) callback
+        val staleResult = listOf(ChatModel(99L, "Stale Chat", "Old msg", "10:00", 0, ChatType.DIRECT, "SC"))
+        pendingCallback?.invoke(staleResult)
+
+        // Progress bar should still be visible because Query2 is active and hasn't finished
+        assertEquals(View.VISIBLE, progressBar.visibility)
+
+        // Now invoke second callback
+        val validResult = listOf(ChatModel(100L, "Valid Chat", "New msg", "10:05", 0, ChatType.DIRECT, "VC"))
+        secondCallback?.invoke(validResult)
+
+        // Progress bar should now be GONE
+        assertEquals(View.GONE, progressBar.visibility)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testClearingInputResetsResultsAndHidesSpinnerImmediately() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val progressBar = dialog.findViewById<ProgressBar>(R.id.progress_search)
+        val emptyLayout = dialog.findViewById<View>(R.id.layout_search_empty)
+        val emptyTitle = dialog.findViewById<TextView>(R.id.tv_search_empty_title)
+
+        // Type search term and wait for search to complete
+        input.setText("News")
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(350))
+
+        assertEquals(View.GONE, progressBar.visibility)
+        assertEquals(View.GONE, emptyLayout.visibility)
+
+        // Clear search input
+        input.setText("")
+
+        // Immediately (0ms delay) UI should reset
+        assertEquals(View.GONE, progressBar.visibility)
+        assertEquals(View.VISIBLE, emptyLayout.visibility)
+        assertEquals("Type a keyword to search", emptyTitle.text.toString())
+
+        dialog.dismiss()
     }
 }
