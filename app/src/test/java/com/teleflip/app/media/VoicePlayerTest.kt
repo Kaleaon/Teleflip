@@ -55,7 +55,6 @@ class VoicePlayerTest {
     @Test
     fun testVoicePlayerPlaybackParamsFallbackOnFailure() {
         val player = VoicePlayer(dummyContext())
-        player.sdkVersion = android.os.Build.VERSION_CODES.M
         val mockMediaPlayer = mock(MediaPlayer::class.java)
 
         // Simulate a failure when accessing/setting playbackParams

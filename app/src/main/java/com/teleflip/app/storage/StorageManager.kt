@@ -3,7 +3,6 @@ package com.teleflip.app.storage
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.Build
 import android.os.Environment
 import androidx.core.content.ContextCompat
 import java.io.File
@@ -241,19 +240,9 @@ object StorageManager {
 
     private fun isConnectedToWifi(context: Context): Boolean {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
-        val isWifi =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val caps = cm.activeNetwork?.let { cm.getNetworkCapabilities(it) }
-                caps != null &&
-                    (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
-            } else {
-                @Suppress("DEPRECATION")
-                val info = cm.activeNetworkInfo
-                @Suppress("DEPRECATION")
-                info != null && info.isConnected &&
-                    (info.type == ConnectivityManager.TYPE_WIFI || info.type == ConnectivityManager.TYPE_ETHERNET)
-            }
-        return isWifi
+        val caps = cm.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        return caps != null &&
+            (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
     }
 
     fun getKeepMediaDuration(context: Context): KeepMediaDuration {
