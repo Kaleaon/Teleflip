@@ -1,7 +1,10 @@
 package com.teleflip.app.ui
 
+import android.content.Context
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 
 class ContentDescriptionFormatterTest {
     private val avatarFormatPattern = "%1\$s's avatar"
@@ -95,5 +98,23 @@ class ContentDescriptionFormatterTest {
                 fallbackString = avatarFallback,
             )
         assertEquals(avatarFallback, result)
+    }
+
+    @Test
+    fun testVoiceStateAndZoomFormatting() {
+        val context = mock(Context::class.java)
+        `when`(context.getString(com.teleflip.app.R.string.cd_voice_state_playing, "1.5x"))
+            .thenReturn("Playing at 1.5x speed")
+        `when`(context.getString(com.teleflip.app.R.string.cd_voice_state_paused, 12))
+            .thenReturn("Paused at 12 seconds")
+        `when`(context.getString(com.teleflip.app.R.string.cd_voice_message_format, "Playing", 12))
+            .thenReturn("Voice message, Playing, 12 seconds")
+        `when`(context.getString(com.teleflip.app.R.string.cd_zoom_scale_format, "1.5x"))
+            .thenReturn("Zoom scale 1.5x")
+
+        assertEquals("Playing at 1.5x speed", ContentDescriptionFormatter.getVoiceStateDescription(context, true, "1.5x", 12))
+        assertEquals("Paused at 12 seconds", ContentDescriptionFormatter.getVoiceStateDescription(context, false, "1.5x", 12))
+        assertEquals("Voice message, Playing, 12 seconds", ContentDescriptionFormatter.getVoiceMessageDescription(context, true, 12))
+        assertEquals("Zoom scale 1.5x", ContentDescriptionFormatter.getZoomDescription(context, 1.5f))
     }
 }

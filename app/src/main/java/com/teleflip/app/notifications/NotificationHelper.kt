@@ -99,6 +99,17 @@ object NotificationHelper {
         }
     }
 
+    fun cancelMessageNotification(
+        context: Context,
+        chatId: Long,
+    ) {
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            nm.cancel(chatId.hashCode())
+        } catch (_: Throwable) {
+        }
+    }
+
     fun showIncomingCallNotification(
         context: Context,
         callId: Int,
