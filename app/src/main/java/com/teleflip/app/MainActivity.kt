@@ -1785,6 +1785,13 @@ class MainActivity : AppCompatActivity() {
                 },
             )
         }
+        val isMuted = telegramManager.isChatMuted(chat.id)
+        val muteLabel = if (isMuted) "🔔 Unmute Notifications" else "🔇 Mute Notifications..."
+        options.add(
+            MenuOption(options.size + 1, muteLabel) {
+                showChatMuteDialog(chat.id, isMuted, chat.title)
+            },
+        )
         options.add(
             MenuOption(options.size + 1, "👤 View Profile / Details") {
                 showProfileScreen(chat)

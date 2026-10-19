@@ -28,7 +28,10 @@ class TelegramParityFeaturesTest {
     fun setUp() {
         val context = mock(Context::class.java)
         val prefs = mock(SharedPreferences::class.java)
+        val editor = mock(SharedPreferences.Editor::class.java)
         Mockito.`when`(context.getSharedPreferences("teleflip_prefs", Context.MODE_PRIVATE)).thenReturn(prefs)
+        Mockito.`when`(prefs.edit()).thenReturn(editor)
+        Mockito.`when`(editor.putStringSet(Mockito.anyString(), Mockito.any())).thenReturn(editor)
         telegramManager = TelegramManager(context)
     }
 
