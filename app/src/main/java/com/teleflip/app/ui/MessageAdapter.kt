@@ -20,6 +20,7 @@ import java.util.Locale
 class MessageAdapter(
     private val onMessageFocused: ((MessageModel) -> Unit)? = null,
     private val onMessageAction: ((MessageModel) -> Unit)? = null,
+    private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     private var playingMessageId: Long? = null
     private var currentSpeed: Float = 1.0f
@@ -83,6 +84,8 @@ class MessageAdapter(
         private val tvMedia: TextView = itemView.findViewById(R.id.tv_media_indicator)
         private val ivPhoto: ImageView = itemView.findViewById(R.id.iv_message_photo)
         private val tvText: TextView = itemView.findViewById(R.id.tv_message_text)
+        private val btnTranscribe: TextView? = itemView.findViewById(R.id.btn_transcribe)
+        private val tvTranscript: TextView? = itemView.findViewById(R.id.tv_transcript)
         private val tvReactions: TextView? = itemView.findViewById(R.id.tv_reactions)
         private val tvTime: TextView = itemView.findViewById(R.id.tv_message_time)
         private val tvStatus: TextView = itemView.findViewById(R.id.tv_read_status)
@@ -232,6 +235,22 @@ class MessageAdapter(
             } else {
                 tvText.text = message.text
                 tvText.visibility = if (message.text.isNotBlank()) View.VISIBLE else View.GONE
+            }
+
+            if (message.mediaType == MediaType.VOICE) {
+                btnTranscribe?.visibility = View.VISIBLE
+                btnTranscribe?.setOnClickListener {
+                    onTranscribeClick?.invoke(message)
+                }
+                if (message.transcript.isNotBlank()) {
+                    tvTranscript?.visibility = View.VISIBLE
+                    tvTranscript?.text = "💬 ${message.transcript}"
+                } else {
+                    tvTranscript?.visibility = View.GONE
+                }
+            } else {
+                btnTranscribe?.visibility = View.GONE
+                tvTranscript?.visibility = View.GONE
             }
 
             if (message.reactions.isNotEmpty()) {

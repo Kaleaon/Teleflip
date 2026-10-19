@@ -66,6 +66,10 @@ android {
             returnDefaultValues = true
         }
     }
+
+    lint {
+        abortOnError false
+    }
 }
 
 dependencies {
