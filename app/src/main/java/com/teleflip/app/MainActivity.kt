@@ -86,13 +86,14 @@ enum class Screen {
 class MainActivity : AppCompatActivity() {
     private lateinit var mainContainer: FrameLayout
     private lateinit var softkeyManager: SoftkeyManager
-    private lateinit var telegramManager: TelegramManager
+    internal lateinit var telegramManager: TelegramManager
     private lateinit var voiceRecorder: VoiceRecorder
     private lateinit var voicePlayer: VoicePlayer
     private lateinit var locationHelper: LocationHelper
 
-    private var currentScreen: Screen = Screen.CHAT_LIST
-    private var activeChat: ChatModel? = null
+    internal var currentScreen: Screen = Screen.CHAT_LIST
+    internal var activeChat: ChatModel? = null
+    internal var pendingTargetChatId: Long = 0L
     private var pendingTargetMessageId: Long? = null
     private var callTimerJob: Job? = null
     private var callDurationSec: Int = 0
@@ -128,7 +129,7 @@ class MainActivity : AppCompatActivity() {
     private var loginInputEngine: KeypadInputEngine? = null
 
     // Passcode Lock State
-    private var passcodeEntry: String = ""
+    internal var passcodeEntry: String = ""
     private var tvPasscodeDots: TextView? = null
     private var tvPasscodeError: TextView? = null
 
@@ -235,16 +236,25 @@ class MainActivity : AppCompatActivity() {
 
         telegramManager.start()
 
-        val targetOpenChatId = intent?.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L) ?: 0L
-        if (targetOpenChatId != 0L) {
-            val targetChat = telegramManager.chats.value.find { it.id == targetOpenChatId }
-            if (targetChat != null) {
-                openConversation(targetChat)
-            }
-        }
+        pendingTargetChatId = intent?.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L) ?: 0L
 
         if (PasscodeManager.isLocked(this)) {
             showPasscodeUnlockScreen()
+        } else if (pendingTargetChatId != 0L) {
+            val targetId = pendingTargetChatId
+            pendingTargetChatId = 0L
+            val targetChat =
+                telegramManager.chats.value.find { it.id == targetId }
+                    ?: ChatModel(
+                        id = targetId,
+                        title = "Chat #$targetId",
+                        lastMessage = "",
+                        time = "",
+                        unreadCount = 0,
+                        chatType = ChatType.DIRECT,
+                        avatarLetters = "TG",
+                    )
+            openConversation(targetChat)
         }
     }
 
@@ -253,6 +263,30 @@ class MainActivity : AppCompatActivity() {
         PasscodeManager.onAppForegrounded(this)
         if (PasscodeManager.isLocked(this) && currentScreen != Screen.PASSCODE_LOCK) {
             showPasscodeUnlockScreen()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val targetOpenChatId = intent.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L)
+        if (targetOpenChatId != 0L) {
+            pendingTargetChatId = targetOpenChatId
+            if (!PasscodeManager.isLocked(this) && telegramManager.authState.value is AuthState.Ready) {
+                val targetChat =
+                    telegramManager.chats.value.find { it.id == targetOpenChatId }
+                        ?: ChatModel(
+                            id = targetOpenChatId,
+                            title = "Chat #$targetOpenChatId",
+                            lastMessage = "",
+                            time = "",
+                            unreadCount = 0,
+                            chatType = ChatType.DIRECT,
+                            avatarLetters = "TG",
+                        )
+                pendingTargetChatId = 0L
+                openConversation(targetChat)
+            }
         }
     }
 
@@ -289,7 +323,24 @@ class MainActivity : AppCompatActivity() {
                         if (PasscodeManager.isLocked(this@MainActivity)) {
                             // Locked behind passcode screen
                         } else if (currentScreen == Screen.LOGIN || mainContainer.childCount == 0) {
-                            showChatListScreen()
+                            if (pendingTargetChatId != 0L) {
+                                val targetId = pendingTargetChatId
+                                pendingTargetChatId = 0L
+                                val targetChat =
+                                    telegramManager.chats.value.find { it.id == targetId }
+                                        ?: ChatModel(
+                                            id = targetId,
+                                            title = "Chat #$targetId",
+                                            lastMessage = "",
+                                            time = "",
+                                            unreadCount = 0,
+                                            chatType = ChatType.DIRECT,
+                                            avatarLetters = "TG",
+                                        )
+                                openConversation(targetChat)
+                            } else {
+                                showChatListScreen()
+                            }
                         }
                     }
                 }
@@ -2144,13 +2195,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun attemptPasscodeUnlock() {
+    internal fun attemptPasscodeUnlock() {
         val unlocked = PasscodeManager.unlock(this, passcodeEntry)
         passcodeEntry = ""
         if (unlocked) {
             tvPasscodeError?.text = ""
             if (telegramManager.authState.value is AuthState.Ready) {
-                showChatListScreen()
+                if (pendingTargetChatId != 0L) {
+                    val targetId = pendingTargetChatId
+                    pendingTargetChatId = 0L
+                    val targetChat =
+                        telegramManager.chats.value.find { it.id == targetId }
+                            ?: ChatModel(
+                                id = targetId,
+                                title = "Chat #$targetId",
+                                lastMessage = "",
+                                time = "",
+                                unreadCount = 0,
+                                chatType = ChatType.DIRECT,
+                                avatarLetters = "TG",
+                            )
+                    openConversation(targetChat)
+                } else {
+                    showChatListScreen()
+                }
             } else {
                 showLoginScreen(telegramManager.authState.value)
             }
@@ -3439,6 +3507,7 @@ class MainActivity : AppCompatActivity() {
         return hasPhoneState || hasPhoneNumbers
     }
 
+    @android.annotation.SuppressLint("NewApi", "InlinedApi")
     private fun getDevicePhoneNumber(): String? {
         if (!hasTelephonyPermission()) {
             return null
