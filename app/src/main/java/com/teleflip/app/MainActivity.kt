@@ -316,6 +316,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
+            telegramManager.chatFolders.collectLatest { folders ->
+                if (currentScreen == Screen.CHAT_LIST) {
+                    val view = mainContainer.getChildAt(0)
+                    if (view != null) {
+                        renderChatFolderTabs(view, folders)
+                    }
+                }
+            }
+        }
+
+        lifecycleScope.launch {
             telegramManager.chats.collectLatest { chats ->
                 if (currentScreen == Screen.CONVERSATION && activeChat != null) {
                     val updatedActive = chats.find { it.id == activeChat?.id }
@@ -469,6 +480,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         setupTabs(view)
+        renderChatFolderTabs(view, telegramManager.chatFolders.value)
 
         softkeyManager.update(
             left = "Options",
@@ -508,10 +520,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun isTabViewFocused(): Boolean {
         val focusId = currentFocus?.id ?: return false
-        return focusId == R.id.tab_all || focusId == R.id.tab_direct ||
+        if (focusId == R.id.tab_all || focusId == R.id.tab_direct ||
             focusId == R.id.tab_groups || focusId == R.id.tab_channels ||
             focusId == R.id.tab_bots || focusId == R.id.tab_folders ||
             focusId == R.id.tab_archived
+        ) {
+            return true
+        }
+
+        return currentFocus?.tag == "dynamic_folder_tab"
     }
 
     private fun filterChatsForCurrentTab(allChats: List<ChatModel>): List<ChatModel> {
@@ -520,7 +537,15 @@ class MainActivity : AppCompatActivity() {
             isFoldersTabSelected -> {
                 val targetFolder = activeFolderFilter
                 if (!targetFolder.isNullOrBlank()) {
-                    allChats.filter { !it.isArchived && it.folderName.equals(targetFolder, ignoreCase = true) }
+                    val folderModel = telegramManager.chatFolders.value.find { it.title.equals(targetFolder, ignoreCase = true) }
+                    if (folderModel != null && folderModel.includedChatIds.isNotEmpty()) {
+                        allChats.filter {
+                            !it.isArchived &&
+                                (folderModel.includedChatIds.contains(it.id) || it.folderName.equals(targetFolder, ignoreCase = true))
+                        }
+                    } else {
+                        allChats.filter { !it.isArchived && it.folderName.equals(targetFolder, ignoreCase = true) }
+                    }
                 } else {
                     allChats.filter { !it.isArchived && it.folderName.isNotBlank() }
                 }
@@ -553,8 +578,19 @@ class MainActivity : AppCompatActivity() {
         tabGroups?.isSelected = (filter == ChatType.GROUP && !archivedMode && !foldersMode)
         tabChannels?.isSelected = (filter == ChatType.CHANNEL && !archivedMode && !foldersMode)
         tabBots?.isSelected = (filter == ChatType.BOT && !archivedMode && !foldersMode)
-        tabFolders?.isSelected = foldersMode
+        tabFolders?.isSelected = (foldersMode && activeFolderFilter.isNullOrBlank())
         tabArchived?.isSelected = archivedMode
+
+        val layoutTabs = findViewById<LinearLayout>(R.id.layout_tabs)
+        if (layoutTabs != null) {
+            for (i in 0 until layoutTabs.childCount) {
+                val child = layoutTabs.getChildAt(i)
+                if (child.tag == "dynamic_folder_tab" && child is TextView) {
+                    val folderTitle = child.text.toString().removePrefix("📁 ").trim()
+                    child.isSelected = (foldersMode && activeFolderFilter.equals(folderTitle, ignoreCase = true))
+                }
+            }
+        }
 
         tabFolders?.text = if (!activeFolderFilter.isNullOrBlank()) "📁 $activeFolderFilter" else "📁 Folders"
 
@@ -588,6 +624,99 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun dpToPx(dp: Int): Int {
+        return (dp * resources.displayMetrics.density).toInt()
+    }
+
+    private fun renderChatFolderTabs(
+        rootView: View,
+        folders: List<com.teleflip.app.model.ChatFolderModel>,
+    ) {
+        val layoutTabs = rootView.findViewById<LinearLayout>(R.id.layout_tabs) ?: return
+        val tabArchived = rootView.findViewById<View>(R.id.tab_archived) ?: return
+        val tabFolders = rootView.findViewById<View>(R.id.tab_folders)
+
+        for (i in layoutTabs.childCount - 1 downTo 0) {
+            val child = layoutTabs.getChildAt(i)
+            if (child.tag == "dynamic_folder_tab") {
+                layoutTabs.removeViewAt(i)
+            }
+        }
+
+        var insertIdx = layoutTabs.indexOfChild(tabArchived)
+        if (insertIdx < 0) insertIdx = layoutTabs.childCount
+
+        if (folders.isNotEmpty()) {
+            tabFolders?.visibility = View.GONE
+        } else {
+            tabFolders?.visibility = View.VISIBLE
+        }
+
+        folders.forEach { folder ->
+            val tabView =
+                TextView(this).apply {
+                    id = View.generateViewId()
+                    tag = "dynamic_folder_tab"
+                    text = "📁 ${folder.title}"
+                    setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+                    textSize = 13f
+                    gravity = android.view.Gravity.CENTER
+                    minWidth = dpToPx(48)
+                    minHeight = dpToPx(48)
+                    setPadding(dpToPx(12), dpToPx(4), dpToPx(12), dpToPx(4))
+                    background = ContextCompat.getDrawable(context, R.drawable.bg_tab_indicator)
+                    isFocusable = true
+                    isFocusableInTouchMode = true
+
+                    setOnClickListener {
+                        activeFolderFilter = folder.title
+                        applyChatFilterAndDebounce(null, foldersMode = true)
+                    }
+
+                    setOnFocusChangeListener { _, hasFocus ->
+                        if (hasFocus) {
+                            activeFolderFilter = folder.title
+                            applyChatFilterAndDebounce(null, foldersMode = true)
+                        }
+                    }
+                }
+
+            val lp =
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    marginEnd = dpToPx(6)
+                }
+
+            layoutTabs.addView(tabView, insertIdx, lp)
+            insertIdx++
+        }
+
+        relinkTabFocusChain(layoutTabs)
+    }
+
+    private fun relinkTabFocusChain(layoutTabs: LinearLayout) {
+        val visibleTabs = mutableListOf<View>()
+        for (i in 0 until layoutTabs.childCount) {
+            val child = layoutTabs.getChildAt(i)
+            if (child.visibility == View.VISIBLE) {
+                visibleTabs.add(child)
+            }
+        }
+        if (visibleTabs.isEmpty()) return
+
+        for (i in visibleTabs.indices) {
+            val current = visibleTabs[i]
+            val prev = visibleTabs[(i - 1 + visibleTabs.size) % visibleTabs.size]
+            val next = visibleTabs[(i + 1) % visibleTabs.size]
+
+            current.nextFocusLeftId = prev.id
+            current.nextFocusRightId = next.id
+            current.nextFocusDownId = R.id.rv_chats
+        }
+    }
+
     private fun setupTabs(rootView: View) {
         val tabAll = rootView.findViewById<TextView>(R.id.tab_all)
         val tabDirect = rootView.findViewById<TextView>(R.id.tab_direct)
@@ -597,21 +726,69 @@ class MainActivity : AppCompatActivity() {
         val tabFolders = rootView.findViewById<TextView>(R.id.tab_folders)
         val tabArchived = rootView.findViewById<TextView>(R.id.tab_archived)
 
-        tabAll?.setOnClickListener { applyChatFilterAndDebounce(null) }
-        tabDirect?.setOnClickListener { applyChatFilterAndDebounce(ChatType.DIRECT) }
-        tabGroups?.setOnClickListener { applyChatFilterAndDebounce(ChatType.GROUP) }
-        tabChannels?.setOnClickListener { applyChatFilterAndDebounce(ChatType.CHANNEL) }
-        tabBots?.setOnClickListener { applyChatFilterAndDebounce(ChatType.BOT) }
+        tabAll?.setOnClickListener {
+            activeFolderFilter = null
+            applyChatFilterAndDebounce(null)
+        }
+        tabDirect?.setOnClickListener {
+            activeFolderFilter = null
+            applyChatFilterAndDebounce(ChatType.DIRECT)
+        }
+        tabGroups?.setOnClickListener {
+            activeFolderFilter = null
+            applyChatFilterAndDebounce(ChatType.GROUP)
+        }
+        tabChannels?.setOnClickListener {
+            activeFolderFilter = null
+            applyChatFilterAndDebounce(ChatType.CHANNEL)
+        }
+        tabBots?.setOnClickListener {
+            activeFolderFilter = null
+            applyChatFilterAndDebounce(ChatType.BOT)
+        }
         tabFolders?.setOnClickListener { showFolderFilterMenu() }
-        tabArchived?.setOnClickListener { applyChatFilterAndDebounce(null, archivedMode = true) }
+        tabArchived?.setOnClickListener {
+            activeFolderFilter = null
+            applyChatFilterAndDebounce(null, archivedMode = true)
+        }
 
-        tabAll?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) applyChatFilterAndDebounce(null) }
-        tabDirect?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) applyChatFilterAndDebounce(ChatType.DIRECT) }
-        tabGroups?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) applyChatFilterAndDebounce(ChatType.GROUP) }
-        tabChannels?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) applyChatFilterAndDebounce(ChatType.CHANNEL) }
-        tabBots?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) applyChatFilterAndDebounce(ChatType.BOT) }
+        tabAll?.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                activeFolderFilter = null
+                applyChatFilterAndDebounce(null)
+            }
+        }
+        tabDirect?.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                activeFolderFilter = null
+                applyChatFilterAndDebounce(ChatType.DIRECT)
+            }
+        }
+        tabGroups?.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                activeFolderFilter = null
+                applyChatFilterAndDebounce(ChatType.GROUP)
+            }
+        }
+        tabChannels?.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                activeFolderFilter = null
+                applyChatFilterAndDebounce(ChatType.CHANNEL)
+            }
+        }
+        tabBots?.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                activeFolderFilter = null
+                applyChatFilterAndDebounce(ChatType.BOT)
+            }
+        }
         tabFolders?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) applyChatFilterAndDebounce(null, foldersMode = true) }
-        tabArchived?.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) applyChatFilterAndDebounce(null, archivedMode = true) }
+        tabArchived?.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                activeFolderFilter = null
+                applyChatFilterAndDebounce(null, archivedMode = true)
+            }
+        }
     }
 
     private fun showFolderFilterMenu() {
