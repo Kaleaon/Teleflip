@@ -7,9 +7,11 @@ import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
+import com.teleflip.app.model.ForumTopicModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -232,6 +234,51 @@ class TelegramParityFeaturesTest {
         assertTrue(chatAfterSelect.isForum)
         assertEquals(createdTopicId, chatAfterSelect.activeTopicId)
         assertEquals("Hardware Mods", chatAfterSelect.activeTopicName)
+    }
+
+    @Test
+    fun testForumTopicPinTogglingAndCacheOrdering() {
+        val chatId = 75L
+        telegramManager.setChatsForTesting(
+            listOf(ChatModel(chatId, "Tech Forum", "", "14:00", 0, ChatType.GROUP, "TF")),
+        )
+
+        var loadedTopics = emptyList<ForumTopicModel>()
+        telegramManager.loadForumTopics(chatId) { topics ->
+            loadedTopics = topics
+        }
+        assertEquals(3, loadedTopics.size)
+        assertFalse(loadedTopics.any { it.isPinned })
+
+        // Pin topic 102L ("Support & Q&A")
+        val targetTopicId = 102L
+        var pinResult = false
+        telegramManager.toggleForumTopicPin(chatId, targetTopicId, false) { isPinned ->
+            pinResult = isPinned
+        }
+        assertTrue(pinResult)
+
+        // Verify topic is pinned and sorted to top of cache
+        var updatedTopics = emptyList<ForumTopicModel>()
+        telegramManager.loadForumTopics(chatId) { topics ->
+            updatedTopics = topics
+        }
+        assertEquals(3, updatedTopics.size)
+        assertTrue(updatedTopics.first().isPinned)
+        assertEquals(targetTopicId, updatedTopics.first().topicId)
+
+        // Unpin topic and verify cache sorting
+        var unpinResult = true
+        telegramManager.toggleForumTopicPin(chatId, targetTopicId, true) { isPinned, errorMsg ->
+            unpinResult = isPinned
+            assertNull(errorMsg)
+        }
+        assertFalse(unpinResult)
+
+        telegramManager.loadForumTopics(chatId) { topics ->
+            updatedTopics = topics
+        }
+        assertFalse(updatedTopics.first().isPinned)
     }
 
     @Test
