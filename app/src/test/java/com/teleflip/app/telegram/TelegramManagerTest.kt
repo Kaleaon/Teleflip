@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
+import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -141,5 +142,71 @@ class TelegramManagerTest {
         // Wait briefly for coroutine scope to set Offline
         Thread.sleep(100)
         assertEquals("Offline", manager.connectionState.value)
+    }
+
+    @Test
+    fun testExtractStickerInfoNullOrNonStickerContent() {
+        val manager = TelegramManager(mockContext)
+
+        val nullResult = manager.extractStickerInfo(null)
+        assertEquals("", nullResult.first)
+        assertFalse(nullResult.second)
+
+        val textContent = TdApi.MessageText()
+        val textResult = manager.extractStickerInfo(textContent)
+        assertEquals("", textResult.first)
+        assertFalse(textResult.second)
+    }
+
+    @Test
+    fun testExtractStickerInfoStandardSticker() {
+        val manager = TelegramManager(mockContext)
+
+        val sticker = TdApi.Sticker()
+        sticker.emoji = "😀"
+        sticker.fullType = TdApi.StickerFullTypeRegular()
+
+        val content = TdApi.MessageSticker()
+        content.sticker = sticker
+
+        val result = manager.extractStickerInfo(content)
+        assertEquals("😀", result.first)
+        assertFalse("Standard sticker should not be premium", result.second)
+    }
+
+    @Test
+    fun testExtractStickerInfoPremiumSticker() {
+        val manager = TelegramManager(mockContext)
+
+        class StickerFullTypePremium : TdApi.StickerFullType() {
+            override fun getConstructor(): Int = 0
+        }
+
+        val sticker = TdApi.Sticker()
+        sticker.emoji = "🔥"
+        sticker.fullType = StickerFullTypePremium()
+
+        val content = TdApi.MessageSticker()
+        content.sticker = sticker
+
+        val result = manager.extractStickerInfo(content)
+        assertEquals("🔥", result.first)
+        assertTrue("Premium sticker should be detected as premium", result.second)
+    }
+
+    @Test
+    fun testExtractStickerInfoNullEmojiAndFullType() {
+        val manager = TelegramManager(mockContext)
+
+        val sticker = TdApi.Sticker()
+        sticker.emoji = null
+        sticker.fullType = null
+
+        val content = TdApi.MessageSticker()
+        content.sticker = sticker
+
+        val result = manager.extractStickerInfo(content)
+        assertEquals("", result.first)
+        assertFalse("Null fullType should safely evaluate isPremium to false", result.second)
     }
 }

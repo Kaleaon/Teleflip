@@ -17,12 +17,15 @@ import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.model.PollOption
+import com.teleflip.app.model.ProxyItem
+import com.teleflip.app.model.ProxyType
 import com.teleflip.app.model.SavedGifItem
 import com.teleflip.app.model.SessionModel
 import com.teleflip.app.model.StickerItem
 import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.model.UserProfileModel
 import com.teleflip.app.notifications.NotificationHelper
+import com.teleflip.app.storage.ProxyStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,6 +52,8 @@ sealed class AuthState {
     object WaitParameters : AuthState()
 
     data class WaitPhoneNumber(val errorMessage: String? = null) : AuthState()
+
+    data class WaitOtherDeviceConfirmation(val link: String = "", val errorMessage: String? = null) : AuthState()
 
     data class WaitCode(val info: String = "", val errorMessage: String? = null) : AuthState()
 
@@ -137,11 +142,15 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         _connectionState.value = state
     }
 
+    @androidx.annotation.VisibleForTesting
+    internal fun setChatFoldersForTesting(folders: List<ChatFolderModel>) {
+        _chatFolders.value = folders
+    }
+
     var chatBatchSize: Int = DEFAULT_CHAT_BATCH_SIZE
 
     companion object {
         const val DEFAULT_CHAT_BATCH_SIZE = 10
-
         @Volatile
         private var instance: TelegramManager? = null
 
@@ -159,6 +168,27 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         @androidx.annotation.VisibleForTesting
         internal fun setInstanceForTesting(manager: TelegramManager?) {
             instance = manager
+        }
+
+        private val customEmojiCache = java.util.concurrent.ConcurrentHashMap<String, StickerItem>()
+
+        fun registerCustomEmojiSticker(
+            key: String,
+            item: StickerItem,
+        ) {
+            customEmojiCache[key] = item
+        }
+
+        fun getCustomEmojiSticker(key: String): StickerItem? = customEmojiCache[key]
+
+        fun getCustomEmojiFilePath(key: String): String? {
+            val item = customEmojiCache[key] ?: return null
+            val path = item.filePath ?: return null
+            return if (File(path).exists()) path else null
+        }
+
+        fun clearCustomEmojiCache() {
+            customEmojiCache.clear()
         }
     }
 
@@ -300,6 +330,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                     com.teleflip.app.report.AdbReporter.reportError(tag, "Client.create returned null")
                 } else {
                     tdClient = client
+                    applySavedProxy()
                 }
             } catch (e: Throwable) {
                 com.teleflip.app.report.AdbReporter.reportError(tag, "Client creation error: ${e.message}", e)
@@ -360,6 +391,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                     val timeoutMsg = "Request timed out after 15 seconds. Please try again."
                     when (val curr = _authState.value) {
                         is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = timeoutMsg)
+                        is AuthState.WaitOtherDeviceConfirmation -> _authState.value = curr.copy(errorMessage = timeoutMsg)
                         is AuthState.WaitCode -> _authState.value = curr.copy(errorMessage = timeoutMsg)
                         is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = timeoutMsg)
                         else -> _authState.value = AuthState.Error(timeoutMsg)
@@ -382,6 +414,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         val msg = "Telegram client unavailable. Please check connection or tap Retry Connection."
         when (val curr = _authState.value) {
             is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = msg)
+            is AuthState.WaitOtherDeviceConfirmation -> _authState.value = curr.copy(errorMessage = msg)
             is AuthState.WaitCode -> _authState.value = curr.copy(errorMessage = msg)
             is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = msg)
             else -> _authState.value = AuthState.WaitPhoneNumber(errorMessage = msg)
@@ -410,6 +443,25 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 allowSmsRetrieverApi = false
             }
         tdClient?.send(TdApi.SetAuthenticationPhoneNumber(normalized, settings), this)
+    }
+
+    fun requestQrCodeLogin() {
+        if (isAuthQueryInProgress) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "requestQrCodeLogin ignored: authorization query already in flight")
+            return
+        }
+        if (!isClientActive()) {
+            handleClientUnavailable()
+            return
+        }
+        isAuthQueryInProgress = true
+        startAuthTimeoutSafeguard()
+        com.teleflip.app.report.AdbReporter.reportInfo(tag, "Requesting QR code authentication")
+        tdClient?.send(TdApi.RequestQrCodeAuthentication(longArrayOf()), this)
+    }
+
+    fun showPhoneNumberLogin() {
+        _authState.value = AuthState.WaitPhoneNumber()
     }
 
     fun checkCode(code: String) {
@@ -479,11 +531,30 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         tdClient?.send(TdApi.DeleteAccount("Account reset requested from login view", ""), this)
     }
 
+    internal fun createSendOptions(
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
+    ): TdApi.MessageSendOptions {
+        val effectiveSchedulingState =
+            if (schedulingState is TdApi.MessageSchedulingStateSendAtDate) {
+                val nowSec = (System.currentTimeMillis() / 1000).toInt()
+                if (schedulingState.sendDate <= nowSec) null else schedulingState
+            } else {
+                schedulingState
+            }
+        return TdApi.MessageSendOptions().apply {
+            this.disableNotification = disableNotification
+            this.schedulingState = effectiveSchedulingState
+        }
+    }
+
     fun sendMessage(
         chatId: Long,
         text: String,
         replyToMessageId: Long = 0L,
         replyToPreview: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         if (text.isBlank()) return
 
@@ -531,6 +602,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
             TdApi.SendMessage().apply {
                 this.chatId = chatId
                 this.inputMessageContent = content
+                this.options = createSendOptions(disableNotification, schedulingState)
                 if (replyToMessageId != 0L) {
                     applyReplyToMessageId(this, replyToMessageId)
                 }
@@ -645,9 +717,33 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
 
         val client = tdClient ?: return
         try {
-            val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeEmoji")
-            val reactionType = reactionTypeClass.getDeclaredConstructor().newInstance()
-            reactionTypeClass.getField("emoji").set(reactionType, emoji)
+            val reactionType =
+                if (emoji.startsWith("custom_emoji_")) {
+                    val customEmojiId = emoji.removePrefix("custom_emoji_").toLongOrNull() ?: 0L
+                    if (customEmojiId != 0L) {
+                        try {
+                            val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeCustomEmoji")
+                            val inst = reactionTypeClass.getDeclaredConstructor().newInstance()
+                            reactionTypeClass.getField("customEmojiId").setLong(inst, customEmojiId)
+                            inst
+                        } catch (_: Throwable) {
+                            val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeEmoji")
+                            val inst = reactionTypeClass.getDeclaredConstructor().newInstance()
+                            reactionTypeClass.getField("emoji").set(inst, emoji)
+                            inst
+                        }
+                    } else {
+                        val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeEmoji")
+                        val inst = reactionTypeClass.getDeclaredConstructor().newInstance()
+                        reactionTypeClass.getField("emoji").set(inst, emoji)
+                        inst
+                    }
+                } else {
+                    val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeEmoji")
+                    val inst = reactionTypeClass.getDeclaredConstructor().newInstance()
+                    reactionTypeClass.getField("emoji").set(inst, emoji)
+                    inst
+                }
 
             val funcClassName =
                 if (added) {
@@ -794,6 +890,44 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                     chat
                 }
             }
+
+        val draftMessage =
+            if (trimmed.isNotEmpty()) {
+                TdApi.DraftMessage(
+                    null,
+                    (System.currentTimeMillis() / 1000).toInt(),
+                    TdApi.DraftMessageContentText(
+                        TdApi.FormattedText(trimmed, emptyArray()),
+                        null,
+                    ),
+                    0L,
+                    null,
+                )
+            } else {
+                null
+            }
+        val req = TdApi.SetChatDraftMessage(chatId, null, draftMessage)
+        tdClient?.send(req, this)
+    }
+
+    fun handleChatDraftUpdated(
+        chatId: Long,
+        draftText: String,
+    ) {
+        val trimmed = draftText.trim()
+        if (trimmed.isEmpty()) {
+            chatDrafts.remove(chatId)
+        } else {
+            chatDrafts[chatId] = trimmed
+        }
+        _chats.value =
+            _chats.value.map { chat ->
+                if (chat.id == chatId && chat.draftText != trimmed) {
+                    chat.copy(draftText = trimmed)
+                } else {
+                    chat
+                }
+            }
     }
 
     fun getChatDraft(chatId: Long): String = chatDrafts[chatId] ?: ""
@@ -802,6 +936,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         chatId: Long,
         filePath: String,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val displayText = if (caption.isNotBlank()) "📷 [Photo] $caption" else "📷 [Photo]"
@@ -834,6 +970,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = photoContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
@@ -845,6 +982,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         chatId: Long,
         filePath: String,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val fileName = File(filePath).name.ifBlank { "Document" }
         val effectiveCaption = caption.ifBlank { fileName }
@@ -878,6 +1017,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = docContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
@@ -888,6 +1028,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
     fun sendStickerEmoji(
         chatId: Long,
         stickerEmoji: String,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         if (stickerEmoji.isBlank()) return
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
@@ -915,6 +1057,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
             TdApi.SendMessage().apply {
                 this.chatId = chatId
                 this.inputMessageContent = content
+                this.options = createSendOptions(disableNotification, schedulingState)
             }
         tdClient?.send(sendReq, this)
     }
@@ -923,6 +1066,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         chatId: Long,
         stickerFileId: Int,
         emoji: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val newMsg =
@@ -954,6 +1099,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = content
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(req, this)
         } catch (e: Exception) {
@@ -1006,6 +1152,122 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         }
     }
 
+    fun getCustomEmojiFilePath(key: String): String? = Companion.getCustomEmojiFilePath(key)
+
+    fun getCustomEmojiSticker(key: String): StickerItem? = Companion.getCustomEmojiSticker(key)
+
+    fun registerCustomEmojiSticker(
+        key: String,
+        item: StickerItem,
+    ) {
+        Companion.registerCustomEmojiSticker(key, item)
+    }
+
+    fun fetchCustomEmojiStickers(onResult: (List<StickerItem>) -> Unit) {
+        val client = tdClient
+        val resultList = mutableListOf<StickerItem>()
+
+        val defaults =
+            listOf(
+                StickerItem(fileId = 1001, emoji = "⭐", filePath = null, setName = "Custom Emoji 1001"),
+                StickerItem(fileId = 1002, emoji = "🚀", filePath = null, setName = "Custom Emoji 1002"),
+                StickerItem(fileId = 1003, emoji = "💎", filePath = null, setName = "Custom Emoji 1003"),
+                StickerItem(fileId = 1004, emoji = "⚡", filePath = null, setName = "Custom Emoji 1004"),
+                StickerItem(fileId = 1005, emoji = "🎉", filePath = null, setName = "Custom Emoji 1005"),
+            )
+        defaults.forEach { item ->
+            val key = "custom_emoji_${item.fileId}"
+            registerCustomEmojiSticker(key, item)
+        }
+
+        if (client == null) {
+            onResult(defaults)
+            return
+        }
+
+        try {
+            client.send(TdApi.GetRecentStickers(false)) { obj ->
+                if (obj is TdApi.Stickers) {
+                    obj.stickers.forEach { st ->
+                        val customEmojiId =
+                            if (st.fullType is TdApi.StickerFullTypeCustomEmoji) {
+                                (st.fullType as TdApi.StickerFullTypeCustomEmoji).customEmojiId
+                            } else {
+                                st.id
+                            }
+                        val item =
+                            StickerItem(
+                                fileId = st.sticker.id,
+                                emoji = if (st.emoji.isNotBlank()) st.emoji else "✨",
+                                filePath = if (st.sticker.local.isDownloadingCompleted) st.sticker.local.path else null,
+                                setName = "Custom Emoji $customEmojiId",
+                            )
+                        val key = "custom_emoji_$customEmojiId"
+                        registerCustomEmojiSticker(key, item)
+                        registerCustomEmojiSticker("custom_emoji_${st.sticker.id}", item)
+                        synchronized(resultList) {
+                            resultList.add(item)
+                        }
+                        if (!st.sticker.local.isDownloadingCompleted) {
+                            resolveFile(st.sticker)
+                        }
+                    }
+                }
+                client.send(TdApi.GetInstalledStickerSets(TdApi.StickerTypeCustomEmoji())) { setObj ->
+                    if (setObj is TdApi.StickerSets) {
+                        var pending = setObj.sets.size
+                        if (pending == 0) {
+                            val finalItems = (resultList + defaults).distinctBy { it.fileId }
+                            scope.launch(Dispatchers.Main) { onResult(finalItems) }
+                        } else {
+                            for (info in setObj.sets) {
+                                client.send(TdApi.GetStickerSet(info.id)) { set ->
+                                    if (set is TdApi.StickerSet) {
+                                        set.stickers.forEach { st ->
+                                            val customEmojiId =
+                                                if (st.fullType is TdApi.StickerFullTypeCustomEmoji) {
+                                                    (st.fullType as TdApi.StickerFullTypeCustomEmoji).customEmojiId
+                                                } else {
+                                                    st.id
+                                                }
+                                            val item =
+                                                StickerItem(
+                                                    fileId = st.sticker.id,
+                                                    emoji = if (st.emoji.isNotBlank()) st.emoji else "✨",
+                                                    filePath = if (st.sticker.local.isDownloadingCompleted) st.sticker.local.path else null,
+                                                    setName = set.title,
+                                                )
+                                            val key = "custom_emoji_$customEmojiId"
+                                            registerCustomEmojiSticker(key, item)
+                                            registerCustomEmojiSticker("custom_emoji_${st.sticker.id}", item)
+                                            synchronized(resultList) {
+                                                resultList.add(item)
+                                            }
+                                            if (!st.sticker.local.isDownloadingCompleted) {
+                                                resolveFile(st.sticker)
+                                            }
+                                        }
+                                    }
+                                    pending--
+                                    if (pending <= 0) {
+                                        val finalItems = (resultList + defaults).distinctBy { it.fileId }
+                                        scope.launch(Dispatchers.Main) { onResult(finalItems) }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        val finalItems = (resultList + defaults).distinctBy { it.fileId }
+                        scope.launch(Dispatchers.Main) { onResult(finalItems) }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to fetch custom emoji stickers: ${e.message}")
+            onResult(defaults)
+        }
+    }
+
     fun loadSavedGifs(onResult: (List<SavedGifItem>) -> Unit) {
         val client = tdClient
         if (client == null) {
@@ -1047,6 +1309,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         animFileId: Int,
         duration: Int = 0,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val display = if (caption.isNotBlank()) "🎞️ [GIF] $caption" else "🎞️ [GIF]"
@@ -1081,6 +1345,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = content
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(req, this)
         } catch (e: Exception) {
@@ -1093,6 +1358,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         filePath: String,
         durationSeconds: Int = 0,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val display = if (caption.isNotBlank()) "📹 [Video] $caption" else "📹 [Video]"
@@ -1127,6 +1394,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = videoContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
@@ -1138,6 +1406,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         chatId: Long,
         filePath: String,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val display = if (caption.isNotBlank()) "🎞️ [GIF] $caption" else "🎞️ [GIF]"
@@ -1170,6 +1440,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = animContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
@@ -1182,6 +1453,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         question: String,
         options: List<String>,
         isAnonymous: Boolean = true,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val trimmedQuestion = question.trim()
         val cleanOptions = options.map { it.trim() }.filter { it.isNotEmpty() }
@@ -1218,6 +1491,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = pollContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Throwable) {
@@ -1492,15 +1766,65 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
     ) {
         val cached = forumTopicsCache[chatId]
         if (cached != null && cached.isNotEmpty()) {
-            onResult(cached)
+            onResult(cached.sortedByDescending { it.isPinned })
             return
+        }
+        val client = tdClient
+        if (client != null) {
+            try {
+                val req =
+                    TdApi.GetForumTopics().apply {
+                        this.chatId = chatId
+                        this.query = ""
+                        this.offsetDate = 0
+                        this.offsetMessageId = 0
+                        this.offsetForumTopicId = 0
+                        this.limit = 100
+                    }
+                client.send(req) { obj ->
+                    val topicsList =
+                        if (obj is TdApi.ForumTopics) {
+                            obj.topics.map { topic ->
+                                ForumTopicModel(
+                                    topicId = topic.info.forumTopicId.toLong(),
+                                    name = topic.info.name,
+                                    unreadCount = topic.unreadCount,
+                                    iconEmoji = "💬",
+                                    isClosed = topic.info.isClosed,
+                                    isPinned = topic.isPinned,
+                                )
+                            }.sortedByDescending { it.isPinned }
+                        } else {
+                            null
+                        }
+
+                    scope.launch(Dispatchers.Main) {
+                        if (!topicsList.isNullOrEmpty()) {
+                            forumTopicsCache[chatId] = topicsList
+                            onResult(topicsList)
+                        } else {
+                            val defaultTopics =
+                                listOf(
+                                    ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
+                                    ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
+                                    ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
+                                ).sortedByDescending { it.isPinned }
+                            forumTopicsCache[chatId] = defaultTopics
+                            onResult(defaultTopics)
+                        }
+                    }
+                }
+                return
+            } catch (e: Exception) {
+                Log.w(tag, "loadForumTopics query failed: ${e.message}")
+            }
         }
         val defaultTopics =
             listOf(
                 ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
                 ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
                 ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
-            )
+            ).sortedByDescending { it.isPinned }
         forumTopicsCache[chatId] = defaultTopics
         onResult(defaultTopics)
     }
@@ -1520,10 +1844,81 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 iconEmoji = iconEmoji,
             )
         val existing = forumTopicsCache[chatId] ?: listOf(ForumTopicModel(0L, "General (All Messages)", 0, "💬"))
-        val updated = existing + newTopic
+        val updated = (existing + newTopic).sortedByDescending { it.isPinned }
         forumTopicsCache[chatId] = updated
         selectForumTopic(chatId, newTopic.topicId, newTopic.name)
         onResult(newTopic)
+    }
+
+    fun toggleForumTopicPin(
+        chatId: Long,
+        topicId: Long,
+        currentPinned: Boolean,
+        onResult: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val newPinned = !currentPinned
+        val existing =
+            forumTopicsCache[chatId] ?: listOf(
+                ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
+                ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
+                ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
+            )
+        val updated =
+            existing.map {
+                if (it.topicId == topicId) it.copy(isPinned = newPinned) else it
+            }.sortedByDescending { it.isPinned }
+        forumTopicsCache[chatId] = updated
+
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(newPinned, null)
+            return
+        }
+
+        try {
+            val req =
+                TdApi.ToggleForumTopicIsPinned().apply {
+                    this.chatId = chatId
+                    this.forumTopicId = topicId.toInt()
+                    this.isPinned = newPinned
+                }
+            client.send(req) { obj ->
+                if (obj is TdApi.Ok) {
+                    scope.launch(Dispatchers.Main) {
+                        onResult?.invoke(newPinned, null)
+                    }
+                } else {
+                    val errMsg = (obj as? TdApi.Error)?.message ?: "Failed to toggle topic pin"
+                    val reverted =
+                        existing.map {
+                            if (it.topicId == topicId) it.copy(isPinned = currentPinned) else it
+                        }.sortedByDescending { it.isPinned }
+                    forumTopicsCache[chatId] = reverted
+                    scope.launch(Dispatchers.Main) {
+                        onResult?.invoke(currentPinned, errMsg)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "toggleForumTopicPin failed: ${e.message}")
+            val reverted =
+                existing.map {
+                    if (it.topicId == topicId) it.copy(isPinned = currentPinned) else it
+                }.sortedByDescending { it.isPinned }
+            forumTopicsCache[chatId] = reverted
+            onResult?.invoke(currentPinned, e.message)
+        }
+    }
+
+    fun toggleForumTopicPin(
+        chatId: Long,
+        topicId: Long,
+        currentPinned: Boolean,
+        onResult: (Boolean) -> Unit,
+    ) {
+        toggleForumTopicPin(chatId, topicId, currentPinned) { isPinned, _ ->
+            onResult(isPinned)
+        }
     }
 
     fun selectForumTopic(
@@ -1853,6 +2248,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         chatId: Long,
         filePath: String,
         durationSeconds: Int,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val newMsg =
@@ -1887,10 +2284,56 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = voiceContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
             Log.e(tag, "Failed to send voice note via TDLib: ${e.message}")
+        }
+    }
+
+    fun recognizeSpeech(
+        chatId: Long,
+        messageId: Long,
+        onResult: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        scope.launch {
+            try {
+                val res = sendQuery(TdApi.RecognizeSpeech(chatId, messageId))
+                if (res is TdApi.Ok) {
+                    withContext(Dispatchers.Main) {
+                        onResult?.invoke(true, null)
+                    }
+                } else if (res is TdApi.Error) {
+                    val errMsg = res.message.ifBlank { "Speech recognition failed" }
+                    withContext(Dispatchers.Main) {
+                        onResult?.invoke(false, errMsg)
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        onResult?.invoke(false, "Speech recognition failed")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult?.invoke(false, e.message ?: "Speech recognition error")
+                }
+            }
+        }
+    }
+
+    fun updateMessageTranscript(
+        chatId: Long,
+        messageId: Long,
+        transcriptText: String,
+    ) {
+        val currentMap = _messages.value.toMutableMap()
+        val list = (currentMap[chatId] ?: return).toMutableList()
+        val idx = list.indexOfFirst { it.id == messageId }
+        if (idx >= 0) {
+            list[idx] = list[idx].copy(transcript = transcriptText)
+            currentMap[chatId] = list
+            _messages.value = currentMap
         }
     }
 
@@ -1899,6 +2342,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         latitude: Double,
         longitude: Double,
         accuracy: Float,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val latStr = String.format(Locale.US, "%.6f", latitude)
@@ -1934,11 +2379,12 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = locContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
 
             // Also send fallback text with Google Maps link for clients that don't render native geo points
-            sendMessage(chatId, "📍 Location link: $gmapsLink")
+            sendMessage(chatId, "📍 Location link: $gmapsLink", disableNotification = disableNotification, schedulingState = schedulingState)
         } catch (e: Exception) {
             Log.e(tag, "Failed to send location via TDLib: ${e.message}")
         }
@@ -2017,6 +2463,51 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
     fun loadMoreChats(step: Int = 20) {
         val currentCount = _chats.value.size
         tdClient?.send(TdApi.GetChats(TdApi.ChatListMain(), currentCount + step), this)
+    }
+
+    fun loadChatFolders() {
+        tdClient?.send(TdApi.GetChatFolder(0), this)
+    }
+
+    private fun handleUpdateChatFolders(chatFolderInfos: Array<TdApi.ChatFolderInfo>?) {
+        if (chatFolderInfos == null) return
+        val currentFolders = _chatFolders.value.toMutableList()
+        chatFolderInfos.forEach { info ->
+            val folderName = info.name?.text?.text.orEmpty()
+            if (folderName.isNotBlank()) {
+                val idx = currentFolders.indexOfFirst { it.id == info.id || it.title.equals(folderName, ignoreCase = true) }
+                if (idx < 0) {
+                    currentFolders.add(ChatFolderModel(id = info.id, title = folderName, includedChatIds = emptySet()))
+                }
+            }
+            tdClient?.send(TdApi.GetChatFolder(info.id), this)
+        }
+        _chatFolders.value = currentFolders
+    }
+
+    private fun handleChatFolderReceived(folder: TdApi.ChatFolder) {
+        val title = folder.name?.text?.text.orEmpty()
+        if (title.isBlank()) return
+        val includedSet = folder.includedChatIds?.toSet() ?: emptySet()
+        val currentFolders = _chatFolders.value.toMutableList()
+        val idx = currentFolders.indexOfFirst { it.title.equals(title, ignoreCase = true) }
+        if (idx >= 0) {
+            currentFolders[idx] = currentFolders[idx].copy(includedChatIds = includedSet)
+        } else {
+            currentFolders.add(ChatFolderModel(id = currentFolders.size + 1, title = title, includedChatIds = includedSet))
+        }
+        _chatFolders.value = currentFolders
+
+        if (includedSet.isNotEmpty()) {
+            _chats.value =
+                _chats.value.map { chat ->
+                    if (includedSet.contains(chat.id)) {
+                        chat.copy(folderName = title)
+                    } else {
+                        chat
+                    }
+                }
+        }
     }
 
     fun loadMessages(
@@ -2120,8 +2611,9 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         if (client == null) {
             val lowerQuery = trimmed.lowercase()
             val results = mutableListOf<MessageSearchResult>()
+            val chatTitleMap = _chats.value.associate { it.id to it.title }
             for ((cId, msgList) in _messages.value) {
-                val chatTitle = _chats.value.find { it.id == cId }?.title ?: "Chat #$cId"
+                val chatTitle = chatTitleMap[cId] ?: "Chat #$cId"
                 for (msg in msgList) {
                     if (msg.text.lowercase().contains(lowerQuery) || msg.mediaCaption.lowercase().contains(lowerQuery)) {
                         results.add(
@@ -2159,12 +2651,13 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 val nextOff = obj.nextOffset
                 val total = obj.totalCount
                 val list = mutableListOf<MessageSearchResult>()
+                val chatTitleMap = _chats.value.associate { it.id to it.title }
                 for (msg in obj.messages) {
                     val cId = msg.chatId
                     val mId = msg.id
                     val text = extractMessageText(msg.content)
                     val time = formatTime(msg.date.toLong() * 1000)
-                    val chatTitle = _chats.value.find { it.id == cId }?.title ?: "Chat #$cId"
+                    val chatTitle = chatTitleMap[cId] ?: "Chat #$cId"
                     val sender = if (msg.isOutgoing) "You" else "Contact"
 
                     list.add(
@@ -2220,6 +2713,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         if (client == null) {
             val lower = trimmed.lowercase()
             val localMsgs = _messages.value[chatId].orEmpty()
+            val chatTitleMap = _chats.value.associate { it.id to it.title }
+            val chatTitle = chatTitleMap[chatId] ?: "Chat"
             val matches =
                 localMsgs.filter {
                     it.text.lowercase().contains(lower) || it.mediaCaption.lowercase().contains(lower)
@@ -2227,7 +2722,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                     MessageSearchResult(
                         messageId = it.id,
                         chatId = it.chatId,
-                        chatTitle = _chats.value.find { c -> c.id == chatId }?.title ?: "Chat",
+                        chatTitle = chatTitle,
                         senderName = it.senderName,
                         text = it.text.ifBlank { it.mediaCaption },
                         time = it.time,
@@ -2250,7 +2745,8 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         client.send(req) { obj ->
             if (obj is TdApi.FoundChatMessages) {
                 val list = mutableListOf<MessageSearchResult>()
-                val chatTitle = _chats.value.find { it.id == chatId }?.title ?: "Chat"
+                val chatTitleMap = _chats.value.associate { it.id to it.title }
+                val chatTitle = chatTitleMap[chatId] ?: "Chat"
                 for (msg in obj.messages) {
                     val text = extractMessageText(msg.content)
                     val time = formatTime(msg.date.toLong() * 1000)
@@ -3239,6 +3735,11 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 val updateLast = obj as TdApi.UpdateChatLastMessage
                 updateChatLastMessage(updateLast.chatId, updateLast.lastMessage)
             }
+            TdApi.UpdateChatDraftMessage.CONSTRUCTOR -> {
+                val updateDraft = obj as TdApi.UpdateChatDraftMessage
+                val draftText = (updateDraft.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
+                handleChatDraftUpdated(updateDraft.chatId, draftText)
+            }
             TdApi.UpdateNewMessage.CONSTRUCTOR -> {
                 val updateMsg = obj as TdApi.UpdateNewMessage
                 handleIncomingMessage(updateMsg.message)
@@ -3268,6 +3769,14 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
             TdApi.Chat.CONSTRUCTOR -> {
                 addOrUpdateChat(obj as TdApi.Chat)
             }
+            TdApi.UpdateChatFolders.CONSTRUCTOR -> {
+                val updateFolders = obj as TdApi.UpdateChatFolders
+                handleUpdateChatFolders(updateFolders.chatFolders)
+            }
+            TdApi.ChatFolder.CONSTRUCTOR -> {
+                val folder = obj as TdApi.ChatFolder
+                handleChatFolderReceived(folder)
+            }
             TdApi.Messages.CONSTRUCTOR -> {
                 val msgs = (obj as TdApi.Messages).messages
                 handleMessagesList(msgs)
@@ -3296,6 +3805,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 com.teleflip.app.report.AdbReporter.reportError(tag, "TDLib Server Error [Code: ${err.code}]: ${err.message}")
                 when (val curr = _authState.value) {
                     is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = err.message)
+                    is AuthState.WaitOtherDeviceConfirmation -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitCode -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitPasswordRecoveryCode -> _authState.value = curr.copy(errorMessage = err.message)
@@ -3340,6 +3850,10 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
             TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR -> {
                 _authState.value = AuthState.WaitPhoneNumber()
             }
+            TdApi.AuthorizationStateWaitOtherDeviceConfirmation.CONSTRUCTOR -> {
+                val waitOther = state as TdApi.AuthorizationStateWaitOtherDeviceConfirmation
+                _authState.value = AuthState.WaitOtherDeviceConfirmation(link = waitOther.link ?: "")
+            }
             TdApi.AuthorizationStateWaitCode.CONSTRUCTOR -> {
                 _authState.value = AuthState.WaitCode()
             }
@@ -3359,6 +3873,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 _authState.value = AuthState.Ready
                 loadChats()
                 loadCurrentUser()
+                loadChatFolders()
             }
             TdApi.AuthorizationStateClosed.CONSTRUCTOR -> {
                 _authState.value = AuthState.Initial
@@ -3368,12 +3883,13 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
     }
 
     private fun handleConnectionState(state: TdApi.ConnectionState) {
+        val isProxyActive = getEnabledProxy() != null || activeProxyId != 0
         val label =
             when (state.constructor) {
-                TdApi.ConnectionStateConnecting.CONSTRUCTOR -> "Connecting..."
+                TdApi.ConnectionStateConnecting.CONSTRUCTOR -> if (isProxyActive) "Connecting via Proxy..." else "Connecting..."
                 TdApi.ConnectionStateConnectingToProxy.CONSTRUCTOR -> "Proxy..."
                 TdApi.ConnectionStateUpdating.CONSTRUCTOR -> "Updating..."
-                TdApi.ConnectionStateReady.CONSTRUCTOR -> "Online"
+                TdApi.ConnectionStateReady.CONSTRUCTOR -> if (isProxyActive) "Online via Proxy" else "Online"
                 else -> "Waiting for network"
             }
         _connectionState.value = label
@@ -3492,7 +4008,11 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         val existingModel = _chats.value.find { it.id == chat.id }
         val isPinnedChat = existingModel?.isPinned ?: false
         val isMutedChat = chat.notificationSettings?.muteFor != 0
-        val draftStr = chatDrafts[chat.id] ?: ""
+        val cloudDraft = (chat.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
+        if (cloudDraft.isNotEmpty() && !chatDrafts.containsKey(chat.id)) {
+            chatDrafts[chat.id] = cloudDraft
+        }
+        val draftStr = chatDrafts[chat.id] ?: cloudDraft
 
         val newModel =
             ChatModel(
@@ -3557,29 +4077,34 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         }
     }
 
-    private fun extractStickerInfo(content: TdApi.MessageContent?): Pair<String, Boolean> {
+    @androidx.annotation.VisibleForTesting
+    internal fun extractStickerInfo(content: TdApi.MessageContent?): Pair<String, Boolean> {
         if (content == null) return Pair("", false)
         if (content.constructor == TdApi.MessageSticker.CONSTRUCTOR) {
             val sticker = (content as TdApi.MessageSticker).sticker
             if (sticker != null) {
                 val emoji = sticker.emoji ?: ""
-                val isPremium =
-                    try {
-                        val field = sticker.javaClass.getField("isPremium")
-                        field.getBoolean(sticker)
-                    } catch (e: Throwable) {
-                        try {
-                            val fullTypeField = sticker.javaClass.getField("fullType")
-                            val fullTypeObj = fullTypeField.get(sticker)
-                            fullTypeObj != null && fullTypeObj.javaClass.simpleName.contains("Premium")
-                        } catch (ex: Throwable) {
-                            false
-                        }
-                    }
+                val isPremium = sticker.fullType?.javaClass?.simpleName?.contains("Premium") == true
                 return Pair(emoji, isPremium)
             }
         }
         return Pair("", false)
+    }
+
+    private fun extractVoiceTranscript(content: TdApi.MessageContent?): String {
+        if (content is TdApi.MessageVoiceNote) {
+            val result = content.voiceNote?.speechRecognitionResult ?: return ""
+            return when (result.constructor) {
+                TdApi.SpeechRecognitionResultText.CONSTRUCTOR -> {
+                    (result as TdApi.SpeechRecognitionResultText).text ?: ""
+                }
+                TdApi.SpeechRecognitionResultPending.CONSTRUCTOR -> {
+                    (result as TdApi.SpeechRecognitionResultPending).partialText ?: ""
+                }
+                else -> ""
+            }
+        }
+        return ""
     }
 
     private fun handleMessageContentUpdated(
@@ -3589,11 +4114,19 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
     ) {
         val newText = extractMessageText(newContent)
         val newCaption = extractMediaCaption(newContent)
+        val newTranscript = extractVoiceTranscript(newContent)
         val currentMap = _messages.value.toMutableMap()
         val list = (currentMap[chatId] ?: return).toMutableList()
         val idx = list.indexOfFirst { it.id == messageId }
         if (idx >= 0) {
-            list[idx] = list[idx].copy(text = newText, mediaCaption = newCaption, isEdited = true)
+            val old = list[idx]
+            list[idx] =
+                old.copy(
+                    text = if (newText.isNotBlank()) newText else old.text,
+                    mediaCaption = newCaption,
+                    transcript = if (newTranscript.isNotBlank()) newTranscript else old.transcript,
+                    isEdited = true,
+                )
             currentMap[chatId] = list
             _messages.value = currentMap
         }
@@ -3634,6 +4167,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 mediaFileId = mediaInfo.first,
                 stickerEmoji = stickerInfo.first,
                 isPremiumSticker = stickerInfo.second,
+                transcript = extractVoiceTranscript(msg.content),
             )
 
         appendMessage(msg.chatId, model)
@@ -3673,6 +4207,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                     mediaFileId = mediaInfo.first,
                     stickerEmoji = stickerInfo.first,
                     isPremiumSticker = stickerInfo.second,
+                    transcript = extractVoiceTranscript(msg.content),
                 )
             }
         val currentMap = _messages.value.toMutableMap()
@@ -3857,5 +4392,195 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
     private fun formatTime(millis: Long): String {
         val df = SimpleDateFormat("HH:mm", Locale.getDefault())
         return df.format(Date(millis))
+    }
+
+    var activeProxyId: Int = 0
+
+    fun getProxies(): List<ProxyItem> {
+        return ProxyStorage.getProxies(context)
+    }
+
+    fun getEnabledProxy(): ProxyItem? {
+        return ProxyStorage.getEnabledProxy(context)
+    }
+
+    private fun buildTdApiProxy(proxyItem: ProxyItem): TdApi.Proxy {
+        val proxyType: TdApi.ProxyType =
+            when (proxyItem.type) {
+                ProxyType.SOCKS5 -> TdApi.ProxyTypeSocks5(proxyItem.username, proxyItem.password)
+                ProxyType.MTPROTO -> TdApi.ProxyTypeMtproto(proxyItem.secret)
+            }
+        return TdApi.Proxy(proxyItem.server, proxyItem.port, proxyType)
+    }
+
+    fun applySavedProxy() {
+        val enabledProxy = ProxyStorage.getEnabledProxy(context) ?: return
+        scope.launch {
+            try {
+                val tdProxy = buildTdApiProxy(enabledProxy)
+                val result = sendQuery(TdApi.AddProxy(tdProxy, true, ""))
+                if (result is TdApi.AddedProxy) {
+                    activeProxyId = result.id
+                    sendQuery(TdApi.EnableProxy(result.id))
+                    val updatedItem = enabledProxy.copy(id = result.id, isEnabled = true)
+                    ProxyStorage.saveProxy(context, updatedItem)
+                    com.teleflip.app.report.AdbReporter.reportInfo(
+                        tag,
+                        "Applied saved proxy id=${result.id} (${enabledProxy.server}:${enabledProxy.port})",
+                    )
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Failed to apply saved proxy: ${e.message}")
+            }
+        }
+    }
+
+    fun addProxy(
+        server: String,
+        port: Int,
+        type: ProxyType,
+        username: String = "",
+        password: String = "",
+        secret: String = "",
+        enableNow: Boolean = true,
+        callback: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val newItem =
+            ProxyItem(
+                server = server,
+                port = port,
+                type = type,
+                username = username,
+                password = password,
+                secret = secret,
+                isEnabled = enableNow,
+            )
+        val saved = ProxyStorage.saveProxy(context, newItem)
+
+        if (tdClient == null) {
+            callback?.invoke(true, "Proxy saved locally (client offline)")
+            return
+        }
+
+        scope.launch {
+            try {
+                val tdProxy = buildTdApiProxy(saved)
+                val addResult = sendQuery(TdApi.AddProxy(tdProxy, enableNow, ""))
+                if (addResult is TdApi.AddedProxy) {
+                    val realId = addResult.id
+                    val updatedSaved = saved.copy(id = realId, isEnabled = enableNow)
+                    ProxyStorage.saveProxy(context, updatedSaved)
+
+                    if (enableNow) {
+                        activeProxyId = realId
+                        sendQuery(TdApi.EnableProxy(realId))
+                        if (_connectionState.value == "Online" || _connectionState.value == "Connecting...") {
+                            _connectionState.value = "Online via Proxy"
+                        }
+                    }
+                    callback?.invoke(true, null)
+                } else {
+                    callback?.invoke(false, "Unexpected result from AddProxy")
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Error adding proxy: ${e.message}")
+                callback?.invoke(false, e.message ?: "Failed to add proxy")
+            }
+        }
+    }
+
+    fun enableProxy(
+        proxyId: Int,
+        callback: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        ProxyStorage.enableProxy(context, proxyId)
+        val item = ProxyStorage.getProxies(context).find { it.id == proxyId }
+        if (item == null) {
+            callback?.invoke(false, "Proxy not found")
+            return
+        }
+
+        if (tdClient == null) {
+            activeProxyId = proxyId
+            callback?.invoke(true, "Proxy enabled locally")
+            return
+        }
+
+        scope.launch {
+            try {
+                val tdProxy = buildTdApiProxy(item)
+                val addResult = sendQuery(TdApi.AddProxy(tdProxy, true, ""))
+                val realId = if (addResult is TdApi.AddedProxy) addResult.id else proxyId
+                val enableResult = sendQuery(TdApi.EnableProxy(realId))
+                if (enableResult is TdApi.Ok) {
+                    activeProxyId = realId
+                    if (_connectionState.value == "Online" || _connectionState.value == "Connecting...") {
+                        _connectionState.value = "Online via Proxy"
+                    }
+                    callback?.invoke(true, null)
+                } else {
+                    callback?.invoke(false, "Failed to enable proxy in TDLib")
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Error enabling proxy: ${e.message}")
+                callback?.invoke(false, e.message ?: "Failed to enable proxy")
+            }
+        }
+    }
+
+    fun disableProxy(callback: ((Boolean, String?) -> Unit)? = null) {
+        ProxyStorage.disableAllProxies(context)
+        activeProxyId = 0
+        if (_connectionState.value == "Online via Proxy") {
+            _connectionState.value = "Online"
+        }
+
+        if (tdClient == null) {
+            callback?.invoke(true, null)
+            return
+        }
+
+        scope.launch {
+            try {
+                val result = sendQuery(TdApi.DisableProxy())
+                if (result is TdApi.Ok) {
+                    callback?.invoke(true, null)
+                } else {
+                    callback?.invoke(false, "Failed to disable proxy")
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Error disabling proxy: ${e.message}")
+                callback?.invoke(false, e.message ?: "Failed to disable proxy")
+            }
+        }
+    }
+
+    fun deleteProxy(
+        proxyId: Int,
+        callback: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val item = ProxyStorage.getProxies(context).find { it.id == proxyId }
+        if (item?.isEnabled == true) {
+            disableProxy()
+        }
+        ProxyStorage.deleteProxy(context, proxyId)
+
+        if (tdClient == null) {
+            callback?.invoke(true, null)
+            return
+        }
+
+        scope.launch {
+            try {
+                val result = sendQuery(TdApi.RemoveProxy(proxyId))
+                if (result is TdApi.Ok) {
+                    callback?.invoke(true, null)
+                } else {
+                    callback?.invoke(true, null)
+                }
+            } catch (e: Exception) {
+                callback?.invoke(true, null)
+            }
+        }
     }
 }
