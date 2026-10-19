@@ -35,7 +35,8 @@
             android:text="1.0x"
             android:textColor="@color/text_accent"
             android:textSize="12sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:accessibilityLiveRegion="polite" />
 
     </LinearLayout>
 
@@ -72,7 +73,8 @@
             android:textSize="14sp"
             android:gravity="center"
             android:padding="16dp"
-            android:visibility="gone" />
+            android:visibility="gone"
+            android:accessibilityLiveRegion="polite" />
 
     </FrameLayout>
 
