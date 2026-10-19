@@ -1,6 +1,5 @@
 package com.teleflip.app.input
 
-import android.annotation.SuppressLint
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -81,7 +80,6 @@ class KeypadInputEngine(
             },
         )
 
-        @SuppressLint("NewApi")
         val externalAccessibilityDelegate =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 editText.accessibilityDelegate

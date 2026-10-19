@@ -5,13 +5,23 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import java.io.File
+
+enum class PlayerState { IDLE, PLAYING, PAUSED, COMPLETED, ERROR }
 
 class VoicePlayer(private val context: Context) {
     private val tag = "VoicePlayer"
     internal var mediaPlayer: MediaPlayer? = null
     private var currentPlayingPath: String? = null
+
+    var currentState: PlayerState = PlayerState.IDLE
+        private set
+
+    private var progressRunnable: Runnable? = null
+    private var currentOnStateChanged: ((PlayerState) -> Unit)? = null
 
     var currentSpeed: Float = 1.0f
         private set
@@ -47,13 +57,57 @@ class VoicePlayer(private val context: Context) {
         }
     }
 
+    private fun getHandler(): Handler? {
+        return try {
+            val looper = Looper.getMainLooper()
+            if (looper != null) Handler(looper) else null
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun startProgressTimer(onProgress: ((currentMs: Int, totalMs: Int) -> Unit)?) {
+        stopProgressTimer()
+        if (onProgress == null) return
+        val h = getHandler() ?: return
+        val runnable =
+            object : Runnable {
+                override fun run() {
+                    val player = mediaPlayer
+                    if (player != null && player.isPlaying) {
+                        try {
+                            val current = player.currentPosition
+                            val total = player.duration
+                            onProgress.invoke(current, total)
+                        } catch (e: Exception) {
+                            Log.e(tag, "Error reading progress: ${e.message}")
+                        }
+                        getHandler()?.postDelayed(this, 500L)
+                    }
+                }
+            }
+        progressRunnable = runnable
+        h.post(runnable)
+    }
+
+    private fun stopProgressTimer() {
+        val runnable = progressRunnable
+        if (runnable != null) {
+            getHandler()?.removeCallbacks(runnable)
+            progressRunnable = null
+        }
+    }
+
     fun play(
         path: String,
+        onProgress: ((currentMs: Int, totalMs: Int) -> Unit)? = null,
+        onStateChanged: ((PlayerState) -> Unit)? = null,
         onError: (() -> Unit)? = null,
         onCompletion: () -> Unit,
     ): Boolean {
         try {
             stop()
+            currentOnStateChanged = onStateChanged
             val file = File(path)
             val player =
                 MediaPlayer().apply {
@@ -72,18 +126,29 @@ class VoicePlayer(private val context: Context) {
                         try {
                             mp.start()
                             applyPlaybackSpeed()
+                            currentState = PlayerState.PLAYING
+                            onStateChanged?.invoke(PlayerState.PLAYING)
+                            startProgressTimer(onProgress)
                         } catch (e: Exception) {
                             Log.e(tag, "Failed to start playback after prepare: ${e.message}")
+                            currentState = PlayerState.ERROR
+                            onStateChanged?.invoke(PlayerState.ERROR)
                             stop()
                             onError?.invoke()
                         }
                     }
                     setOnCompletionListener {
+                        stopProgressTimer()
                         currentPlayingPath = null
+                        currentState = PlayerState.COMPLETED
+                        onStateChanged?.invoke(PlayerState.COMPLETED)
                         onCompletion()
                     }
                     setOnErrorListener { _, what, extra ->
                         Log.e(tag, "MediaPlayer error: what=$what, extra=$extra")
+                        stopProgressTimer()
+                        currentState = PlayerState.ERROR
+                        onStateChanged?.invoke(PlayerState.ERROR)
                         stop()
                         onError?.invoke()
                         true
@@ -96,16 +161,40 @@ class VoicePlayer(private val context: Context) {
             return true
         } catch (e: Exception) {
             Log.e(tag, "Failed to initiate voice note playback: ${e.message}")
+            stopProgressTimer()
+            currentState = PlayerState.ERROR
+            onStateChanged?.invoke(PlayerState.ERROR)
             stop()
             onError?.invoke()
             return false
         }
     }
 
+    fun pause() {
+        val player = mediaPlayer
+        if (player != null && player.isPlaying) {
+            try {
+                player.pause()
+                stopProgressTimer()
+                currentState = PlayerState.PAUSED
+                currentOnStateChanged?.invoke(PlayerState.PAUSED)
+            } catch (e: Exception) {
+                Log.e(tag, "Error pausing mediaPlayer: ${e.message}")
+            }
+        }
+    }
+
     fun stop() {
+        stopProgressTimer()
         val player = mediaPlayer
         mediaPlayer = null
         currentPlayingPath = null
+
+        if (currentState != PlayerState.IDLE) {
+            currentState = PlayerState.IDLE
+            currentOnStateChanged?.invoke(PlayerState.IDLE)
+        }
+        currentOnStateChanged = null
 
         if (player != null) {
             try {
