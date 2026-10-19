@@ -104,6 +104,11 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     val chatDrafts = java.util.concurrent.ConcurrentHashMap<Long, String>()
     val forumTopicsCache = java.util.concurrent.ConcurrentHashMap<Long, List<ForumTopicModel>>()
     val groupMembersCache = java.util.concurrent.ConcurrentHashMap<Long, List<GroupMember>>()
+    val chatNotificationSettingsCache = java.util.concurrent.ConcurrentHashMap<Long, TdApi.ChatNotificationSettings>()
+    var scopePrivateChatsMuted = false
+    var scopeGroupChatsMuted = false
+    var scopeChannelChatsMuted = false
+    private val prefMutedChatsKey = "teleflip_muted_chat_ids"
 
     private val _chatFolders = MutableStateFlow<List<ChatFolderModel>>(emptyList())
     val chatFolders: StateFlow<List<ChatFolderModel>> = _chatFolders.asStateFlow()
@@ -3466,7 +3471,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 val avatarPath = chatModel?.avatarPath
                 val avatarLetters = chatModel?.avatarLetters ?: "TG"
                 val isPremium = chatModel?.isPremium ?: false
-                val isMuted = chatObj?.notificationSettings?.muteFor != 0
+                val isMuted =
+                    chatObj?.notificationSettings?.let {
+                        isNotificationSettingsMuted(it, chatType)
+                    } ?: isChatMuted(chatId)
 
                 var username = ""
                 var phone = ""
@@ -3602,12 +3610,145 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         setChatNotificationMute(chatId, muteFor, onResult)
     }
 
+    fun getPersistedMutedChatIds(): MutableSet<String> {
+        val raw =
+            try {
+                prefs.getStringSet(prefMutedChatsKey, null)
+            } catch (_: Exception) {
+                null
+            } ?: emptySet()
+        return raw.toMutableSet()
+    }
+
+    fun persistChatMuted(
+        chatId: Long,
+        isMuted: Boolean,
+    ) {
+        val currentSet = getPersistedMutedChatIds()
+        val idStr = chatId.toString()
+        val changed =
+            if (isMuted) {
+                currentSet.add(idStr)
+            } else {
+                currentSet.remove(idStr)
+            }
+        if (changed) {
+            prefs.edit()?.putStringSet(prefMutedChatsKey, HashSet(currentSet))?.apply()
+        }
+    }
+
+    fun isNotificationSettingsMuted(
+        settings: TdApi.ChatNotificationSettings?,
+        chatType: ChatType = ChatType.DIRECT,
+    ): Boolean {
+        if (settings == null) return false
+        return if (!settings.useDefaultMuteFor) {
+            settings.muteFor > 0
+        } else {
+            when (chatType) {
+                ChatType.DIRECT, ChatType.BOT -> scopePrivateChatsMuted
+                ChatType.GROUP -> scopeGroupChatsMuted
+                ChatType.CHANNEL -> scopeChannelChatsMuted
+            }
+        }
+    }
+
+    fun isChatMuted(chatId: Long): Boolean {
+        val chat = chatMap[chatId]
+        if (chat != null) {
+            return chat.isMuted
+        }
+        val settings = chatNotificationSettingsCache[chatId]
+        if (settings != null) {
+            return isNotificationSettingsMuted(settings, ChatType.DIRECT)
+        }
+        return getPersistedMutedChatIds().contains(chatId.toString())
+    }
+
+    fun handleChatNotificationSettingsUpdated(
+        chatId: Long,
+        notificationSettings: TdApi.ChatNotificationSettings,
+    ) {
+        chatNotificationSettingsCache[chatId] = notificationSettings
+        val existingChat = chatMap[chatId]
+        val chatType = existingChat?.chatType ?: ChatType.DIRECT
+        val isMuted = isNotificationSettingsMuted(notificationSettings, chatType)
+        persistChatMuted(chatId, isMuted)
+        if (isMuted) {
+            NotificationHelper.cancelMessageNotification(context, chatId)
+        }
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(isMuted = isMuted)
+            }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
+    }
+
+    fun handleScopeNotificationSettingsUpdated(
+        scope: TdApi.NotificationSettingsScope,
+        notificationSettings: TdApi.ScopeNotificationSettings,
+    ) {
+        val isScopeMuted = notificationSettings.muteFor > 0
+        when (scope.constructor) {
+            TdApi.NotificationSettingsScopePrivateChats.CONSTRUCTOR -> {
+                scopePrivateChatsMuted = isScopeMuted
+            }
+            TdApi.NotificationSettingsScopeGroupChats.CONSTRUCTOR -> {
+                scopeGroupChatsMuted = isScopeMuted
+            }
+            TdApi.NotificationSettingsScopeChannelChats.CONSTRUCTOR -> {
+                scopeChannelChatsMuted = isScopeMuted
+            }
+        }
+        synchronized(chatMap) {
+            for ((key, chat) in chatMap) {
+                val cached = chatNotificationSettingsCache[chat.id]
+                if (cached != null && cached.useDefaultMuteFor) {
+                    val newMuted = isNotificationSettingsMuted(cached, chat.chatType)
+                    persistChatMuted(chat.id, newMuted)
+                    if (newMuted) {
+                        NotificationHelper.cancelMessageNotification(context, chat.id)
+                    }
+                    if (chat.isMuted != newMuted) {
+                        chatMap[key] = chat.copy(isMuted = newMuted)
+                    }
+                }
+            }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
+    }
+
+    fun loadScopeNotificationSettings() {
+        val client = tdClient ?: return
+        client.send(TdApi.GetScopeNotificationSettings(TdApi.NotificationSettingsScopePrivateChats())) { obj ->
+            if (obj is TdApi.ScopeNotificationSettings) {
+                handleScopeNotificationSettingsUpdated(TdApi.NotificationSettingsScopePrivateChats(), obj)
+            }
+        }
+        client.send(TdApi.GetScopeNotificationSettings(TdApi.NotificationSettingsScopeGroupChats())) { obj ->
+            if (obj is TdApi.ScopeNotificationSettings) {
+                handleScopeNotificationSettingsUpdated(TdApi.NotificationSettingsScopeGroupChats(), obj)
+            }
+        }
+        client.send(TdApi.GetScopeNotificationSettings(TdApi.NotificationSettingsScopeChannelChats())) { obj ->
+            if (obj is TdApi.ScopeNotificationSettings) {
+                handleScopeNotificationSettingsUpdated(TdApi.NotificationSettingsScopeChannelChats(), obj)
+            }
+        }
+    }
+
     fun setChatNotificationMute(
         chatId: Long,
         muteForSeconds: Int,
         onResult: ((Boolean) -> Unit)? = null,
     ) {
         val isMuted = muteForSeconds > 0
+        persistChatMuted(chatId, isMuted)
+        if (isMuted) {
+            NotificationHelper.cancelMessageNotification(context, chatId)
+        }
         synchronized(chatMap) {
             val existing = chatMap[chatId]
             if (existing != null) {
@@ -3620,16 +3761,42 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             onResult?.invoke(isMuted)
             return
         }
+        val currentSettings = chatNotificationSettingsCache[chatId]
         val settings =
             TdApi.ChatNotificationSettings().apply {
+                if (currentSettings != null) {
+                    this.useDefaultSound = currentSettings.useDefaultSound
+                    this.soundId = currentSettings.soundId
+                    this.useDefaultShowPreview = currentSettings.useDefaultShowPreview
+                    this.showPreview = currentSettings.showPreview
+                    this.useDefaultMuteStories = currentSettings.useDefaultMuteStories
+                    this.muteStories = currentSettings.muteStories
+                    this.useDefaultDisablePinnedMessageNotifications = currentSettings.useDefaultDisablePinnedMessageNotifications
+                    this.disablePinnedMessageNotifications = currentSettings.disablePinnedMessageNotifications
+                    this.useDefaultDisableMentionNotifications = currentSettings.useDefaultDisableMentionNotifications
+                    this.disableMentionNotifications = currentSettings.disableMentionNotifications
+                }
                 this.useDefaultMuteFor = false
                 this.muteFor = muteForSeconds
             }
+        chatNotificationSettingsCache[chatId] = settings
         val req = TdApi.SetChatNotificationSettings(chatId, settings)
         client.send(req) { obj ->
             val success = obj is TdApi.Ok
-            scope.launch(Dispatchers.Main) {
-                onResult?.invoke(if (success) isMuted else !isMuted)
+            if (!success) {
+                val revertedMuted = !isMuted
+                persistChatMuted(chatId, revertedMuted)
+                scope.launch(Dispatchers.Main) {
+                    _chats.value =
+                        _chats.value.map {
+                            if (it.id == chatId) it.copy(isMuted = revertedMuted) else it
+                        }
+                    onResult?.invoke(revertedMuted)
+                }
+            } else {
+                scope.launch(Dispatchers.Main) {
+                    onResult?.invoke(isMuted)
+                }
             }
         }
     }
@@ -3768,6 +3935,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 val draftText = (updateDraft.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
                 handleChatDraftUpdated(updateDraft.chatId, draftText)
             }
+            TdApi.UpdateChatNotificationSettings.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateChatNotificationSettings
+                handleChatNotificationSettingsUpdated(update.chatId, update.notificationSettings)
+            }
+            TdApi.UpdateScopeNotificationSettings.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateScopeNotificationSettings
+                handleScopeNotificationSettingsUpdated(update.scope, update.notificationSettings)
+            }
             TdApi.UpdateNewMessage.CONSTRUCTOR -> {
                 val updateMsg = obj as TdApi.UpdateNewMessage
                 handleIncomingMessage(updateMsg.message)
@@ -3902,6 +4077,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 loadChats()
                 loadCurrentUser()
                 loadChatFolders()
+                loadScopeNotificationSettings()
             }
             TdApi.AuthorizationStateClosed.CONSTRUCTOR -> {
                 _authState.value = AuthState.Initial
@@ -4032,7 +4208,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         val existingModel = chatMap[chat.id]
         val isPinnedChat = existingModel?.isPinned ?: false
-        val isMutedChat = chat.notificationSettings?.muteFor != 0
+        chat.notificationSettings?.let {
+            chatNotificationSettingsCache[chat.id] = it
+        }
+        val isMutedChat =
+            chat.notificationSettings?.let {
+                isNotificationSettingsMuted(it, type)
+            } ?: (existingModel?.isMuted ?: getPersistedMutedChatIds().contains(chat.id.toString()))
+        persistChatMuted(chat.id, isMutedChat)
         val cloudDraft = (chat.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
         if (cloudDraft.isNotEmpty() && !chatDrafts.containsKey(chat.id)) {
             chatDrafts[chat.id] = cloudDraft
@@ -4197,8 +4380,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         appendMessage(msg.chatId, model)
         if (!msg.isOutgoing && backgroundPushEnabled) {
-            val targetChat = chatMap[msg.chatId]
-            if (targetChat?.isMuted != true) {
+            if (!isChatMuted(msg.chatId)) {
+                val targetChat = chatMap[msg.chatId]
                 val chatTitle = targetChat?.title ?: "Telegram"
                 NotificationHelper.showIncomingMessageNotification(
                     context = context,
