@@ -80,6 +80,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     private val _authState = MutableStateFlow<AuthState>(AuthState.Initial)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
+    val chatMap = java.util.Collections.synchronizedMap(LinkedHashMap<Long, ChatModel>())
+
     private val _chats = MutableStateFlow<List<ChatModel>>(emptyList())
     val chats: StateFlow<List<ChatModel>> = _chats.asStateFlow()
 
@@ -113,6 +115,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     @androidx.annotation.VisibleForTesting
     internal fun setChatsForTesting(chats: List<ChatModel>) {
+        synchronized(chatMap) {
+            chatMap.clear()
+            chats.forEach { chatMap[it.id] = it }
+        }
         _chats.value = chats
     }
 
@@ -457,7 +463,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         saveChatDraft(chatId, "")
 
-        val activeChatModel = _chats.value.find { it.id == chatId }
+        val activeChatModel = chatMap[chatId]
         val threadId = activeChatModel?.activeTopicId ?: 0L
         val ttlSec = activeChatModel?.selfDestructTimerSec ?: 0
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
@@ -538,10 +544,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             _messages.value = currentMap
 
             if (idx == chatMsgs.lastIndex) {
-                _chats.value =
-                    _chats.value.map {
-                        if (it.id == chatId) it.copy(lastMessage = trimmed) else it
+                synchronized(chatMap) {
+                    val existing = chatMap[chatId]
+                    if (existing != null) {
+                        chatMap[chatId] = existing.copy(lastMessage = trimmed)
                     }
+                }
+                _chats.value = synchronized(chatMap) { chatMap.values.toList() }
             }
         }
 
@@ -630,11 +639,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         onResult: ((Boolean) -> Unit)? = null,
     ) {
         val newPinned = !currentPinned
-        val updated =
-            _chats.value
-                .map { if (it.id == chatId) it.copy(isPinned = newPinned) else it }
-                .sortedByDescending { it.isPinned }
-        _chats.value = updated
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(isPinned = newPinned)
+            }
+            val sortedList = chatMap.values.sortedByDescending { it.isPinned }
+            chatMap.clear()
+            sortedList.forEach { chatMap[it.id] = it }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
 
         val client = tdClient
         if (client == null) {
@@ -680,14 +694,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         currentMap[chatId] = chatMsgs
         _messages.value = currentMap
 
-        _chats.value =
-            _chats.value.map { chat ->
-                if (chat.id == chatId) {
-                    chat.copy(pinnedMessageId = if (newPinned) messageId else 0L)
-                } else {
-                    chat
-                }
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(pinnedMessageId = if (newPinned) messageId else 0L)
             }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
 
         val client = tdClient
         if (client == null) {
@@ -728,10 +741,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         if (unreadIds.isNotEmpty()) {
             markMessagesAsRead(chatId, unreadIds)
         }
-        _chats.value =
-            _chats.value.map { chat ->
-                if (chat.id == chatId) chat.copy(unreadCount = 0) else chat
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(unreadCount = 0)
             }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
     }
 
     fun saveChatDraft(
@@ -744,14 +760,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         } else {
             chatDrafts[chatId] = trimmed
         }
-        _chats.value =
-            _chats.value.map { chat ->
-                if (chat.id == chatId && chat.draftText != trimmed) {
-                    chat.copy(draftText = trimmed)
-                } else {
-                    chat
-                }
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null && existing.draftText != trimmed) {
+                chatMap[chatId] = existing.copy(draftText = trimmed)
             }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
     }
 
     fun getChatDraft(chatId: Long): String = chatDrafts[chatId] ?: ""
@@ -1287,10 +1302,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         onResult: ((Boolean) -> Unit)? = null,
     ) {
         val newArchived = !currentArchived
-        _chats.value =
-            _chats.value.map {
-                if (it.id == chatId) it.copy(isArchived = newArchived, isPinned = if (newArchived) false else it.isPinned) else it
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(isArchived = newArchived, isPinned = if (newArchived) false else existing.isPinned)
             }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
 
         val client = tdClient
         if (client == null) {
@@ -1321,10 +1339,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         folderName: String,
     ) {
         val cleanFolder = folderName.trim()
-        _chats.value =
-            _chats.value.map {
-                if (it.id == chatId) it.copy(folderName = cleanFolder) else it
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(folderName = cleanFolder)
             }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
 
         val currentFolders = _chatFolders.value.toMutableList()
         if (cleanFolder.isNotEmpty()) {
@@ -1385,7 +1406,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     secretChatId = secretId,
                     selfDestructTimerSec = 30,
                 )
-            _chats.value = listOf(secretChat) + _chats.value.filter { it.id != secretChat.id }
+            synchronized(chatMap) {
+                chatMap[secretChat.id] = secretChat
+                val list = listOf(secretChat) + chatMap.values.filter { it.id != secretChat.id }
+                chatMap.clear()
+                list.forEach { chatMap[it.id] = it }
+            }
+            _chats.value = synchronized(chatMap) { chatMap.values.toList() }
             onResult(secretChat, null)
             return
         }
@@ -1407,7 +1434,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                             isSecretChat = true,
                             secretChatId = secretId,
                         )
-                    _chats.value = listOf(model) + _chats.value.filter { it.id != model.id }
+                    synchronized(chatMap) {
+                        chatMap[model.id] = model
+                        val list = listOf(model) + chatMap.values.filter { it.id != model.id }
+                        chatMap.clear()
+                        list.forEach { chatMap[it.id] = it }
+                    }
+                    _chats.value = synchronized(chatMap) { chatMap.values.toList() }
                     withContext(Dispatchers.Main) { onResult(model, null) }
                 } else {
                     withContext(Dispatchers.Main) { onResult(null, "Unable to initiate Secret Chat") }
@@ -1428,10 +1461,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         onResult: ((Int) -> Unit)? = null,
     ) {
         val validSec = seconds.coerceAtLeast(0)
-        _chats.value =
-            _chats.value.map {
-                if (it.id == chatId) it.copy(selfDestructTimerSec = validSec) else it
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(selfDestructTimerSec = validSec)
             }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
 
         try {
             val ttlClass = Class.forName("org.drinkless.tdlib.TdApi\$SetChatMessageAutoDeleteTime")
@@ -1489,18 +1525,18 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         topicId: Long,
         topicName: String,
     ) {
-        _chats.value =
-            _chats.value.map {
-                if (it.id == chatId) {
-                    it.copy(
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] =
+                    existing.copy(
                         isForum = true,
                         activeTopicId = topicId,
                         activeTopicName = if (topicId == 0L) "" else topicName,
                     )
-                } else {
-                    it
-                }
             }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
     }
 
     fun getGroupMembers(chatId: Long): List<GroupMember> {
@@ -1548,8 +1584,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     fun openSavedMessages(onResult: (ChatModel) -> Unit) {
         val existing =
-            _chats.value.find {
-                it.title.equals("Saved Messages", ignoreCase = true) || it.id == 777000L
+            chatMap[777000L] ?: synchronized(chatMap) {
+                chatMap.values.find {
+                    it.title.equals("Saved Messages", ignoreCase = true) || it.id == 777000L
+                }
             }
         if (existing != null && tdClient == null) {
             onResult(existing)
@@ -1569,7 +1607,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     avatarLetters = "SM",
                     isPinned = true,
                 )
-            _chats.value = (listOf(savedChat) + _chats.value.filter { it.id != savedChat.id }).sortedByDescending { it.isPinned }
+            synchronized(chatMap) {
+                chatMap[savedChat.id] = savedChat
+                val updated = (listOf(savedChat) + chatMap.values.filter { it.id != savedChat.id }).sortedByDescending { it.isPinned }
+                chatMap.clear()
+                updated.forEach { chatMap[it.id] = it }
+            }
+            _chats.value = synchronized(chatMap) { chatMap.values.toList() }
             onResult(savedChat)
             return
         }
@@ -1595,8 +1639,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                                 avatarLetters = "SM",
                                 isPinned = true,
                             )
-                        val updated = (listOf(model) + _chats.value.filter { it.id != model.id }).sortedByDescending { it.isPinned }
-                        _chats.value = updated
+                        synchronized(chatMap) {
+                            chatMap[model.id] = model
+                            val updated = (listOf(model) + chatMap.values.filter { it.id != model.id }).sortedByDescending { it.isPinned }
+                            chatMap.clear()
+                            updated.forEach { chatMap[it.id] = it }
+                        }
+                        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
                         withContext(Dispatchers.Main) { onResult(model) }
                         return@launch
                     }
@@ -1636,9 +1685,11 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         val cleanUsername = trimmed.removePrefix("@").removePrefix("https://t.me/").trim()
         val matchedExisting =
-            _chats.value.find {
-                it.title.equals(trimmed, ignoreCase = true) ||
-                    it.title.equals(cleanUsername, ignoreCase = true)
+            synchronized(chatMap) {
+                chatMap.values.find {
+                    it.title.equals(trimmed, ignoreCase = true) ||
+                        it.title.equals(cleanUsername, ignoreCase = true)
+                }
             }
         if (matchedExisting != null && tdClient == null) {
             onResult(matchedExisting, null)
@@ -1658,7 +1709,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     chatType = if (isBot) ChatType.BOT else ChatType.DIRECT,
                     avatarLetters = cleanUsername.take(2).uppercase().ifEmpty { "TG" },
                 )
-            _chats.value = listOf(newChat) + _chats.value.filter { it.id != newChat.id }
+            synchronized(chatMap) {
+                chatMap[newChat.id] = newChat
+                val list = listOf(newChat) + chatMap.values.filter { it.id != newChat.id }
+                chatMap.clear()
+                list.forEach { chatMap[it.id] = it }
+            }
+            _chats.value = synchronized(chatMap) { chatMap.values.toList() }
             onResult(newChat, null)
             return
         }
@@ -1760,7 +1817,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     chatType = if (isChannel) ChatType.CHANNEL else ChatType.GROUP,
                     avatarLetters = letters,
                 )
-            _chats.value = listOf(newChat) + _chats.value.filter { it.id != newChat.id }
+            synchronized(chatMap) {
+                chatMap[newChat.id] = newChat
+                val list = listOf(newChat) + chatMap.values.filter { it.id != newChat.id }
+                chatMap.clear()
+                list.forEach { chatMap[it.id] = it }
+            }
+            _chats.value = synchronized(chatMap) { chatMap.values.toList() }
             onResult(newChat, null)
             return
         }
@@ -1961,11 +2024,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         currentMap[chatId] = chatMsgs
         _messages.value = currentMap
 
-        val updatedChats =
-            _chats.value.map {
-                if (it.id == chatId) it.copy(lastMessage = message.text, time = message.time) else it
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(lastMessage = message.text, time = message.time)
             }
-        _chats.value = updatedChats
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
     }
 
     fun loadChats(limit: Int = 30) {
@@ -1973,7 +2038,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     }
 
     fun loadMoreChats(step: Int = 20) {
-        val currentCount = _chats.value.size
+        val currentCount = synchronized(chatMap) { chatMap.size }
         tdClient?.send(TdApi.GetChats(TdApi.ChatListMain(), currentCount + step), this)
     }
 
@@ -1996,8 +2061,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
         val lowerQuery = trimmed.lowercase()
         val localMatched =
-            _chats.value.filter {
-                it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery)
+            synchronized(chatMap) {
+                chatMap.values.filter {
+                    it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery)
+                }
             }
         val client = tdClient
         if (client == null) {
@@ -2013,8 +2080,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 }
                 scope.launch(Dispatchers.Main) {
                     val updatedList =
-                        _chats.value.filter {
-                            it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery)
+                        synchronized(chatMap) {
+                            chatMap.values.filter {
+                                it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery)
+                            }
                         }
                     val combined = (localMatched + updatedList).distinctBy { it.id }
                     onResult(combined.take(50))
@@ -2038,8 +2107,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
         val lowerQuery = trimmed.lowercase()
         val localContacts =
-            _chats.value.filter {
-                it.chatType == ChatType.DIRECT && (it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery))
+            synchronized(chatMap) {
+                chatMap.values.filter {
+                    it.chatType == ChatType.DIRECT && (it.title.lowercase().contains(lowerQuery) || it.lastMessage.lowercase().contains(lowerQuery))
+                }
             }
         val client = tdClient
         if (client == null) {
@@ -2079,7 +2150,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             val lowerQuery = trimmed.lowercase()
             val results = mutableListOf<MessageSearchResult>()
             for ((cId, msgList) in _messages.value) {
-                val chatTitle = _chats.value.find { it.id == cId }?.title ?: "Chat #$cId"
+                val chatTitle = chatMap[cId]?.title ?: "Chat #$cId"
                 for (msg in msgList) {
                     if (msg.text.lowercase().contains(lowerQuery) || msg.mediaCaption.lowercase().contains(lowerQuery)) {
                         results.add(
@@ -2122,7 +2193,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     val mId = msg.id
                     val text = extractMessageText(msg.content)
                     val time = formatTime(msg.date.toLong() * 1000)
-                    val chatTitle = _chats.value.find { it.id == cId }?.title ?: "Chat #$cId"
+                    val chatTitle = chatMap[cId]?.title ?: "Chat #$cId"
                     val sender = if (msg.isOutgoing) "You" else "Contact"
 
                     list.add(
@@ -2185,7 +2256,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     MessageSearchResult(
                         messageId = it.id,
                         chatId = it.chatId,
-                        chatTitle = _chats.value.find { c -> c.id == chatId }?.title ?: "Chat",
+                        chatTitle = chatMap[chatId]?.title ?: "Chat",
                         senderName = it.senderName,
                         text = it.text.ifBlank { it.mediaCaption },
                         time = it.time,
@@ -2208,7 +2279,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         client.send(req) { obj ->
             if (obj is TdApi.FoundChatMessages) {
                 val list = mutableListOf<MessageSearchResult>()
-                val chatTitle = _chats.value.find { it.id == chatId }?.title ?: "Chat"
+                val chatTitle = chatMap[chatId]?.title ?: "Chat"
                 for (msg in obj.messages) {
                     val text = extractMessageText(msg.content)
                     val time = formatTime(msg.date.toLong() * 1000)
@@ -2275,15 +2346,17 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val client = tdClient
         if (client == null) {
             val fallbackContacts =
-                _chats.value.filter { it.chatType == ChatType.DIRECT }.map {
-                    ContactModel(
-                        userId = it.id,
-                        firstName = it.title,
-                        lastName = "",
-                        phoneNumber = "",
-                        username = "",
-                        isOnline = false,
-                    )
+                synchronized(chatMap) {
+                    chatMap.values.filter { it.chatType == ChatType.DIRECT }.map {
+                        ContactModel(
+                            userId = it.id,
+                            firstName = it.title,
+                            lastName = "",
+                            phoneNumber = "",
+                            username = "",
+                            isOnline = false,
+                        )
+                    }
                 }
             onResult(fallbackContacts)
             return
@@ -2720,7 +2793,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val userName =
             userCache[userId]?.let { u ->
                 if (!u.lastName.isNullOrBlank()) "${u.firstName} ${u.lastName}" else u.firstName
-            } ?: _chats.value.find { it.id == userId }?.title ?: "Telegram Call"
+            } ?: chatMap[userId]?.title ?: "Telegram Call"
 
         val client = tdClient
         if (client == null) {
@@ -2856,7 +2929,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val userName =
             userCache[call.userId]?.let { u ->
                 if (!u.lastName.isNullOrBlank()) "${u.firstName} ${u.lastName}" else u.firstName
-            } ?: _chats.value.find { it.id == call.userId }?.title ?: "Telegram Call"
+            } ?: chatMap[call.userId]?.title ?: "Telegram Call"
 
         val existing = _activeCall.value
         val updated =
@@ -2889,7 +2962,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         chatId: Long,
         onResult: (ChatProfile) -> Unit,
     ) {
-        val chatModel = _chats.value.find { it.id == chatId }
+        val chatModel = chatMap[chatId]
 
         scope.launch {
             try {
@@ -3045,10 +3118,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         onResult: ((Boolean) -> Unit)? = null,
     ) {
         val isMuted = muteForSeconds > 0
-        _chats.value =
-            _chats.value.map {
-                if (it.id == chatId) it.copy(isMuted = isMuted) else it
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(isMuted = isMuted)
             }
+        }
+        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
         val client = tdClient
         if (client == null) {
             onResult?.invoke(isMuted)
@@ -3345,18 +3421,18 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         if (!user.phoneNumber.isNullOrBlank()) {
             userPhoneCache[user.id] = user.phoneNumber
         }
-        val list = _chats.value.toMutableList()
         var updated = false
-        for (i in list.indices) {
-            val chat = list[i]
-            val uId = chatIdToUserId[chat.id] ?: if (chat.chatType == ChatType.DIRECT) chat.id else null
-            if (uId == user.id && chat.isPremium != user.isPremium) {
-                list[i] = chat.copy(isPremium = user.isPremium)
-                updated = true
+        synchronized(chatMap) {
+            for ((id, chat) in chatMap) {
+                val uId = chatIdToUserId[id] ?: if (chat.chatType == ChatType.DIRECT) id else null
+                if (uId == user.id && chat.isPremium != user.isPremium) {
+                    chatMap[id] = chat.copy(isPremium = user.isPremium)
+                    updated = true
+                }
             }
         }
         if (updated) {
-            _chats.value = list
+            _chats.value = synchronized(chatMap) { chatMap.values.toList() }
         }
         synchronized(pendingChats) {
             for ((id, chat) in pendingChats) {
@@ -3378,19 +3454,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             userPhoneCache[user.id] = user.phoneNumber
         }
 
-        val currentList = _chats.value.toMutableList()
         var updated = false
-        for (i in currentList.indices) {
-            val chat = currentList[i]
-            if (chat.chatType == ChatType.DIRECT && chat.id == user.id) {
-                if (chat.isPremium != user.isPremium) {
-                    currentList[i] = chat.copy(isPremium = user.isPremium)
-                    updated = true
-                }
+        synchronized(chatMap) {
+            val chat = chatMap[user.id]
+            if (chat != null && chat.chatType == ChatType.DIRECT && chat.isPremium != user.isPremium) {
+                chatMap[user.id] = chat.copy(isPremium = user.isPremium)
+                updated = true
             }
         }
         if (updated) {
-            _chats.value = currentList
+            _chats.value = synchronized(chatMap) { chatMap.values.toList() }
         }
 
         synchronized(pendingChats) {
@@ -3447,7 +3520,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             }
         }
 
-        val existingModel = _chats.value.find { it.id == chat.id }
+        val existingModel = chatMap[chat.id]
         val isPinnedChat = existingModel?.isPinned ?: false
         val isMutedChat = chat.notificationSettings?.muteFor != 0
         val draftStr = chatDrafts[chat.id] ?: ""
@@ -3485,16 +3558,12 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                             updates = pendingChats.values.toList()
                             pendingChats.clear()
                         }
-                        val currentList = _chats.value.toMutableList()
-                        for (model in updates) {
-                            val idx = currentList.indexOfFirst { it.id == model.id }
-                            if (idx >= 0) {
-                                currentList[idx] = model
-                            } else {
-                                currentList.add(model)
+                        synchronized(chatMap) {
+                            for (model in updates) {
+                                chatMap[model.id] = model
                             }
                         }
-                        _chats.value = currentList
+                        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
                     }
                 }
         }
@@ -3504,14 +3573,18 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         chatId: Long,
         msg: TdApi.Message?,
     ) {
-        val list = _chats.value.toMutableList()
-        val index = list.indexOfFirst { it.id == chatId }
-        if (index >= 0) {
-            val old = list[index]
-            val lastMsgText = extractMessageText(msg?.content)
-            val timeStr = if (msg != null) formatTime(msg.date.toLong() * 1000) else old.time
-            list[index] = old.copy(lastMessage = lastMsgText, time = timeStr)
-            _chats.value = list
+        var updated = false
+        synchronized(chatMap) {
+            val old = chatMap[chatId]
+            if (old != null) {
+                val lastMsgText = extractMessageText(msg?.content)
+                val timeStr = if (msg != null) formatTime(msg.date.toLong() * 1000) else old.time
+                chatMap[chatId] = old.copy(lastMessage = lastMsgText, time = timeStr)
+                updated = true
+            }
+        }
+        if (updated) {
+            _chats.value = synchronized(chatMap) { chatMap.values.toList() }
         }
     }
 
@@ -3596,7 +3669,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         appendMessage(msg.chatId, model)
         if (!msg.isOutgoing && backgroundPushEnabled) {
-            val targetChat = _chats.value.find { it.id == msg.chatId }
+            val targetChat = chatMap[msg.chatId]
             if (targetChat?.isMuted != true) {
                 val chatTitle = targetChat?.title ?: "Telegram"
                 NotificationHelper.showIncomingMessageNotification(
@@ -3653,17 +3726,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         // 1. Check if matches any chat avatar
         var chatUpdated = false
-        val currentChats =
-            _chats.value.map { chat ->
+        synchronized(chatMap) {
+            for ((id, chat) in chatMap) {
                 if (chat.avatarFileId == file.id && chat.avatarPath != file.local.path) {
+                    chatMap[id] = chat.copy(avatarPath = file.local.path)
                     chatUpdated = true
-                    chat.copy(avatarPath = file.local.path)
-                } else {
-                    chat
                 }
             }
+        }
         if (chatUpdated) {
-            _chats.value = currentChats
+            _chats.value = synchronized(chatMap) { chatMap.values.toList() }
         }
 
         // 2. Check if matches any message media

@@ -6,6 +6,7 @@ import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -105,12 +106,72 @@ class TelegramManagerTest {
         manager.setChatsForTesting(listOf(chat))
         assertEquals(1, manager.chats.value.size)
         assertEquals("Test", manager.chats.value[0].title)
+        assertEquals("Test", manager.chatMap[10L]?.title)
 
         manager.setConnectionStateForTesting("Ready")
         assertEquals("Ready", manager.connectionState.value)
 
         manager.setAuthStateForTesting(AuthState.Ready)
         assertEquals(AuthState.Ready, manager.authState.value)
+    }
+
+    @Test
+    fun testChatMapDirectLookupAndSynchronization() {
+        val manager = TelegramManager(mockContext)
+        val chat1 = ChatModel(101L, "Chat 1", "Hello", "10:00", 2, ChatType.DIRECT, "C1")
+        val chat2 = ChatModel(102L, "Chat 2", "World", "10:05", 0, ChatType.GROUP, "C2")
+
+        manager.setChatsForTesting(listOf(chat1, chat2))
+
+        assertEquals(2, manager.chatMap.size)
+        assertEquals("Chat 1", manager.chatMap[101L]?.title)
+        assertEquals("Chat 2", manager.chatMap[102L]?.title)
+        assertEquals(manager.chats.value, manager.chatMap.values.toList())
+    }
+
+    @Test
+    fun testToggleChatPinSortsChatMap() {
+        val manager = TelegramManager(mockContext)
+        val chat1 = ChatModel(101L, "Chat 1", "Hello", "10:00", 0, ChatType.DIRECT, "C1", isPinned = false)
+        val chat2 = ChatModel(102L, "Chat 2", "World", "10:05", 0, ChatType.GROUP, "C2", isPinned = false)
+
+        manager.setChatsForTesting(listOf(chat1, chat2))
+
+        manager.toggleChatPin(102L, false)
+
+        val chats = manager.chats.value
+        assertEquals(102L, chats[0].id)
+        assertTrue(chats[0].isPinned)
+        assertEquals(102L, manager.chatMap.keys.first())
+    }
+
+    @Test
+    fun testConcurrentChatMapUpdates() {
+        val manager = TelegramManager(mockContext)
+        val threadCount = 10
+        val operationsPerThread = 100
+        val threads = mutableListOf<Thread>()
+
+        for (t in 0 until threadCount) {
+            val thread =
+                Thread {
+                    for (i in 0 until operationsPerThread) {
+                        val chatId = (t * operationsPerThread + i).toLong()
+                        val chat = ChatModel(chatId, "Chat $chatId", "Message $i", "12:00", 0, ChatType.DIRECT, "C")
+                        synchronized(manager.chatMap) {
+                            manager.chatMap[chatId] = chat
+                        }
+                    }
+                }
+            threads.add(thread)
+            thread.start()
+        }
+
+        threads.forEach { it.join() }
+
+        assertEquals(threadCount * operationsPerThread, manager.chatMap.size)
+        val foundChat = manager.chatMap[(operationsPerThread - 1).toLong()]
+        assertNotNull(foundChat)
     }
 
     @Test
