@@ -15,6 +15,13 @@ import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.telegram.TelegramManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class SearchDialog(
     context: Context,
@@ -28,7 +35,7 @@ class SearchDialog(
         MESSAGES,
     }
 
-    private var currentTab: SearchTab = SearchTab.CHATS
+    internal var currentTab: SearchTab = SearchTab.CHATS
 
     private lateinit var etSearchInput: EditText
     private lateinit var tvInputMode: TextView
@@ -49,6 +56,14 @@ class SearchDialog(
     private var messageNextOffset: String = ""
     private var isMessageLoading: Boolean = false
     private val maxResultsLimit = 50
+
+    private var searchJob: Job? = null
+    private var dialogScope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var searchSequence: Long = 0L
+
+    companion object {
+        private const val DEBOUNCE_DELAY_MS = 300L
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -122,7 +137,9 @@ class SearchDialog(
             }
         }
 
-        performSearch(currentQuery)
+        searchJob?.cancel()
+        val requestId = ++searchSequence
+        performSearch(currentQuery.trim(), requestId)
     }
 
     private fun setupSearchInput() {
@@ -144,13 +161,34 @@ class SearchDialog(
                     val text = s?.toString() ?: ""
                     if (text != currentQuery) {
                         currentQuery = text
-                        performSearch(text)
+                        onQueryChanged(text)
                     }
                 }
 
                 override fun afterTextChanged(s: Editable?) {}
             },
         )
+    }
+
+    private fun onQueryChanged(query: String) {
+        searchJob?.cancel()
+        val requestId = ++searchSequence
+        val trimmed = query.trim()
+
+        if (trimmed.isEmpty()) {
+            progressBar.visibility = View.GONE
+            layoutEmpty.visibility = View.VISIBLE
+            tvEmptyTitle.text = "Type a keyword to search"
+            chatAdapter?.submitList(emptyList())
+            messageSearchAdapter?.submitList(emptyList())
+            return
+        }
+
+        searchJob =
+            dialogScope.launch {
+                delay(DEBOUNCE_DELAY_MS)
+                performSearch(trimmed, requestId)
+            }
     }
 
     private fun setupPagination() {
@@ -179,7 +217,15 @@ class SearchDialog(
     }
 
     private fun performSearch(query: String) {
-        val trimmed = query.trim()
+        searchJob?.cancel()
+        val requestId = ++searchSequence
+        performSearch(query.trim(), requestId)
+    }
+
+    private fun performSearch(
+        trimmed: String,
+        requestId: Long,
+    ) {
         if (trimmed.isEmpty()) {
             progressBar.visibility = View.GONE
             layoutEmpty.visibility = View.VISIBLE
@@ -195,6 +241,7 @@ class SearchDialog(
         when (currentTab) {
             SearchTab.CHATS -> {
                 telegramManager.searchChats(trimmed) { results ->
+                    if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchChats
                     progressBar.visibility = View.GONE
                     chatAdapter?.submitList(results)
                     if (results.isEmpty()) {
@@ -207,6 +254,7 @@ class SearchDialog(
             }
             SearchTab.CONTACTS -> {
                 telegramManager.searchContacts(trimmed) { results ->
+                    if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchContacts
                     progressBar.visibility = View.GONE
                     chatAdapter?.submitList(results)
                     if (results.isEmpty()) {
@@ -221,6 +269,7 @@ class SearchDialog(
                 isMessageLoading = true
                 messageNextOffset = ""
                 telegramManager.searchMessages(trimmed, offset = "", limit = 20) { _, results, nextOffset ->
+                    if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchMessages
                     isMessageLoading = false
                     messageNextOffset = nextOffset
                     progressBar.visibility = View.GONE
@@ -244,8 +293,11 @@ class SearchDialog(
 
         isMessageLoading = true
         val limitToFetch = (maxResultsLimit - currentCount).coerceAtMost(20)
+        val requestId = searchSequence
+        val trimmed = currentQuery.trim()
 
-        telegramManager.searchMessages(currentQuery, offset = messageNextOffset, limit = limitToFetch) { _, results, nextOffset ->
+        telegramManager.searchMessages(trimmed, offset = messageNextOffset, limit = limitToFetch) { _, results, nextOffset ->
+            if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchMessages
             isMessageLoading = false
             messageNextOffset = nextOffset
             val remainingSpace = maxResultsLimit - (messageSearchAdapter?.itemCount ?: 0)
@@ -254,6 +306,18 @@ class SearchDialog(
                 messageSearchAdapter?.addMoreItems(itemsToAdd)
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        searchJob?.cancel()
+        dialogScope.cancel()
+    }
+
+    override fun dismiss() {
+        searchJob?.cancel()
+        dialogScope.cancel()
+        super.dismiss()
     }
 
     override fun onKeyDown(
@@ -270,60 +334,72 @@ class SearchDialog(
             return true
         }
 
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-            val tabs = SearchTab.values()
-            val prevIndex = (currentTab.ordinal - 1 + tabs.size) % tabs.size
-            selectTab(tabs[prevIndex])
-            return true
-        }
-        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            val tabs = SearchTab.values()
-            val nextIndex = (currentTab.ordinal + 1) % tabs.size
-            selectTab(tabs[nextIndex])
-            return true
-        }
-
-        val isInputKey =
-            (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
-                keyCode == KeyEvent.KEYCODE_STAR ||
-                keyCode == KeyEvent.KEYCODE_POUND ||
-                keyCode == KeyEvent.KEYCODE_DEL
-        if (isInputKey && etSearchInput.hasFocus()) {
-            if (keypadEngine?.handleKeyEvent(keyCode, event) == true) {
+        if (etSearchInput.hasFocus()) {
+            val isInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL ||
+                    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+            if (isInputKey && keypadEngine?.handleKeyEvent(keyCode, event) == true) {
                 return true
             }
-        }
 
-        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-            val focused = currentFocus
-            if (focused != null && focused !== etSearchInput && focused !== tabChats && focused !== tabContacts && focused !== tabMessages) {
-                val itemView = rvResults.findContainingItemView(focused)
-                if (itemView != null) {
-                    val pos = rvResults.getChildAdapterPosition(itemView)
-                    if (pos != RecyclerView.NO_POSITION) {
-                        if (currentTab == SearchTab.MESSAGES) {
-                            val msgItem = messageSearchAdapter?.getItemAt(pos)
-                            if (msgItem != null) {
-                                dismiss()
-                                onMessageSelected(msgItem.chatId, msgItem.messageId)
-                                return true
-                            }
-                        } else {
-                            val chatItem = chatAdapter?.getItemAt(pos)
-                            if (chatItem != null) {
-                                dismiss()
-                                onChatSelected(chatItem)
-                                return true
+            keypadEngine?.commitCurrentChar()
+
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                if ((rvResults.adapter?.itemCount ?: 0) > 0) {
+                    rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                    return true
+                }
+            }
+
+            return super.onKeyDown(keyCode, event)
+        } else {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                val tabs = SearchTab.values()
+                val prevIndex = (currentTab.ordinal - 1 + tabs.size) % tabs.size
+                selectTab(tabs[prevIndex])
+                return true
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                val tabs = SearchTab.values()
+                val nextIndex = (currentTab.ordinal + 1) % tabs.size
+                selectTab(tabs[nextIndex])
+                return true
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                val focused = currentFocus
+                if (focused != null && focused !== etSearchInput && focused !== tabChats && focused !== tabContacts && focused !== tabMessages) {
+                    val itemView = rvResults.findContainingItemView(focused)
+                    if (itemView != null) {
+                        val pos = rvResults.getChildAdapterPosition(itemView)
+                        if (pos != RecyclerView.NO_POSITION) {
+                            if (currentTab == SearchTab.MESSAGES) {
+                                val msgItem = messageSearchAdapter?.getItemAt(pos)
+                                if (msgItem != null) {
+                                    dismiss()
+                                    onMessageSelected(msgItem.chatId, msgItem.messageId)
+                                    return true
+                                }
+                            } else {
+                                val chatItem = chatAdapter?.getItemAt(pos)
+                                if (chatItem != null) {
+                                    dismiss()
+                                    onChatSelected(chatItem)
+                                    return true
+                                }
                             }
                         }
                     }
+                } else if ((rvResults.adapter?.itemCount ?: 0) > 0) {
+                    rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                    return true
                 }
-            } else if ((rvResults.adapter?.itemCount ?: 0) > 0) {
-                rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-                return true
             }
-        }
 
-        return super.onKeyDown(keyCode, event)
+            return super.onKeyDown(keyCode, event)
+        }
     }
 }

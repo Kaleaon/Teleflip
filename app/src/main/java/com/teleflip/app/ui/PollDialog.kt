@@ -98,8 +98,7 @@ class PollDialog(
                 (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
                     keyCode == KeyEvent.KEYCODE_STAR ||
                     keyCode == KeyEvent.KEYCODE_POUND ||
-                    keyCode == KeyEvent.KEYCODE_DEL ||
-                    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    keyCode == KeyEvent.KEYCODE_DEL
             if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
                 return true
             }
