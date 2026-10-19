@@ -437,11 +437,30 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         tdClient?.send(TdApi.DeleteAccount("Account reset requested from login view", ""), this)
     }
 
+    internal fun createSendOptions(
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
+    ): TdApi.MessageSendOptions {
+        val effectiveSchedulingState =
+            if (schedulingState is TdApi.MessageSchedulingStateSendAtDate) {
+                val nowSec = (System.currentTimeMillis() / 1000).toInt()
+                if (schedulingState.sendDate <= nowSec) null else schedulingState
+            } else {
+                schedulingState
+            }
+        return TdApi.MessageSendOptions().apply {
+            this.disableNotification = disableNotification
+            this.schedulingState = effectiveSchedulingState
+        }
+    }
+
     fun sendMessage(
         chatId: Long,
         text: String,
         replyToMessageId: Long = 0L,
         replyToPreview: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         if (text.isBlank()) return
 
@@ -489,6 +508,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.SendMessage().apply {
                 this.chatId = chatId
                 this.inputMessageContent = content
+                this.options = createSendOptions(disableNotification, schedulingState)
                 if (replyToMessageId != 0L) {
                     applyReplyToMessageId(this, replyToMessageId)
                 }
@@ -760,6 +780,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         chatId: Long,
         filePath: String,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val displayText = if (caption.isNotBlank()) "📷 [Photo] $caption" else "📷 [Photo]"
@@ -792,6 +814,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = photoContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
@@ -803,6 +826,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         chatId: Long,
         filePath: String,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val fileName = File(filePath).name.ifBlank { "Document" }
         val effectiveCaption = caption.ifBlank { fileName }
@@ -836,6 +861,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = docContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
@@ -846,6 +872,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     fun sendStickerEmoji(
         chatId: Long,
         stickerEmoji: String,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         if (stickerEmoji.isBlank()) return
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
@@ -873,6 +901,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.SendMessage().apply {
                 this.chatId = chatId
                 this.inputMessageContent = content
+                this.options = createSendOptions(disableNotification, schedulingState)
             }
         tdClient?.send(sendReq, this)
     }
@@ -881,6 +910,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         chatId: Long,
         stickerFileId: Int,
         emoji: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val newMsg =
@@ -912,6 +943,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = content
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(req, this)
         } catch (e: Exception) {
@@ -1005,6 +1037,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         animFileId: Int,
         duration: Int = 0,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val display = if (caption.isNotBlank()) "🎞️ [GIF] $caption" else "🎞️ [GIF]"
@@ -1039,6 +1073,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = content
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(req, this)
         } catch (e: Exception) {
@@ -1051,6 +1086,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         filePath: String,
         durationSeconds: Int = 0,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val display = if (caption.isNotBlank()) "📹 [Video] $caption" else "📹 [Video]"
@@ -1085,6 +1122,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = videoContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
@@ -1096,6 +1134,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         chatId: Long,
         filePath: String,
         caption: String = "",
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val display = if (caption.isNotBlank()) "🎞️ [GIF] $caption" else "🎞️ [GIF]"
@@ -1128,6 +1168,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = animContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
@@ -1140,6 +1181,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         question: String,
         options: List<String>,
         isAnonymous: Boolean = true,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val trimmedQuestion = question.trim()
         val cleanOptions = options.map { it.trim() }.filter { it.isNotEmpty() }
@@ -1176,6 +1219,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = pollContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Throwable) {
@@ -1811,6 +1855,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         chatId: Long,
         filePath: String,
         durationSeconds: Int,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val newMsg =
@@ -1845,6 +1891,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = voiceContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
         } catch (e: Exception) {
@@ -1857,6 +1904,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         latitude: Double,
         longitude: Double,
         accuracy: Float,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val latStr = String.format(Locale.US, "%.6f", latitude)
@@ -1892,11 +1941,12 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 TdApi.SendMessage().apply {
                     this.chatId = chatId
                     this.inputMessageContent = locContent
+                    this.options = createSendOptions(disableNotification, schedulingState)
                 }
             tdClient?.send(sendReq, this)
 
             // Also send fallback text with Google Maps link for clients that don't render native geo points
-            sendMessage(chatId, "📍 Location link: $gmapsLink")
+            sendMessage(chatId, "📍 Location link: $gmapsLink", disableNotification = disableNotification, schedulingState = schedulingState)
         } catch (e: Exception) {
             Log.e(tag, "Failed to send location via TDLib: ${e.message}")
         }

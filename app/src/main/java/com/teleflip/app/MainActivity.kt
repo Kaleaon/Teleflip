@@ -1037,6 +1037,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnSend.setOnClickListener { doSend() }
+        btnSend.setOnLongClickListener {
+            showSendOptionsMenu(chat)
+            true
+        }
 
         etComposeInput?.addTextChangedListener(
             object : android.text.TextWatcher {
@@ -1557,6 +1561,11 @@ class MainActivity : AppCompatActivity() {
             },
         )
         options.add(
+            MenuOption(options.size + 1, "📤 Send Options (Silent / Schedule)") {
+                showSendOptionsMenu(chat)
+            },
+        )
+        options.add(
             MenuOption(options.size + 1, "🔍 Search in This Chat") {
                 showSearchInChatDialog(chat)
             },
@@ -1567,6 +1576,144 @@ class MainActivity : AppCompatActivity() {
             },
         )
         OptionsMenuDialog(this, "Attach & Actions", options).show()
+    }
+
+    private fun dispatchOutboundMessageWithOptions(
+        chat: ChatModel,
+        disableNotification: Boolean = false,
+        schedulingState: org.drinkless.tdlib.TdApi.MessageSchedulingState? = null,
+    ) {
+        commitActiveInputEngines()
+        val text = etComposeInput?.text?.toString()?.trim() ?: ""
+        if (text.isEmpty()) {
+            showToast("Please enter a message first")
+            return
+        }
+        val editing = activeEditMessage
+        val replying = activeReplyMessage
+        if (editing != null) {
+            telegramManager.editMessageText(chat.id, editing.id, text) {
+                showToast("Message edited")
+            }
+            clearReplyOrEditMode()
+            etComposeInput?.setText("")
+        } else if (replying != null) {
+            val preview = "${replying.senderName}: ${replying.text.take(35)}"
+            telegramManager.sendMessage(
+                chatId = chat.id,
+                text = text,
+                replyToMessageId = replying.id,
+                replyToPreview = preview,
+                disableNotification = disableNotification,
+                schedulingState = schedulingState,
+            )
+            clearReplyOrEditMode()
+            etComposeInput?.setText("")
+        } else {
+            telegramManager.sendMessage(
+                chatId = chat.id,
+                text = text,
+                disableNotification = disableNotification,
+                schedulingState = schedulingState,
+            )
+            etComposeInput?.setText("")
+        }
+
+        if (disableNotification && schedulingState != null) {
+            showToast("Message scheduled silently")
+        } else if (disableNotification) {
+            showToast("Message sent silently")
+        } else if (schedulingState != null) {
+            showToast("Message scheduled")
+        }
+    }
+
+    private fun showSendOptionsMenu(chat: ChatModel) {
+        val options = mutableListOf<MenuOption>()
+        options.add(
+            MenuOption(1, "🔕 Send Silently") {
+                dispatchOutboundMessageWithOptions(chat, disableNotification = true)
+            },
+        )
+        options.add(
+            MenuOption(2, "📅 Schedule Message") {
+                showScheduleTimePickerMenu(chat)
+            },
+        )
+        options.add(
+            MenuOption(3, "✉️ Send Normally") {
+                dispatchOutboundMessageWithOptions(chat, disableNotification = false)
+            },
+        )
+        OptionsMenuDialog(this, "Send Options", options).show()
+    }
+
+    private fun showScheduleTimePickerMenu(chat: ChatModel) {
+        val options = mutableListOf<MenuOption>()
+        val nowSec = (System.currentTimeMillis() / 1000).toInt()
+
+        options.add(
+            MenuOption(1, "In 10 minutes") {
+                val sendAtDate = nowSec + 10 * 60
+                val schedulingState = org.drinkless.tdlib.TdApi.MessageSchedulingStateSendAtDate(sendAtDate, 0)
+                dispatchOutboundMessageWithOptions(chat, schedulingState = schedulingState)
+            },
+        )
+        options.add(
+            MenuOption(2, "In 30 minutes") {
+                val sendAtDate = nowSec + 30 * 60
+                val schedulingState = org.drinkless.tdlib.TdApi.MessageSchedulingStateSendAtDate(sendAtDate, 0)
+                dispatchOutboundMessageWithOptions(chat, schedulingState = schedulingState)
+            },
+        )
+        options.add(
+            MenuOption(3, "In 1 hour") {
+                val sendAtDate = nowSec + 60 * 60
+                val schedulingState = org.drinkless.tdlib.TdApi.MessageSchedulingStateSendAtDate(sendAtDate, 0)
+                dispatchOutboundMessageWithOptions(chat, schedulingState = schedulingState)
+            },
+        )
+        options.add(
+            MenuOption(4, "Tomorrow morning (09:00 AM)") {
+                val calendar = java.util.Calendar.getInstance()
+                calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 9)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                val sendAtDate = (calendar.timeInMillis / 1000).toInt()
+                val schedulingState = org.drinkless.tdlib.TdApi.MessageSchedulingStateSendAtDate(sendAtDate, 0)
+                dispatchOutboundMessageWithOptions(chat, schedulingState = schedulingState)
+            },
+        )
+        options.add(
+            MenuOption(5, "Custom delay (minutes)") {
+                showCustomScheduleDelayDialog(chat)
+            },
+        )
+        OptionsMenuDialog(this, "Schedule Message", options).show()
+    }
+
+    private fun showCustomScheduleDelayDialog(chat: ChatModel) {
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            hint = "Minutes (e.g. 15)"
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Schedule Delay (Minutes)")
+            .setView(input)
+            .setPositiveButton("Schedule") { _, _ ->
+                val minutes = input.text.toString().trim().toIntOrNull() ?: 0
+                if (minutes > 0) {
+                    val nowSec = (System.currentTimeMillis() / 1000).toInt()
+                    val sendAtDate = nowSec + minutes * 60
+                    val schedulingState = org.drinkless.tdlib.TdApi.MessageSchedulingStateSendAtDate(sendAtDate, 0)
+                    dispatchOutboundMessageWithOptions(chat, schedulingState = schedulingState)
+                } else {
+                    showToast("Invalid minute duration")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showCreatePollDialog(chat: ChatModel) {
