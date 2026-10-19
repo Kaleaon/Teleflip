@@ -15,6 +15,13 @@ import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.telegram.TelegramManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class SearchDialog(
     context: Context,
@@ -49,6 +56,14 @@ class SearchDialog(
     private var messageNextOffset: String = ""
     private var isMessageLoading: Boolean = false
     private val maxResultsLimit = 50
+
+    private var searchJob: Job? = null
+    private var dialogScope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var searchSequence: Long = 0L
+
+    companion object {
+        private const val DEBOUNCE_DELAY_MS = 300L
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -122,7 +137,9 @@ class SearchDialog(
             }
         }
 
-        performSearch(currentQuery)
+        searchJob?.cancel()
+        val requestId = ++searchSequence
+        performSearch(currentQuery.trim(), requestId)
     }
 
     private fun setupSearchInput() {
@@ -144,13 +161,33 @@ class SearchDialog(
                     val text = s?.toString() ?: ""
                     if (text != currentQuery) {
                         currentQuery = text
-                        performSearch(text)
+                        onQueryChanged(text)
                     }
                 }
 
                 override fun afterTextChanged(s: Editable?) {}
             },
         )
+    }
+
+    private fun onQueryChanged(query: String) {
+        searchJob?.cancel()
+        val requestId = ++searchSequence
+        val trimmed = query.trim()
+
+        if (trimmed.isEmpty()) {
+            progressBar.visibility = View.GONE
+            layoutEmpty.visibility = View.VISIBLE
+            tvEmptyTitle.text = "Type a keyword to search"
+            chatAdapter?.submitList(emptyList())
+            messageSearchAdapter?.submitList(emptyList())
+            return
+        }
+
+        searchJob = dialogScope.launch {
+            delay(DEBOUNCE_DELAY_MS)
+            performSearch(trimmed, requestId)
+        }
     }
 
     private fun setupPagination() {
@@ -179,7 +216,12 @@ class SearchDialog(
     }
 
     private fun performSearch(query: String) {
-        val trimmed = query.trim()
+        searchJob?.cancel()
+        val requestId = ++searchSequence
+        performSearch(query.trim(), requestId)
+    }
+
+    private fun performSearch(trimmed: String, requestId: Long) {
         if (trimmed.isEmpty()) {
             progressBar.visibility = View.GONE
             layoutEmpty.visibility = View.VISIBLE
@@ -195,6 +237,7 @@ class SearchDialog(
         when (currentTab) {
             SearchTab.CHATS -> {
                 telegramManager.searchChats(trimmed) { results ->
+                    if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchChats
                     progressBar.visibility = View.GONE
                     chatAdapter?.submitList(results)
                     if (results.isEmpty()) {
@@ -207,6 +250,7 @@ class SearchDialog(
             }
             SearchTab.CONTACTS -> {
                 telegramManager.searchContacts(trimmed) { results ->
+                    if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchContacts
                     progressBar.visibility = View.GONE
                     chatAdapter?.submitList(results)
                     if (results.isEmpty()) {
@@ -221,6 +265,7 @@ class SearchDialog(
                 isMessageLoading = true
                 messageNextOffset = ""
                 telegramManager.searchMessages(trimmed, offset = "", limit = 20) { _, results, nextOffset ->
+                    if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchMessages
                     isMessageLoading = false
                     messageNextOffset = nextOffset
                     progressBar.visibility = View.GONE
@@ -244,8 +289,11 @@ class SearchDialog(
 
         isMessageLoading = true
         val limitToFetch = (maxResultsLimit - currentCount).coerceAtMost(20)
+        val requestId = searchSequence
+        val trimmed = currentQuery.trim()
 
-        telegramManager.searchMessages(currentQuery, offset = messageNextOffset, limit = limitToFetch) { _, results, nextOffset ->
+        telegramManager.searchMessages(trimmed, offset = messageNextOffset, limit = limitToFetch) { _, results, nextOffset ->
+            if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchMessages
             isMessageLoading = false
             messageNextOffset = nextOffset
             val remainingSpace = maxResultsLimit - (messageSearchAdapter?.itemCount ?: 0)
@@ -254,6 +302,18 @@ class SearchDialog(
                 messageSearchAdapter?.addMoreItems(itemsToAdd)
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        searchJob?.cancel()
+        dialogScope.cancel()
+    }
+
+    override fun dismiss() {
+        searchJob?.cancel()
+        dialogScope.cancel()
+        super.dismiss()
     }
 
     override fun onKeyDown(
