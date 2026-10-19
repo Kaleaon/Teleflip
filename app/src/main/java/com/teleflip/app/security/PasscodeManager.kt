@@ -1,6 +1,7 @@
 package com.teleflip.app.security
 
 import android.content.Context
+import android.content.SharedPreferences
 import java.security.MessageDigest
 
 object PasscodeManager {
@@ -8,6 +9,8 @@ object PasscodeManager {
     private const val PREF_PASSCODE_ENABLED = "pref_passcode_enabled"
     private const val PREF_PASSCODE_HASH = "pref_passcode_hash"
     private const val PREF_AUTO_LOCK_TIMEOUT = "pref_passcode_timeout_sec"
+
+    private fun getPrefs(context: Context): SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     const val TIMEOUT_IMMEDIATE = 0
     const val TIMEOUT_1_MIN = 60
@@ -18,7 +21,7 @@ object PasscodeManager {
     private var lastBackgroundTimestamp = 0L
 
     fun isEnabled(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         return prefs.getBoolean(PREF_PASSCODE_ENABLED, false) && prefs.getString(PREF_PASSCODE_HASH, null) != null
     }
 
@@ -32,7 +35,7 @@ object PasscodeManager {
         pin: String,
     ) {
         val hash = hashPin(pin)
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         prefs.edit()
             .putBoolean(PREF_PASSCODE_ENABLED, true)
             .putString(PREF_PASSCODE_HASH, hash)
@@ -41,7 +44,7 @@ object PasscodeManager {
     }
 
     fun disablePasscode(context: Context) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         prefs.edit()
             .putBoolean(PREF_PASSCODE_ENABLED, false)
             .remove(PREF_PASSCODE_HASH)
@@ -53,7 +56,7 @@ object PasscodeManager {
         context: Context,
         pin: String,
     ): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         val savedHash = prefs.getString(PREF_PASSCODE_HASH, null) ?: return false
         return hashPin(pin) == savedHash
     }
@@ -74,7 +77,7 @@ object PasscodeManager {
     }
 
     fun getAutoLockTimeoutSeconds(context: Context): Int {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         return prefs.getInt(PREF_AUTO_LOCK_TIMEOUT, TIMEOUT_IMMEDIATE)
     }
 
@@ -82,7 +85,7 @@ object PasscodeManager {
         context: Context,
         seconds: Int,
     ) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         prefs.edit().putInt(PREF_AUTO_LOCK_TIMEOUT, seconds).apply()
     }
 

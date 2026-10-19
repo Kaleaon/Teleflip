@@ -1,6 +1,7 @@
 package com.teleflip.app.storage
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
@@ -48,6 +49,8 @@ object StorageManager {
     private const val PREF_AUTO_DOWNLOAD = "pref_auto_download_media"
     private const val PREF_KEEP_MEDIA = "pref_keep_media_days"
     private const val PREF_SAVE_TO_DOWNLOADS = "pref_save_to_downloads"
+
+    private fun getPrefs(context: Context): SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private const val BYTES_PER_KB = 1024L
     private const val BYTES_PER_MB = 1024L * 1024L
@@ -157,7 +160,7 @@ object StorageManager {
     }
 
     fun getSelectedStorageType(context: Context): StorageLocationType {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         val value = prefs.getString(PREF_STORAGE_LOCATION, "internal")
         return if (value == "sd_card" && isSdCardAvailable(context)) {
             StorageLocationType.SD_CARD
@@ -173,7 +176,7 @@ object StorageManager {
         if (type == StorageLocationType.SD_CARD && !isSdCardAvailable(context)) {
             return false
         }
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         val value = if (type == StorageLocationType.SD_CARD) "sd_card" else "internal"
         prefs.edit().putString(PREF_STORAGE_LOCATION, value).apply()
         return true
@@ -214,7 +217,7 @@ object StorageManager {
     }
 
     fun getAutoDownloadMode(context: Context): AutoDownloadMode {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         val raw = prefs.getString(PREF_AUTO_DOWNLOAD, AutoDownloadMode.WIFI_ONLY.name)
         return try {
             AutoDownloadMode.valueOf(raw ?: AutoDownloadMode.WIFI_ONLY.name)
@@ -227,7 +230,7 @@ object StorageManager {
         context: Context,
         mode: AutoDownloadMode,
     ) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         prefs.edit().putString(PREF_AUTO_DOWNLOAD, mode.name).apply()
     }
 
@@ -257,7 +260,7 @@ object StorageManager {
     }
 
     fun getKeepMediaDuration(context: Context): KeepMediaDuration {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         val days = prefs.getInt(PREF_KEEP_MEDIA, 0)
         return KeepMediaDuration.values().find { it.days == days } ?: KeepMediaDuration.FOREVER
     }
@@ -266,12 +269,12 @@ object StorageManager {
         context: Context,
         duration: KeepMediaDuration,
     ) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         prefs.edit().putInt(PREF_KEEP_MEDIA, duration.days).apply()
     }
 
     fun isSaveToDownloadsEnabled(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         return prefs.getBoolean(PREF_SAVE_TO_DOWNLOADS, false)
     }
 
@@ -279,7 +282,7 @@ object StorageManager {
         context: Context,
         enabled: Boolean,
     ) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         prefs.edit().putBoolean(PREF_SAVE_TO_DOWNLOADS, enabled).apply()
     }
 
