@@ -111,6 +111,7 @@ class MainActivity : AppCompatActivity() {
     private var rvMessages: RecyclerView? = null
     private var etComposeInput: EditText? = null
     private var composeInputEngine: KeypadInputEngine? = null
+    private var draftSyncJob: Job? = null
     private var activeReplyMessage: MessageModel? = null
     private var activeEditMessage: MessageModel? = null
     private var layoutReplyEditBar: View? = null
@@ -422,6 +423,8 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
     private fun showChatListScreen() {
         commitActiveInputEngines()
+        draftSyncJob?.cancel()
+        draftSyncJob = null
         if (currentScreen == Screen.CONVERSATION && activeEditMessage == null) {
             activeChat?.let { chat ->
                 val currentDraft = etComposeInput?.text?.toString()?.trim().orEmpty()
@@ -1009,6 +1012,8 @@ class MainActivity : AppCompatActivity() {
 
         val doSend = {
             commitActiveInputEngines()
+            draftSyncJob?.cancel()
+            draftSyncJob = null
             val text = etComposeInput?.text?.toString()?.trim() ?: ""
             if (text.isNotEmpty()) {
                 val editing = activeEditMessage
@@ -1058,7 +1063,15 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                override fun afterTextChanged(s: android.text.Editable?) {}
+                override fun afterTextChanged(s: android.text.Editable?) {
+                    draftSyncJob?.cancel()
+                    draftSyncJob =
+                        lifecycleScope.launch {
+                            delay(500L)
+                            val text = s?.toString()?.trim().orEmpty()
+                            telegramManager.saveChatDraft(chat.id, text)
+                        }
+                }
             },
         )
 
@@ -3439,6 +3452,7 @@ class MainActivity : AppCompatActivity() {
         return hasPhoneState || hasPhoneNumbers
     }
 
+    @android.annotation.SuppressLint("NewApi")
     private fun getDevicePhoneNumber(): String? {
         if (!hasTelephonyPermission()) {
             return null

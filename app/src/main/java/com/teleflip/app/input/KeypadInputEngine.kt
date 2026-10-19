@@ -79,7 +79,7 @@ class KeypadInputEngine(
             },
         )
 
-        val externalAccessibilityDelegate = editText.accessibilityDelegate
+        val externalAccessibilityDelegate = androidx.core.view.ViewCompat.getAccessibilityDelegate(editText)
         editText.accessibilityDelegate =
             object : View.AccessibilityDelegate() {
                 override fun sendAccessibilityEvent(
