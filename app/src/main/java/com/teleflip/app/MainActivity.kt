@@ -959,6 +959,9 @@ class MainActivity : AppCompatActivity() {
                 onMessageAction = { clickedMsg ->
                     handleMessageActionClick(clickedMsg)
                 },
+                onTranscribeClick = { msg ->
+                    handleTranscribeVoiceMessage(msg)
+                },
             )
         rvMessages?.adapter = messageAdapter
 
@@ -1293,6 +1296,15 @@ class MainActivity : AppCompatActivity() {
             )
         }
         OptionsMenuDialog(this, msg.pollQuestion.ifBlank { "Poll Options" }, options).show()
+    }
+
+    private fun handleTranscribeVoiceMessage(msg: MessageModel) {
+        showToast("Transcribing voice note...")
+        telegramManager.recognizeSpeech(msg.chatId, msg.id) { success, errorMsg ->
+            if (!success) {
+                showToast(errorMsg ?: "Speech recognition failed", true)
+            }
+        }
     }
 
     private fun handlePlayVoiceMessage(msg: MessageModel) {
@@ -3089,6 +3101,11 @@ class MainActivity : AppCompatActivity() {
                     voicePlayer.setPlaybackSpeed(2.0f)
                     messageAdapter?.setPlaybackSpeed(2.0f)
                     activeChat?.let { updateSoftkeysForFocusedMessage(it, msg) }
+                },
+            )
+            options.add(
+                MenuOption(options.size + 1, "🔤 Transcribe Voice Note") {
+                    handleTranscribeVoiceMessage(msg)
                 },
             )
         }

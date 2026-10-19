@@ -1890,6 +1890,51 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    fun recognizeSpeech(
+        chatId: Long,
+        messageId: Long,
+        onResult: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        scope.launch {
+            try {
+                val res = sendQuery(TdApi.RecognizeSpeech(chatId, messageId))
+                if (res is TdApi.Ok) {
+                    withContext(Dispatchers.Main) {
+                        onResult?.invoke(true, null)
+                    }
+                } else if (res is TdApi.Error) {
+                    val errMsg = res.message.ifBlank { "Speech recognition failed" }
+                    withContext(Dispatchers.Main) {
+                        onResult?.invoke(false, errMsg)
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        onResult?.invoke(false, "Speech recognition failed")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult?.invoke(false, e.message ?: "Speech recognition error")
+                }
+            }
+        }
+    }
+
+    fun updateMessageTranscript(
+        chatId: Long,
+        messageId: Long,
+        transcriptText: String,
+    ) {
+        val currentMap = _messages.value.toMutableMap()
+        val list = (currentMap[chatId] ?: return).toMutableList()
+        val idx = list.indexOfFirst { it.id == messageId }
+        if (idx >= 0) {
+            list[idx] = list[idx].copy(transcript = transcriptText)
+            currentMap[chatId] = list
+            _messages.value = currentMap
+        }
+    }
+
     fun sendLocation(
         chatId: Long,
         latitude: Double,
@@ -3587,6 +3632,22 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         return Pair("", false)
     }
 
+    private fun extractVoiceTranscript(content: TdApi.MessageContent?): String {
+        if (content is TdApi.MessageVoiceNote) {
+            val result = content.voiceNote?.speechRecognitionResult ?: return ""
+            return when (result.constructor) {
+                TdApi.SpeechRecognitionResultText.CONSTRUCTOR -> {
+                    (result as TdApi.SpeechRecognitionResultText).text ?: ""
+                }
+                TdApi.SpeechRecognitionResultPending.CONSTRUCTOR -> {
+                    (result as TdApi.SpeechRecognitionResultPending).partialText ?: ""
+                }
+                else -> ""
+            }
+        }
+        return ""
+    }
+
     private fun handleMessageContentUpdated(
         chatId: Long,
         messageId: Long,
@@ -3594,11 +3655,18 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     ) {
         val newText = extractMessageText(newContent)
         val newCaption = extractMediaCaption(newContent)
+        val newTranscript = extractVoiceTranscript(newContent)
         val currentMap = _messages.value.toMutableMap()
         val list = (currentMap[chatId] ?: return).toMutableList()
         val idx = list.indexOfFirst { it.id == messageId }
         if (idx >= 0) {
-            list[idx] = list[idx].copy(text = newText, mediaCaption = newCaption, isEdited = true)
+            val old = list[idx]
+            list[idx] = old.copy(
+                text = if (newText.isNotBlank()) newText else old.text,
+                mediaCaption = newCaption,
+                transcript = if (newTranscript.isNotBlank()) newTranscript else old.transcript,
+                isEdited = true,
+            )
             currentMap[chatId] = list
             _messages.value = currentMap
         }
@@ -3639,6 +3707,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 mediaFileId = mediaInfo.first,
                 stickerEmoji = stickerInfo.first,
                 isPremiumSticker = stickerInfo.second,
+                transcript = extractVoiceTranscript(msg.content),
             )
 
         appendMessage(msg.chatId, model)
@@ -3678,6 +3747,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     mediaFileId = mediaInfo.first,
                     stickerEmoji = stickerInfo.first,
                     isPremiumSticker = stickerInfo.second,
+                    transcript = extractVoiceTranscript(msg.content),
                 )
             }
         val currentMap = _messages.value.toMutableMap()

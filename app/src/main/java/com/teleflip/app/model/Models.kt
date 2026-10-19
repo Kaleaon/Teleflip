@@ -111,6 +111,7 @@ data class MessageModel(
     val pollTotalVoters: Int = 0,
     val messageThreadId: Long = 0L,
     val selfDestructSeconds: Int = 0,
+    val transcript: String = "",
 )
 
 data class MessageSearchResult(
