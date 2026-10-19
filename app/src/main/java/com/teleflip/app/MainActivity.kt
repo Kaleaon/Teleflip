@@ -221,7 +221,7 @@ class MainActivity : AppCompatActivity() {
             },
         )
 
-        telegramManager = TelegramManager(this)
+        telegramManager = TelegramManager.getInstance(this)
         voiceRecorder = VoiceRecorder(this)
         voicePlayer = VoicePlayer(this)
         locationHelper = LocationHelper(this)
@@ -266,6 +266,9 @@ class MainActivity : AppCompatActivity() {
         voiceRecorder.cancelRecording()
         voicePlayer.stop()
         cleanupInCallAudio()
+        if (!telegramManager.backgroundPushEnabled) {
+            telegramManager.stop()
+        }
     }
 
     private fun observeTelegramState() {
