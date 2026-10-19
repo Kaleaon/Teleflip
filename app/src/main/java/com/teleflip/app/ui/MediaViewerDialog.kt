@@ -37,9 +37,16 @@ class MediaViewerDialog(
     var panY: Float = 0f
         private set
 
+    var playbackSpeed: Float = 1.0f
+        private set
+
     private val zoomSteps = listOf(1.0f, 1.5f, 2.0f, 3.0f)
+    private val playbackSpeedSteps = listOf(1.0f, 1.25f, 1.5f, 2.0f)
     private val panStepPx = 48f
     private var isVideoPlaying = false
+
+    internal var mediaPlayer: android.media.MediaPlayer? = null
+    internal var sdkVersion: Int = android.os.Build.VERSION_CODES.M
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,8 +81,8 @@ class MediaViewerDialog(
             MediaType.VIDEO, MediaType.ANIMATION -> {
                 val isGif = message.mediaType == MediaType.ANIMATION
                 tvTitle?.text = if (isGif) "🎞️ GIF Viewer" else "📹 Video Player"
-                tvHint?.text = "[OK] Play/Pause • [◄/►] ±5s • [LSK] Restart • [1] Save • [RSK] Back"
-                tvZoomBadge?.text = if (isGif) "LOOP" else "00:00"
+                tvHint?.text = "[OK] Play/Pause • [◄/►] ±5s • [3] Speed • [LSK] Restart • [1] Save • [RSK] Back"
+                tvZoomBadge?.text = if (isGif) "LOOP" else formatSpeedLabel(playbackSpeed)
                 setupVideoOrGif(filePath, fileExists, isGif)
             }
             MediaType.STICKER -> {
@@ -138,10 +145,12 @@ class MediaViewerDialog(
         tvStatus?.visibility = View.GONE
         vvVideo?.setVideoURI(Uri.fromFile(File(filePath)))
         vvVideo?.setOnPreparedListener { mp ->
+            mediaPlayer = mp
             mp.isLooping = isLoopingGif
             vvVideo?.start()
             isVideoPlaying = true
-            tvZoomBadge?.text = if (isLoopingGif) "GIF ▶" else "Playing ▶"
+            applyPlaybackSpeed()
+            updateSpeedBadge()
         }
         vvVideo?.setOnCompletionListener {
             if (!isLoopingGif) {
@@ -214,6 +223,38 @@ class MediaViewerDialog(
         tvZoomBadge?.text = String.format(Locale.US, "%.1fx", zoomLevel)
     }
 
+    fun cyclePlaybackSpeed(): Float {
+        val currentIdx = playbackSpeedSteps.indexOfFirst { it == playbackSpeed }
+        val nextIdx = if (currentIdx in playbackSpeedSteps.indices) (currentIdx + 1) % playbackSpeedSteps.size else 0
+        playbackSpeed = playbackSpeedSteps[nextIdx]
+        applyPlaybackSpeed()
+        updateSpeedBadge()
+        return playbackSpeed
+    }
+
+    internal fun applyPlaybackSpeed() {
+        val mp = mediaPlayer ?: return
+        if (sdkVersion >= android.os.Build.VERSION_CODES.M) {
+            try {
+                val params = mp.playbackParams
+                mp.playbackParams = params.setSpeed(playbackSpeed)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    internal fun updateSpeedBadge() {
+        tvZoomBadge?.text = formatSpeedLabel(playbackSpeed)
+    }
+
+    internal fun formatSpeedLabel(speed: Float): String {
+        return if (speed == 1.25f) {
+            String.format(Locale.US, "%.2fx", speed)
+        } else {
+            String.format(Locale.US, "%.1fx", speed)
+        }
+    }
+
     private fun toggleVideoPlayback() {
         val vv = vvVideo ?: return
         if (vv.isPlaying) {
@@ -267,11 +308,15 @@ class MediaViewerDialog(
                     toggleVideoPlayback()
                     return true
                 }
+                keyCode == KeyEvent.KEYCODE_3 -> {
+                    cyclePlaybackSpeed()
+                    return true
+                }
                 SoftkeyUtils.isSoftLeftKey(keyCode) || keyCode == KeyEvent.KEYCODE_0 -> {
                     vvVideo?.seekTo(0)
                     vvVideo?.start()
                     isVideoPlaying = true
-                    tvZoomBadge?.text = "Playing ▶"
+                    updateSpeedBadge()
                     return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_4 -> {

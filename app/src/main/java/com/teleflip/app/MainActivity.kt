@@ -3463,6 +3463,7 @@ class MainActivity : AppCompatActivity() {
         return hasPhoneState || hasPhoneNumbers
     }
 
+    @android.annotation.SuppressLint("NewApi", "InlinedApi")
     private fun getDevicePhoneNumber(): String? {
         if (!hasTelephonyPermission()) {
             return null
