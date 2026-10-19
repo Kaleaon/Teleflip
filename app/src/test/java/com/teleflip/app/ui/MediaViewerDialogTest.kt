@@ -1,9 +1,12 @@
 package com.teleflip.app.ui
 
 import android.app.Application
+import android.graphics.Bitmap
 import android.media.MediaPlayer
 import android.media.PlaybackParams
 import android.view.KeyEvent
+import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -12,24 +15,43 @@ import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyFloat
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.LooperMode
+import java.io.File
+import java.io.FileOutputStream
 
 @RunWith(AndroidJUnit4::class)
+@LooperMode(LooperMode.Mode.PAUSED)
 class MediaViewerDialogTest {
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
     private lateinit var context: Application
+    private lateinit var samplePhotoFile: File
     private lateinit var samplePhotoMessage: MessageModel
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         context.setTheme(R.style.Theme_TeleFlip)
+
+        samplePhotoFile = tempFolder.newFile("sample_photo.jpg")
+        val bitmap = Bitmap.createBitmap(800, 600, Bitmap.Config.ARGB_8888)
+        FileOutputStream(samplePhotoFile).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        }
+
         samplePhotoMessage =
             MessageModel(
                 id = 1L,
@@ -39,6 +61,7 @@ class MediaViewerDialogTest {
                 time = "12:00",
                 isOutbound = false,
                 mediaType = MediaType.PHOTO,
+                mediaFilePath = samplePhotoFile.absolutePath,
             )
     }
 
@@ -70,6 +93,8 @@ class MediaViewerDialogTest {
         assertTrue("panBy should return true when zoomed in", dialog.panBy(24f, 24f))
         assertEquals(24f, dialog.panX)
         assertEquals(24f, dialog.panY)
+
+        dialog.dismiss()
     }
 
     @Test
@@ -94,6 +119,8 @@ class MediaViewerDialogTest {
             assertEquals(0f, dialog.panX)
             assertEquals(0f, dialog.panY)
         }
+
+        dialog.dismiss()
     }
 
     @Test
@@ -123,6 +150,8 @@ class MediaViewerDialogTest {
         val rightHandled = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, rightEvent)
         assertTrue("KEYCODE_DPAD_RIGHT should be consumed when zoomed in", rightHandled)
         assertEquals(0f, dialog.panX)
+
+        dialog.dismiss()
     }
 
     @Test
@@ -142,6 +171,8 @@ class MediaViewerDialogTest {
         dialog.resetZoomAndPan()
         assertEquals(1.0f, dialog.zoomLevel)
         assertFalse(dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, rightEvent))
+
+        dialog.dismiss()
     }
 
     @Test
@@ -270,5 +301,115 @@ class MediaViewerDialogTest {
         // Should not throw
         dialog.cyclePlaybackSpeed()
         assertEquals(1.25f, dialog.playbackSpeed, 0.001f)
+    }
+
+    @Test
+    fun setupPhoto_withValidFile_loadsBitmapAsynchronously() {
+        val message =
+            MessageModel(
+                id = 1,
+                chatId = 100,
+                senderName = "Test Sender",
+                text = "Photo Test",
+                time = "10:00 AM",
+                isOutbound = false,
+                mediaType = MediaType.PHOTO,
+                mediaFilePath = samplePhotoFile.absolutePath,
+                mediaFileId = 1234,
+            )
+
+        val dialog =
+            MediaViewerDialog(
+                context = context,
+                message = message,
+                onSaveMedia = {},
+                onRequestDownload = {},
+            )
+
+        dialog.show()
+
+        val ivPhoto = dialog.findViewById<ImageView>(R.id.iv_viewer_photo)
+        val tvStatus = dialog.findViewById<TextView>(R.id.tv_viewer_status)
+
+        // Execute background coroutine tasks and main looper tasks
+        val startTime = System.currentTimeMillis()
+        while (ivPhoto.visibility != View.VISIBLE && System.currentTimeMillis() - startTime < 3000) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+
+        assertEquals(View.VISIBLE, ivPhoto.visibility)
+        assertEquals(View.GONE, tvStatus.visibility)
+        assertNotNull(ivPhoto.drawable)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun setupPhoto_withMissingFile_showsDownloadingStatus() {
+        val missingPath = File(tempFolder.root, "missing_photo.jpg").absolutePath
+        val message =
+            MessageModel(
+                id = 2,
+                chatId = 100,
+                senderName = "Test Sender",
+                text = "Missing Photo",
+                time = "10:00 AM",
+                isOutbound = false,
+                mediaType = MediaType.PHOTO,
+                mediaFilePath = missingPath,
+                mediaFileId = 5678,
+            )
+
+        var downloadFileId = 0
+        val dialog =
+            MediaViewerDialog(
+                context = context,
+                message = message,
+                onSaveMedia = {},
+                onRequestDownload = { downloadFileId = it },
+            )
+
+        dialog.show()
+
+        val ivPhoto = dialog.findViewById<ImageView>(R.id.iv_viewer_photo)
+        val tvStatus = dialog.findViewById<TextView>(R.id.tv_viewer_status)
+
+        assertEquals(View.GONE, ivPhoto.visibility)
+        assertEquals(View.VISIBLE, tvStatus.visibility)
+        assertEquals(5678, downloadFileId)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun dialogStop_cancelsBackgroundDecodingJobsSafely() {
+        val message =
+            MessageModel(
+                id = 3,
+                chatId = 100,
+                senderName = "Test Sender",
+                text = "Photo Cancel Test",
+                time = "10:00 AM",
+                isOutbound = false,
+                mediaType = MediaType.PHOTO,
+                mediaFilePath = samplePhotoFile.absolutePath,
+                mediaFileId = 999,
+            )
+
+        val dialog =
+            MediaViewerDialog(
+                context = context,
+                message = message,
+                onSaveMedia = {},
+                onRequestDownload = {},
+            )
+
+        dialog.show()
+        // Immediately dismiss dialog before background coroutines finish
+        dialog.dismiss()
+
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        // Should close cleanly without crashing or updating dismissed views
     }
 }
