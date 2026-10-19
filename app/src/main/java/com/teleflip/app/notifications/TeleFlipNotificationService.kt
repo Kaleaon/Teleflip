@@ -36,6 +36,7 @@ class TeleFlipNotificationService : Service() {
         }
     }
 
+    @android.annotation.SuppressLint("ForegroundServiceType")
     override fun onCreate() {
         super.onCreate()
         try {
