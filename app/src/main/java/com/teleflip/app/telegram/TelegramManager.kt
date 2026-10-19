@@ -1719,15 +1719,60 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     ) {
         val cached = forumTopicsCache[chatId]
         if (cached != null && cached.isNotEmpty()) {
-            onResult(cached)
+            onResult(cached.sortedByDescending { it.isPinned })
             return
+        }
+        val client = tdClient
+        if (client != null) {
+            try {
+                val req = TdApi.GetForumTopics().apply {
+                    this.chatId = chatId
+                    this.query = ""
+                    this.offsetDate = 0
+                    this.offsetMessageId = 0
+                    this.offsetForumTopicId = 0
+                    this.limit = 100
+                }
+                client.send(req) { obj ->
+                    val topicsList = if (obj is TdApi.ForumTopics) {
+                        obj.topics.map { topic ->
+                            ForumTopicModel(
+                                topicId = topic.info.forumTopicId.toLong(),
+                                name = topic.info.name,
+                                unreadCount = topic.unreadCount,
+                                iconEmoji = "💬",
+                                isClosed = topic.info.isClosed,
+                                isPinned = topic.isPinned,
+                            )
+                        }.sortedByDescending { it.isPinned }
+                    } else null
+
+                    scope.launch(Dispatchers.Main) {
+                        if (!topicsList.isNullOrEmpty()) {
+                            forumTopicsCache[chatId] = topicsList
+                            onResult(topicsList)
+                        } else {
+                            val defaultTopics = listOf(
+                                ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
+                                ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
+                                ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
+                            ).sortedByDescending { it.isPinned }
+                            forumTopicsCache[chatId] = defaultTopics
+                            onResult(defaultTopics)
+                        }
+                    }
+                }
+                return
+            } catch (e: Exception) {
+                Log.w(tag, "loadForumTopics query failed: ${e.message}")
+            }
         }
         val defaultTopics =
             listOf(
                 ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
                 ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
                 ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
-            )
+            ).sortedByDescending { it.isPinned }
         forumTopicsCache[chatId] = defaultTopics
         onResult(defaultTopics)
     }
@@ -1747,10 +1792,76 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 iconEmoji = iconEmoji,
             )
         val existing = forumTopicsCache[chatId] ?: listOf(ForumTopicModel(0L, "General (All Messages)", 0, "💬"))
-        val updated = existing + newTopic
+        val updated = (existing + newTopic).sortedByDescending { it.isPinned }
         forumTopicsCache[chatId] = updated
         selectForumTopic(chatId, newTopic.topicId, newTopic.name)
         onResult(newTopic)
+    }
+
+    fun toggleForumTopicPin(
+        chatId: Long,
+        topicId: Long,
+        currentPinned: Boolean,
+        onResult: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val newPinned = !currentPinned
+        val existing = forumTopicsCache[chatId] ?: listOf(
+            ForumTopicModel(topicId = 0L, name = "General (All Messages)", unreadCount = 0, iconEmoji = "💬"),
+            ForumTopicModel(topicId = 101L, name = "Announcements", unreadCount = 0, iconEmoji = "📢"),
+            ForumTopicModel(topicId = 102L, name = "Support & Q&A", unreadCount = 0, iconEmoji = "🛠️"),
+        )
+        val updated = existing.map {
+            if (it.topicId == topicId) it.copy(isPinned = newPinned) else it
+        }.sortedByDescending { it.isPinned }
+        forumTopicsCache[chatId] = updated
+
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(newPinned, null)
+            return
+        }
+
+        try {
+            val req = TdApi.ToggleForumTopicIsPinned().apply {
+                this.chatId = chatId
+                this.forumTopicId = topicId.toInt()
+                this.isPinned = newPinned
+            }
+            client.send(req) { obj ->
+                if (obj is TdApi.Ok) {
+                    scope.launch(Dispatchers.Main) {
+                        onResult?.invoke(newPinned, null)
+                    }
+                } else {
+                    val errMsg = (obj as? TdApi.Error)?.message ?: "Failed to toggle topic pin"
+                    val reverted = existing.map {
+                        if (it.topicId == topicId) it.copy(isPinned = currentPinned) else it
+                    }.sortedByDescending { it.isPinned }
+                    forumTopicsCache[chatId] = reverted
+                    scope.launch(Dispatchers.Main) {
+                        onResult?.invoke(currentPinned, errMsg)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "toggleForumTopicPin failed: ${e.message}")
+            val reverted = existing.map {
+                if (it.topicId == topicId) it.copy(isPinned = currentPinned) else it
+            }.sortedByDescending { it.isPinned }
+            forumTopicsCache[chatId] = reverted
+            onResult?.invoke(currentPinned, e.message)
+        }
+    }
+
+    fun toggleForumTopicPin(
+        chatId: Long,
+        topicId: Long,
+        currentPinned: Boolean,
+        onResult: (Boolean) -> Unit,
+    ) {
+        toggleForumTopicPin(chatId, topicId, currentPinned) { isPinned, _ ->
+            onResult(isPinned)
+        }
     }
 
     fun selectForumTopic(

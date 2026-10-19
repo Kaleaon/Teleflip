@@ -29,6 +29,7 @@ data class ForumTopicModel(
     val unreadCount: Int = 0,
     val iconEmoji: String = "💬",
     val isClosed: Boolean = false,
+    val isPinned: Boolean = false,
 )
 
 data class ChatFolderModel(

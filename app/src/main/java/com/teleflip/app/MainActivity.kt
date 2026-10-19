@@ -1840,12 +1840,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun showForumTopicsMenu(chat: ChatModel) {
         commitActiveInputEngines()
-        telegramManager.loadForumTopics(chat.id) { topics ->
+        telegramManager.loadForumTopics(chat.id) { rawTopics ->
+            val topics = rawTopics.sortedByDescending { it.isPinned }
             val options = mutableListOf<MenuOption>()
-            topics.forEachIndexed { idx, topic ->
+            topics.forEach { topic ->
                 val activeMark = if (chat.activeTopicId == topic.topicId) "✓ " else ""
+                val pinBadge = if (topic.isPinned) "📌 " else ""
                 options.add(
-                    MenuOption(idx + 1, "$activeMark${topic.iconEmoji} ${topic.name}") {
+                    MenuOption(options.size + 1, "$activeMark$pinBadge${topic.iconEmoji} ${topic.name}") {
                         telegramManager.selectForumTopic(chat.id, topic.topicId, topic.name)
                         val updatedChat =
                             chat.copy(
@@ -1854,6 +1856,20 @@ class MainActivity : AppCompatActivity() {
                                 activeTopicName = if (topic.topicId == 0L) "" else topic.name,
                             )
                         openConversation(updatedChat)
+                    },
+                )
+                val pinLabel = if (topic.isPinned) "📌 Unpin '${topic.name}'" else "📌 Pin '${topic.name}'"
+                options.add(
+                    MenuOption(options.size + 1, pinLabel) {
+                        telegramManager.toggleForumTopicPin(chat.id, topic.topicId, topic.isPinned) { isNowPinned, errorMsg ->
+                            if (errorMsg != null) {
+                                showToast(errorMsg)
+                            } else {
+                                val actionStr = if (isNowPinned) "Pinned" else "Unpinned"
+                                showToast("$actionStr topic: ${topic.name}")
+                                showForumTopicsMenu(chat)
+                            }
+                        }
                     },
                 )
             }
