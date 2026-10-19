@@ -7,4 +7,11 @@
     <string name="cd_avatar_format">%1$s\'s avatar</string>
     <string name="cd_photo_attachment">Photo attachment</string>
     <string name="cd_photo_attachment_format">Photo: %1$s</string>
+    <string name="cd_voice_state_playing">Playing at %1$s speed</string>
+    <string name="cd_voice_state_paused">Paused at %1$d seconds</string>
+    <string name="cd_voice_message_format">Voice message, %1$s, %2$d seconds</string>
+    <string name="cd_video_state_playing">Video playing</string>
+    <string name="cd_video_state_paused">Video paused</string>
+    <string name="cd_video_state_ended">Video ended</string>
+    <string name="cd_zoom_scale_format">Zoom scale %1$s</string>
 </resources>
