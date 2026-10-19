@@ -4,9 +4,11 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.teleflip.app.MainActivity
 import com.teleflip.app.R
 
@@ -57,7 +59,16 @@ class TeleFlipNotificationService : Service() {
                     .setContentIntent(pendingIntent)
                     .build()
 
-            startForeground(FG_NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceCompat.startForeground(
+                    this,
+                    FG_NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+                )
+            } else {
+                startForeground(FG_NOTIFICATION_ID, notification)
+            }
         } catch (_: Throwable) {
         }
     }
