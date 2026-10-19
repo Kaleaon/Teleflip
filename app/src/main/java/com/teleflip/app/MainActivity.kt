@@ -1202,6 +1202,27 @@ class MainActivity : AppCompatActivity() {
                     onRight = { showChatListScreen() },
                 )
             }
+            MediaType.PAID_MEDIA -> {
+                if (msg.isPaidMediaLocked) {
+                    softkeyManager.update(
+                        left = "Options",
+                        center = "Unlock",
+                        right = "Back",
+                        onLeft = { showMessageOptionsMenu(msg) },
+                        onCenter = { handlePaidMediaAction(msg) },
+                        onRight = { showChatListScreen() },
+                    )
+                } else {
+                    softkeyManager.update(
+                        left = "Options",
+                        center = "View",
+                        right = "Back",
+                        onLeft = { showMessageOptionsMenu(msg) },
+                        onCenter = { openMediaViewer(msg) },
+                        onRight = { showChatListScreen() },
+                    )
+                }
+            }
             else -> {
                 softkeyManager.update(
                     left = "Options",
@@ -1221,8 +1242,38 @@ class MainActivity : AppCompatActivity() {
             MediaType.LOCATION -> LocationHelper.openInOrganicMaps(this, msg.latitude, msg.longitude)
             MediaType.PHOTO, MediaType.VIDEO, MediaType.ANIMATION, MediaType.STICKER -> openMediaViewer(msg)
             MediaType.POLL -> showPollVoteMenu(msg)
+            MediaType.PAID_MEDIA -> handlePaidMediaAction(msg)
             else -> showMessageOptionsMenu(msg)
         }
+    }
+
+    private fun handlePaidMediaAction(msg: MessageModel) {
+        if (msg.isPaidMediaLocked) {
+            showPaidMediaUnlockConfirmation(msg)
+        } else {
+            openMediaViewer(msg)
+        }
+    }
+
+    private fun showPaidMediaUnlockConfirmation(msg: MessageModel) {
+        commitActiveInputEngines()
+        AlertDialog.Builder(this)
+            .setTitle("Unlock Content")
+            .setMessage("Unlock this media for ⭐ ${msg.starCount} Stars?")
+            .setPositiveButton("Unlock") { _, _ ->
+                showToast("Requesting unlock for ⭐ ${msg.starCount} Stars...")
+                telegramManager.unlockPaidMedia(msg.chatId, msg.id) { success ->
+                    runOnUiThread {
+                        if (success) {
+                            showToast("Content unlocked!")
+                        } else {
+                            showToast("Failed to unlock content", isError = true)
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun openMediaViewer(msg: MessageModel) {
@@ -2972,6 +3023,21 @@ class MainActivity : AppCompatActivity() {
                     openMediaViewer(msg)
                 },
             )
+        }
+        if (msg.mediaType == MediaType.PAID_MEDIA) {
+            if (msg.isPaidMediaLocked) {
+                options.add(
+                    MenuOption(options.size + 1, "🔓 Unlock Content (⭐ ${msg.starCount} Stars)") {
+                        handlePaidMediaAction(msg)
+                    },
+                )
+            } else {
+                options.add(
+                    MenuOption(options.size + 1, "🔍 View Full-Screen / Play Media") {
+                        openMediaViewer(msg)
+                    },
+                )
+            }
         }
         if (msg.mediaType == MediaType.POLL) {
             options.add(

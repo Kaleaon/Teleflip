@@ -122,6 +122,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     }
 
     @androidx.annotation.VisibleForTesting
+    internal fun handleIncomingMessageForTesting(msg: TdApi.Message) {
+        handleIncomingMessage(msg)
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun handleMessagesListForTesting(msgs: Array<TdApi.Message>) {
+        handleMessagesList(msgs)
+    }
+
+    @androidx.annotation.VisibleForTesting
     internal fun setActiveCallForTesting(call: ActiveCall?) {
         _activeCall.value = call
     }
@@ -3547,11 +3557,27 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     ) {
         val newText = extractMessageText(newContent)
         val newCaption = extractMediaCaption(newContent)
+        val newMediaType = extractMediaType(newContent)
+        val newMediaInfo = extractMediaFileInfo(newContent)
+        val starCount = extractStarCount(newContent)
+        val isLocked = extractIsPaidMediaLocked(newContent)
+
         val currentMap = _messages.value.toMutableMap()
         val list = (currentMap[chatId] ?: return).toMutableList()
         val idx = list.indexOfFirst { it.id == messageId }
         if (idx >= 0) {
-            list[idx] = list[idx].copy(text = newText, mediaCaption = newCaption, isEdited = true)
+            val old = list[idx]
+            list[idx] =
+                old.copy(
+                    text = newText,
+                    mediaCaption = newCaption,
+                    mediaType = newMediaType,
+                    mediaFileId = if (newMediaInfo.first != 0) newMediaInfo.first else old.mediaFileId,
+                    mediaFilePath = newMediaInfo.second ?: old.mediaFilePath,
+                    starCount = starCount,
+                    isPaidMediaLocked = isLocked,
+                    isEdited = true,
+                )
             currentMap[chatId] = list
             _messages.value = currentMap
         }
@@ -3592,6 +3618,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 mediaFileId = mediaInfo.first,
                 stickerEmoji = stickerInfo.first,
                 isPremiumSticker = stickerInfo.second,
+                starCount = extractStarCount(msg.content),
+                isPaidMediaLocked = extractIsPaidMediaLocked(msg.content),
             )
 
         appendMessage(msg.chatId, model)
@@ -3631,6 +3659,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     mediaFileId = mediaInfo.first,
                     stickerEmoji = stickerInfo.first,
                     isPremiumSticker = stickerInfo.second,
+                    starCount = extractStarCount(msg.content),
+                    isPaidMediaLocked = extractIsPaidMediaLocked(msg.content),
                 )
             }
         val currentMap = _messages.value.toMutableMap()
@@ -3703,6 +3733,49 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    private fun extractStarCount(content: TdApi.MessageContent?): Long {
+        if (content == null) return 0L
+        return if (content.constructor == TdApi.MessagePaidMedia.CONSTRUCTOR) {
+            (content as TdApi.MessagePaidMedia).starCount
+        } else {
+            0L
+        }
+    }
+
+    private fun extractIsPaidMediaLocked(content: TdApi.MessageContent?): Boolean {
+        if (content == null) return false
+        if (content.constructor == TdApi.MessagePaidMedia.CONSTRUCTOR) {
+            val paidMedia = content as TdApi.MessagePaidMedia
+            if (paidMedia.media.isEmpty()) return true
+            return paidMedia.media.any { it.constructor == TdApi.PaidMediaPreview.CONSTRUCTOR }
+        }
+        return false
+    }
+
+    fun unlockPaidMedia(
+        chatId: Long,
+        messageId: Long,
+        callback: ((Boolean) -> Unit)? = null,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            callback?.invoke(false)
+            return
+        }
+        client.send(
+            TdApi.OpenMessageContent(chatId, messageId),
+            object : Client.ResultHandler {
+                override fun onResult(obj: TdApi.Object?) {
+                    val success = obj is TdApi.Ok
+                    if (!success && obj is TdApi.Error) {
+                        Log.e("TelegramManager", "Failed to unlock paid media: ${obj.message}")
+                    }
+                    callback?.invoke(success)
+                }
+            },
+        )
+    }
+
     private fun extractMediaCaption(content: TdApi.MessageContent?): String {
         if (content == null) return ""
         return when (content.constructor) {
@@ -3712,6 +3785,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 doc.caption.text.ifBlank { doc.document.fileName }
             }
             TdApi.MessageVideo.CONSTRUCTOR -> (content as TdApi.MessageVideo).caption.text
+            TdApi.MessagePaidMedia.CONSTRUCTOR -> (content as TdApi.MessagePaidMedia).caption.text
             else -> ""
         }
     }
@@ -3747,6 +3821,23 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessageDocument.CONSTRUCTOR -> {
                 val doc = (content as TdApi.MessageDocument).document
                 resolveFile(doc.document)
+            }
+            TdApi.MessagePaidMedia.CONSTRUCTOR -> {
+                val paidMedia = content as TdApi.MessagePaidMedia
+                for (m in paidMedia.media) {
+                    when (m.constructor) {
+                        TdApi.PaidMediaPhoto.CONSTRUCTOR -> {
+                            val photo = (m as TdApi.PaidMediaPhoto).photo
+                            val size = photo.sizes.lastOrNull()
+                            if (size != null) return resolveFile(size.photo)
+                        }
+                        TdApi.PaidMediaVideo.CONSTRUCTOR -> {
+                            val video = (m as TdApi.PaidMediaVideo).video
+                            if (video != null) return resolveFile(video.video)
+                        }
+                    }
+                }
+                Pair(0, null)
             }
             else -> Pair(0, null)
         }
@@ -3788,6 +3879,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessageVideo.CONSTRUCTOR -> MediaType.VIDEO
             TdApi.MessageAnimation.CONSTRUCTOR -> MediaType.ANIMATION
             TdApi.MessagePoll.CONSTRUCTOR -> MediaType.POLL
+            TdApi.MessagePaidMedia.CONSTRUCTOR -> MediaType.PAID_MEDIA
             else -> MediaType.NONE
         }
     }
@@ -3807,6 +3899,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessageSticker.CONSTRUCTOR -> {
                 val emoji = (content as TdApi.MessageSticker).sticker?.emoji ?: ""
                 if (emoji.isNotBlank()) "🎨 [Sticker $emoji]" else "🎨 [Sticker]"
+            }
+            TdApi.MessagePaidMedia.CONSTRUCTOR -> {
+                val paid = content as TdApi.MessagePaidMedia
+                val isLocked = extractIsPaidMediaLocked(content)
+                val lockTag = if (isLocked) "🔒 Locked" else "🔓 Unlocked"
+                val cap = paid.caption.text
+                val base = "⭐ ${paid.starCount} Stars • $lockTag"
+                if (cap.isNotBlank()) "$base • $cap" else base
             }
             else -> "[Message]"
         }
