@@ -20,6 +20,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
+import android.view.accessibility.AccessibilityEvent
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
@@ -673,8 +674,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var activeDialogCount = 0
+    private var savedFocusView: View? = null
 
     fun onDialogShown() {
+        if (activeDialogCount == 0) {
+            savedFocusView = currentFocus ?: window?.decorView?.findFocus()
+        }
         activeDialogCount++
         softkeyManager.setSoftkeyBarVisible(false)
     }
@@ -684,6 +689,14 @@ class MainActivity : AppCompatActivity() {
         if (activeDialogCount <= 0) {
             activeDialogCount = 0
             softkeyManager.setSoftkeyBarVisible(true)
+            val targetView = savedFocusView
+            savedFocusView = null
+            targetView?.post {
+                if (targetView.isAttachedToWindow) {
+                    targetView.requestFocus()
+                    targetView.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED)
+                }
+            }
         }
     }
 
