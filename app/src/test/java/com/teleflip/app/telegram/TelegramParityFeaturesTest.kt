@@ -4,10 +4,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
+import com.teleflip.app.model.ForumTopicModel
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
-import com.teleflip.app.model.ForumTopicModel
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals

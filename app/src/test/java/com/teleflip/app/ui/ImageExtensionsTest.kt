@@ -132,30 +132,33 @@ class ImageExtensionsTest {
 
     @Test
     fun calculateInSampleSize_withLargeImage_calculatesPowerOfTwo() {
-        val options = android.graphics.BitmapFactory.Options().apply {
-            outWidth = 2000
-            outHeight = 1000
-        }
+        val options =
+            android.graphics.BitmapFactory.Options().apply {
+                outWidth = 2000
+                outHeight = 1000
+            }
         val sampleSize = calculateInSampleSize(options, 500, 500)
         assertEquals(2, sampleSize)
     }
 
     @Test
     fun calculateInSampleSize_withSmallImage_returnsOne() {
-        val options = android.graphics.BitmapFactory.Options().apply {
-            outWidth = 400
-            outHeight = 300
-        }
+        val options =
+            android.graphics.BitmapFactory.Options().apply {
+                outWidth = 400
+                outHeight = 300
+            }
         val sampleSize = calculateInSampleSize(options, 800, 600)
         assertEquals(1, sampleSize)
     }
 
     @Test
     fun calculateInSampleSize_withZeroOrNegativeTarget_returnsOne() {
-        val options = android.graphics.BitmapFactory.Options().apply {
-            outWidth = 1000
-            outHeight = 1000
-        }
+        val options =
+            android.graphics.BitmapFactory.Options().apply {
+                outWidth = 1000
+                outHeight = 1000
+            }
         assertEquals(1, calculateInSampleSize(options, 0, 500))
         assertEquals(1, calculateInSampleSize(options, 500, -10))
     }

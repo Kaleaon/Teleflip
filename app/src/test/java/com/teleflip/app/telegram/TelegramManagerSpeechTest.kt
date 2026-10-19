@@ -44,16 +44,17 @@ class TelegramManagerSpeechTest {
         val manager = TelegramManager(mockContext)
         val chatId = 100L
         val msgId = 1L
-        val msg = MessageModel(
-            id = msgId,
-            chatId = chatId,
-            senderName = "Contact",
-            text = "🎤 Voice Message (5s)",
-            time = "12:00",
-            isOutbound = false,
-            mediaType = MediaType.VOICE,
-            durationSeconds = 5,
-        )
+        val msg =
+            MessageModel(
+                id = msgId,
+                chatId = chatId,
+                senderName = "Contact",
+                text = "🎤 Voice Message (5s)",
+                time = "12:00",
+                isOutbound = false,
+                mediaType = MediaType.VOICE,
+                durationSeconds = 5,
+            )
 
         manager.setMessagesForTesting(mapOf(chatId to listOf(msg)))
         assertEquals("", manager.messages.value[chatId]?.first()?.transcript)

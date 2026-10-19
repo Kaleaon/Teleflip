@@ -1924,10 +1924,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCustomScheduleDelayDialog(chat: ChatModel) {
-        val input = android.widget.EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            hint = "Minutes (e.g. 15)"
-        }
+        val input =
+            android.widget.EditText(this).apply {
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                hint = "Minutes (e.g. 15)"
+            }
         androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("Schedule Delay (Minutes)")
             .setView(input)

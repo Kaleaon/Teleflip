@@ -35,7 +35,7 @@ object PasscodeManager {
         return try {
             val biometricManager = BiometricManager.from(context)
             biometricManager.canAuthenticate(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK,
             ) == BiometricManager.BIOMETRIC_SUCCESS
         } catch (_: Exception) {
             false
@@ -106,11 +106,12 @@ object PasscodeManager {
         val callback = createAuthenticationCallback(onSuccess, onError)
 
         val biometricPrompt = BiometricPrompt(activity, executor, callback)
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Teleflip")
-            .setSubtitle("Log in using your biometric credential")
-            .setNegativeButtonText("Use PIN")
-            .build()
+        val promptInfo =
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Unlock Teleflip")
+                .setSubtitle("Log in using your biometric credential")
+                .setNegativeButtonText("Use PIN")
+                .build()
 
         biometricPrompt.authenticate(promptInfo)
     }
@@ -126,7 +127,10 @@ object PasscodeManager {
                 onSuccess()
             }
 
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+            override fun onAuthenticationError(
+                errorCode: Int,
+                errString: CharSequence,
+            ) {
                 super.onAuthenticationError(errorCode, errString)
                 if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
                     errorCode != BiometricPrompt.ERROR_USER_CANCELED &&

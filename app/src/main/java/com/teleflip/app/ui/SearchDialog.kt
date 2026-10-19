@@ -184,10 +184,11 @@ class SearchDialog(
             return
         }
 
-        searchJob = dialogScope.launch {
-            delay(DEBOUNCE_DELAY_MS)
-            performSearch(trimmed, requestId)
-        }
+        searchJob =
+            dialogScope.launch {
+                delay(DEBOUNCE_DELAY_MS)
+                performSearch(trimmed, requestId)
+            }
     }
 
     private fun setupPagination() {
@@ -221,7 +222,10 @@ class SearchDialog(
         performSearch(query.trim(), requestId)
     }
 
-    private fun performSearch(trimmed: String, requestId: Long) {
+    private fun performSearch(
+        trimmed: String,
+        requestId: Long,
+    ) {
         if (trimmed.isEmpty()) {
             progressBar.visibility = View.GONE
             layoutEmpty.visibility = View.VISIBLE

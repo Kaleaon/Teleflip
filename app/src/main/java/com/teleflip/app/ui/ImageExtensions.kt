@@ -49,9 +49,10 @@ fun decodeSampledBitmapFromFile(
         val file = File(filePath)
         if (!file.exists()) return null
 
-        val options = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
+        val options =
+            BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
         BitmapFactory.decodeFile(filePath, options)
 
         options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)

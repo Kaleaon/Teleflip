@@ -1,7 +1,6 @@
 package com.teleflip.app.ui
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
@@ -15,14 +14,14 @@ import coil.load
 import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
-import java.io.File
-import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.Locale
 
 class MediaViewerDialog(
     context: Context,
@@ -132,9 +131,10 @@ class MediaViewerDialog(
         val reqHeight = displayMetrics.heightPixels
 
         dialogScope.launch {
-            val bmp = withContext(Dispatchers.IO) {
-                decodeSampledBitmapFromFile(filePath, reqWidth, reqHeight)
-            }
+            val bmp =
+                withContext(Dispatchers.IO) {
+                    decodeSampledBitmapFromFile(filePath, reqWidth, reqHeight)
+                }
             if (bmp != null) {
                 ivPhoto?.setImageBitmap(bmp)
                 ivPhoto?.visibility = View.VISIBLE

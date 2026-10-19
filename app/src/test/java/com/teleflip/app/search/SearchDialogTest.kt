@@ -34,7 +34,6 @@ import java.time.Duration
 
 @RunWith(AndroidJUnit4::class)
 class SearchDialogTest {
-
     private fun <T> anyKotlin(): T {
         org.mockito.Mockito.any<T>()
         @Suppress("UNCHECKED_CAST")

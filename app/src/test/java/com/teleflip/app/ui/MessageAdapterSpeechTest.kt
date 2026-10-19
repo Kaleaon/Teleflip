@@ -29,21 +29,23 @@ class MessageAdapterSpeechTest {
     @Test
     fun testVoiceMessageViewHolderBindsTranscribeButtonAndTranscript() {
         var transcribeClickedMessage: MessageModel? = null
-        val adapter = MessageAdapter(
-            onTranscribeClick = { msg -> transcribeClickedMessage = msg }
-        )
+        val adapter =
+            MessageAdapter(
+                onTranscribeClick = { msg -> transcribeClickedMessage = msg },
+            )
 
-        val voiceMsgWithoutTranscript = MessageModel(
-            id = 101L,
-            chatId = 1L,
-            senderName = "Alice",
-            text = "🎤 [Voice Note]",
-            time = "10:00",
-            isOutbound = false,
-            mediaType = MediaType.VOICE,
-            durationSeconds = 8,
-            transcript = "",
-        )
+        val voiceMsgWithoutTranscript =
+            MessageModel(
+                id = 101L,
+                chatId = 1L,
+                senderName = "Alice",
+                text = "🎤 [Voice Note]",
+                time = "10:00",
+                isOutbound = false,
+                mediaType = MediaType.VOICE,
+                durationSeconds = 8,
+                transcript = "",
+            )
 
         val parent = FrameLayout(context)
         val viewHolder = adapter.onCreateViewHolder(parent, 0)
@@ -65,9 +67,10 @@ class MessageAdapterSpeechTest {
         assertEquals(voiceMsgWithoutTranscript, transcribeClickedMessage)
 
         // Now test voice message WITH transcript
-        val voiceMsgWithTranscript = voiceMsgWithoutTranscript.copy(
-            transcript = "This is the transcribed speech text."
-        )
+        val voiceMsgWithTranscript =
+            voiceMsgWithoutTranscript.copy(
+                transcript = "This is the transcribed speech text.",
+            )
 
         viewHolder.bind(voiceMsgWithTranscript)
 
@@ -80,15 +83,16 @@ class MessageAdapterSpeechTest {
     fun testNonVoiceMessageHidesTranscribeButtonAndTranscript() {
         val adapter = MessageAdapter()
 
-        val textMsg = MessageModel(
-            id = 202L,
-            chatId = 1L,
-            senderName = "Bob",
-            text = "Hello world",
-            time = "10:05",
-            isOutbound = false,
-            mediaType = MediaType.NONE,
-        )
+        val textMsg =
+            MessageModel(
+                id = 202L,
+                chatId = 1L,
+                senderName = "Bob",
+                text = "Hello world",
+                time = "10:05",
+                isOutbound = false,
+                mediaType = MediaType.NONE,
+            )
 
         val parent = FrameLayout(context)
         val viewHolder = adapter.onCreateViewHolder(parent, 0)

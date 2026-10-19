@@ -96,16 +96,17 @@ class LocationHelper(private val context: Context) {
             }
 
             // Fallback timeout after 6 seconds to use best last known location if still waiting
-            val runnable = Runnable {
-                if (isCompleted.compareAndSet(false, true)) {
-                    locationManager.removeUpdates(listener)
-                    if (bestLast != null) {
-                        onSuccess(buildLocationInfo(bestLast))
-                    } else {
-                        onError("GPS timed out acquiring position. Try outdoors with clear sky view.")
+            val runnable =
+                Runnable {
+                    if (isCompleted.compareAndSet(false, true)) {
+                        locationManager.removeUpdates(listener)
+                        if (bestLast != null) {
+                            onSuccess(buildLocationInfo(bestLast))
+                        } else {
+                            onError("GPS timed out acquiring position. Try outdoors with clear sky view.")
+                        }
                     }
                 }
-            }
             timeoutRunnable = runnable
             handler.postDelayed(runnable, 6000)
         } catch (e: Exception) {
