@@ -1,5 +1,6 @@
 package com.teleflip.app.input
 
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
@@ -7,7 +8,6 @@ import android.view.View
 import android.view.accessibility.AccessibilityEvent
 import android.widget.EditText
 import android.widget.TextView
-import androidx.core.view.ViewCompat
 
 enum class InputMode(val label: String) {
     CAP_FIRST("Abc"),
@@ -80,7 +80,12 @@ class KeypadInputEngine(
             },
         )
 
-        val externalAccessibilityDelegate = ViewCompat.getAccessibilityDelegate(editText)
+        val externalAccessibilityDelegate =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                editText.accessibilityDelegate
+            } else {
+                null
+            }
         editText.accessibilityDelegate =
             object : View.AccessibilityDelegate() {
                 override fun sendAccessibilityEvent(

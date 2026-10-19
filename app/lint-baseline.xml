@@ -1,0 +1,3966 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.6.0" type="baseline" client="gradle" dependencies="false" name="AGP (8.6.0)" variant="all" version="8.6.0">
+
+    <issue
+        id="ScopedStorage"
+        message="READ_EXTERNAL_STORAGE is deprecated (and is not granted) when targeting Android 13+. If you need to query or interact with MediaStore or media files on the shared storage, you should instead use one or more new storage permissions: `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO` or `READ_MEDIA_AUDIO`."
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.READ_EXTERNAL_STORAGE&quot; />"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="13"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="ScopedStorage"
+        message="WRITE_EXTERNAL_STORAGE is deprecated (and is not granted) when targeting Android 13+. If you need to write to shared storage, use the `MediaStore.createWriteRequest` intent."
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.WRITE_EXTERNAL_STORAGE&quot; />"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="14"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="CutPasteId"
+        message="The id `R.id.progress_chats` has already been looked up in this method; possible cut &amp; paste error?"
+        errorLine1="                        findViewById&lt;View>(R.id.progress_chats)?.visibility = View.GONE"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="582"
+            column="25"/>
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="567"
+            column="28"
+            message="First usage here"/>
+    </issue>
+
+    <issue
+        id="CutPasteId"
+        message="The id `R.id.layout_empty_state` has already been looked up in this method; possible cut &amp; paste error?"
+        errorLine1="                        findViewById&lt;View>(R.id.layout_empty_state)?.visibility = View.VISIBLE"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="583"
+            column="25"/>
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="566"
+            column="25"
+            message="First usage here"/>
+    </issue>
+
+    <issue
+        id="CutPasteId"
+        message="The id `R.id.progress_chats` has already been looked up in this method; possible cut &amp; paste error?"
+        errorLine1="                        findViewById&lt;View>(R.id.progress_chats)?.visibility = View.GONE"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="585"
+            column="25"/>
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="567"
+            column="28"
+            message="First usage here"/>
+    </issue>
+
+    <issue
+        id="CutPasteId"
+        message="The id `R.id.layout_empty_state` has already been looked up in this method; possible cut &amp; paste error?"
+        errorLine1="                        findViewById&lt;View>(R.id.layout_empty_state)?.visibility = View.GONE"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="586"
+            column="25"/>
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="566"
+            column="25"
+            message="First usage here"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
+        errorLine1="                tvRecordTimer?.text = String.format(&quot;%02d:%02d&quot;, min, sec)"
+        errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="1322"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
+        errorLine1="                tvRecordTimer?.text = String.format(&quot;%02d:%02d&quot;, min, sec)"
+        errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="1322"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
+        errorLine1="                    tvMedia.text = &quot;📍 [Location: ${String.format(&quot;%.4f, %.4f&quot;, message.latitude, message.longitude)}]&quot;"
+        errorLine2="                                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="146"
+            column="53"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
+        errorLine1="                    tvMedia.text = &quot;📍 [Location: ${String.format(&quot;%.4f, %.4f&quot;, message.latitude, message.longitude)}]&quot;"
+        errorLine2="                                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="146"
+            column="53"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `toLowerCase(Locale)` instead. For strings meant to be internal use `Locale.ROOT`, otherwise `Locale.getDefault()`."
+        errorLine1="            defaultCountry = loc.getCountry().toLowerCase();"
+        errorLine2="                                              ~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/telegram/PhoneFormat/PhoneFormat.java"
+            line="135"
+            column="47"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 29 (current min is 26): `android.telephony.SubscriptionManager#DEFAULT_SUBSCRIPTION_ID`"
+        errorLine1="                        val raw = sm.getPhoneNumber(SubscriptionManager.DEFAULT_SUBSCRIPTION_ID)"
+        errorLine2="                                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3543"
+            column="53"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 29 (current min is 26): `android.view.View#getAccessibilityDelegate`"
+        errorLine1="        val externalAccessibilityDelegate = editText.accessibilityDelegate"
+        errorLine2="                                                     ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/input/KeypadInputEngine.kt"
+            line="82"
+            column="54"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 33 (current min is 26): `android.telephony.SubscriptionManager#getPhoneNumber`"
+        errorLine1="                                    val raw = sm.getPhoneNumber(sub.subscriptionId)"
+        errorLine2="                                                 ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3522"
+            column="50"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 33 (current min is 26): `android.telephony.SubscriptionManager#getPhoneNumber`"
+        errorLine1="                        val raw = sm.getPhoneNumber(SubscriptionManager.DEFAULT_SUBSCRIPTION_ID)"
+        errorLine2="                                     ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3543"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="OldTargetApi"
+        message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
+        errorLine1="        targetSdk 34"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="27"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="ForegroundServiceType"
+        message="To call `Service.startForeground()`, the `&lt;service>` element of manifest file must have the `foregroundServiceType` attribute specified"
+        errorLine1="            startForeground(FG_NOTIFICATION_ID, notification)"
+        errorLine2="            ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/notifications/TeleFlipNotificationService.kt"
+            line="60"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.core:core-ktx than 1.12.0 is available: 1.19.1"
+        errorLine1="    implementation &apos;androidx.core:core-ktx:1.12.0&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="77"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.appcompat:appcompat than 1.6.1 is available: 1.8.0"
+        errorLine1="    implementation &apos;androidx.appcompat:appcompat:1.6.1&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="78"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.android.material:material than 1.11.0 is available: 1.14.0"
+        errorLine1="    implementation &apos;com.google.android.material:material:1.11.0&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="79"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.recyclerview:recyclerview than 1.3.2 is available: 1.4.0"
+        errorLine1="    implementation &apos;androidx.recyclerview:recyclerview:1.3.2&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="80"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.constraintlayout:constraintlayout than 2.1.4 is available: 2.2.2"
+        errorLine1="    implementation &apos;androidx.constraintlayout:constraintlayout:2.1.4&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="81"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-viewmodel-ktx than 2.7.0 is available: 2.11.0"
+        errorLine1="    implementation &apos;androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="82"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.7.0 is available: 2.11.0"
+        errorLine1="    implementation &apos;androidx.lifecycle:lifecycle-runtime-ktx:2.7.0&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="83"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-android than 1.7.3 is available: 1.8.1"
+        errorLine1="    implementation &apos;org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="84"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-test than 1.7.3 is available: 1.8.1"
+        errorLine1="    testImplementation &apos;org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3&apos;"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="100"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.test:core than 1.5.0 is available: 1.7.0"
+        errorLine1="    testImplementation &apos;androidx.test:core:1.5.0&apos;"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="102"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.test.ext:junit than 1.1.5 is available: 1.3.0"
+        errorLine1="    testImplementation &apos;androidx.test.ext:junit:1.1.5&apos;"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="103"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="HardwareIds"
+        message="Using `getLine1Number` to get device identifiers is not recommended"
+        errorLine1="                    val raw = tm.line1Number"
+        errorLine2="                              ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3589"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="HardwareIds"
+        message="Using `getLine1Number` to get device identifiers is not recommended"
+        errorLine1="                val raw = tm.line1Number"
+        errorLine2="                          ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3607"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="ExportedReceiver"
+        message="Exported receiver does not require permission"
+        errorLine1="        &lt;receiver"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="41"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="NotifyDataSetChanged"
+        message="It will always be more efficient to use more specific change events if you can. Rely on `notifyDataSetChanged` as a last resort."
+        errorLine1="        notifyDataSetChanged()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageSearchResultAdapter.kt"
+            line="19"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 26"
+        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &amp;&amp;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="167"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 26"
+        errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3495"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is never &lt; 26"
+        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/notifications/NotificationHelper.kt"
+            line="20"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 26"
+        errorLine1="                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/notifications/NotificationHelper.kt"
+            line="77"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 26"
+        errorLine1="                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/notifications/NotificationHelper.kt"
+            line="116"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 26"
+        errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/storage/StorageManager.kt"
+            line="245"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 26"
+        errorLine1="                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/notifications/TeleFlipNotificationService.kt"
+            line="24"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; SDK_INT is always >= 26"
+        errorLine1="                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/notifications/TeleFlipNotificationService.kt"
+            line="43"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark&quot;>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/activity_main.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark_card` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark_card&quot;>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="5"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark_card` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark_card&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_diagnostics.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `#000000` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;#000000&quot;>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_media_viewer.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark_card` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark_card&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark_card` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark_card&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_options_menu.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark&quot;>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark_card` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark_card&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_symbols.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/softkey_bg` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/softkey_bg&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/layout_softkeys.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark&quot;>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark&quot;>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="5"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="5"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_passcode_lock.xml"
+            line="7"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="5"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/bg_dark` with a theme that also paints a background (inferred theme is `@style/Theme.TeleFlip`)"
+        errorLine1="    android:background=&quot;@color/bg_dark&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="5"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.color.tg_green` appears to be unused"
+        errorLine1="    &lt;color name=&quot;tg_green&quot;>#00C853&lt;/color>"
+        errorLine2="           ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/colors.xml"
+            line="13"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.color.offline_indicator` appears to be unused"
+        errorLine1="    &lt;color name=&quot;offline_indicator&quot;>#8B95A1&lt;/color>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/colors.xml"
+            line="34"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.drawable.ic_teleflip_phone` appears to be unused">
+        <location
+            file="src/main/res/drawable/ic_teleflip_phone.png"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.app_name` appears to be unused"
+        errorLine1="    &lt;string name=&quot;app_name&quot;>TeleFlip&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="3"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UselessParent"
+        message="This `LinearLayout` layout or its `LinearLayout` parent is possibly unnecessary; transfer the `background` attribute to the other view"
+        errorLine1="    &lt;LinearLayout"
+        errorLine2="     ~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="12"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="IconLocation"
+        message="Found bitmap drawable `res/drawable/ic_teleflip_logo.png` in densityless folder">
+        <location
+            file="src/main/res/drawable/ic_teleflip_logo.png"/>
+    </issue>
+
+    <issue
+        id="IconLocation"
+        message="Found bitmap drawable `res/drawable/ic_teleflip_phone.png` in densityless folder">
+        <location
+            file="src/main/res/drawable/ic_teleflip_phone.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_launcher.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_launcher.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_launcher.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_launcher.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_launcher.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="ButtonStyle"
+        message="Buttons in button bars should be borderless; use `style=&quot;?android:attr/buttonBarButtonStyle&quot;` (and `?android:attr/buttonBarStyle` on the parent)"
+        errorLine1="                &lt;Button"
+        errorLine2="                 ~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="128"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="ButtonStyle"
+        message="Buttons in button bars should be borderless; use `style=&quot;?android:attr/buttonBarButtonStyle&quot;` (and `?android:attr/buttonBarStyle` on the parent)"
+        errorLine1="                &lt;Button"
+        errorLine2="                 ~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="139"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="TextFields"
+        message="This text field does not specify an `inputType`"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="53"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="TextFields"
+        message="This text field does not specify an `inputType`"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="77"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="TextFields"
+        message="This text field does not specify an `inputType`"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="93"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="TextFields"
+        message="This text field does not specify an `inputType`"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="109"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="TextFields"
+        message="This text field does not specify an `inputType`"
+        errorLine1="    &lt;EditText"
+        errorLine2="     ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="52"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="TextFields"
+        message="This text field does not specify an `inputType`"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="39"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="SmallSp"
+        message="Avoid using sizes smaller than `11sp`: `10sp`"
+        errorLine1="                android:textSize=&quot;10sp&quot; />"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="129"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="53"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="77"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="93"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="109"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="    &lt;EditText"
+        errorLine2="     ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="52"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="39"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="267"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="            &lt;EditText"
+        errorLine2="             ~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="90"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="63"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="        &lt;EditText"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="89"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                tvShortcut.text = (position + 1).toString()"
+        errorLine2="                                   ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/ChatListAdapter.kt"
+            line="68"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Number formatting does not take into account locale settings. Consider using `String.format` instead."
+        errorLine1="                tvShortcut.text = (position + 1).toString()"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/ChatListAdapter.kt"
+            line="68"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            tvTitle.text = &quot;$titlePrefix${chat.title}&quot;"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/ChatListAdapter.kt"
+            line="81"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                tvLastMsg.text = &quot;Draft: ${chat.draftText}&quot;"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/ChatListAdapter.kt"
+            line="98"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvLastMsg.text = &quot;Draft: ${chat.draftText}&quot;"
+        errorLine2="                                  ~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/ChatListAdapter.kt"
+            line="98"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Number formatting does not take into account locale settings. Consider using `String.format` instead."
+        errorLine1="                tvUnread.text = chat.unreadCount.toString()"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/ChatListAdapter.kt"
+            line="107"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="        modeIndicator?.text = &quot;[#] ${currentMode.label}&quot;"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/input/KeypadInputEngine.kt"
+            line="306"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="        tvRecordTimer?.text = &quot;00:00&quot;"
+        errorLine2="                               ~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="1316"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="        tvReplyEditPreview?.text = &quot;↩ Reply to ${msg.senderName}: $snippet&quot;"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="1418"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="        tvReplyEditPreview?.text = &quot;↩ Reply to ${msg.senderName}: $snippet&quot;"
+        errorLine2="                                    ~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="1418"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="        tvReplyEditPreview?.text = &quot;✏️ Editing: ${msg.text.take(35)}&quot;"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="1426"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="        tvReplyEditPreview?.text = &quot;✏️ Editing: ${msg.text.take(35)}&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="1426"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            tvPinnedBannerText?.text = &quot;📌 Pinned: $snippet&quot;"
+        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="1454"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvPinnedBannerText?.text = &quot;📌 Pinned: $snippet&quot;"
+        errorLine2="                                        ~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="1454"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvPasscodeError?.text = &quot;Incorrect PIN. Try again.&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="2160"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvLabel.text = &quot;Phone Number (with +country code):&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3139"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                btnSubmit.text = &quot;Send Code&quot;"
+        errorLine2="                                  ~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3141"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    btnUseSim?.text = &quot;Use SIM ($formatted)&quot;"
+        errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3151"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    btnUseSim?.text = &quot;Use SIM ($formatted)&quot;"
+        errorLine2="                                       ~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3151"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvStatus.text = &quot;Detected SIM phone number&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3167"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvStatus.text = &quot;Enter phone number linked to Telegram&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3170"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvStatus.text = &quot;Scan QR code with Telegram on your main phone&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3192"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvLabel.text = &quot;Verification Code (numbers only):&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3209"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                btnSubmit.text = &quot;Verify Code&quot;"
+        errorLine2="                                  ~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3211"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvStatus.text = &quot;Enter code sent via Telegram or SMS&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3218"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvLabel.text = &quot;2-Step Verification Password:&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3251"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                btnSubmit.text = &quot;Submit Password&quot;"
+        errorLine2="                                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3253"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvLabel.text = &quot;Email Recovery Code (numbers only):&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3290"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                btnSubmit.text = &quot;Submit Recovery Code&quot;"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3293"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    tvStatus.text = &quot;⚠️ Error: ${state.errorMessage}&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3296"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvStatus.text = &quot;⚠️ Error: ${state.errorMessage}&quot;"
+        errorLine2="                                     ~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3296"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    btnSubmit.text = &quot;Sending...&quot;"
+        errorLine2="                                      ~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3334"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvStatus.text = &quot;Contacting Telegram servers...&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3335"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            btnSubmit.text = &quot;Sending...&quot;"
+        errorLine2="                              ~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3432"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    tvUser?.text = &quot;Account: $name$phone&quot;"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3676"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvUser?.text = &quot;Account: $name$phone&quot;"
+        errorLine2="                                    ~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3676"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    tvStatus?.text = &quot;${handle}Bio: ${profile.bio.ifBlank { &quot;None&quot; }}&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3678"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvStatus?.text = &quot;${handle}Bio: ${profile.bio.ifBlank { &quot;None&quot; }}&quot;"
+        errorLine2="                                               ~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3678"
+            column="48"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            btnStorageLocation?.text = &quot;💾 Storage: $storageLabel&quot;"
+        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3691"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            btnStorageLocation?.text = &quot;💾 Storage: $storageLabel&quot;"
+        errorLine2="                                        ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3691"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            btnAutoDownload?.text = &quot;📥 Auto-Download: ${autoMode.label}&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3694"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            btnAutoDownload?.text = &quot;📥 Auto-Download: ${autoMode.label}&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3694"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            btnKeepMedia?.text = &quot;⏳ Keep Media: ${keepMedia.label}&quot;"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3697"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            btnKeepMedia?.text = &quot;⏳ Keep Media: ${keepMedia.label}&quot;"
+        errorLine2="                                  ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3697"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            btnSaveToGallery?.text = &quot;📁 Save to Downloads: ${if (saveEnabled) &quot;ON&quot; else &quot;OFF&quot;}&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3700"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            btnSaveToGallery?.text = &quot;📁 Save to Downloads: ${if (saveEnabled) &quot;ON&quot; else &quot;OFF&quot;}&quot;"
+        errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3700"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Number formatting does not take into account locale settings. Consider using `String.format` instead."
+        errorLine1="        etId.setText(telegramManager.apiId.toString())"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3753"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvStatus.text = &quot;Exchanging encryption keys...&quot;"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3883"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvStatus.text = &quot;Hanging up...&quot;"
+        errorLine2="                                 ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3889"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                tvStatus.text = &quot;Call Ended (${formatCallDuration(callDurationSec)})&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3893"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvStatus.text = &quot;Call Ended (${formatCallDuration(callDurationSec)})&quot;"
+        errorLine2="                                 ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3893"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvStatus.text = &quot;Call Failed&quot;"
+        errorLine2="                                 ~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3897"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    tvStatus?.text = &quot;In Call • ${formatCallDuration(callDurationSec)}&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3973"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvStatus?.text = &quot;In Call • ${formatCallDuration(callDurationSec)}&quot;"
+        errorLine2="                                      ~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="3973"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            btnSelfDestruct?.text = &quot;⏱️ Self-Destruct Timer: $ttlLabel&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="4027"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            btnSelfDestruct?.text = &quot;⏱️ Self-Destruct Timer: $ttlLabel&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="4027"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvBioLabel.text = &quot;Group / Channel Info&quot;"
+        errorLine2="                               ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/MainActivity.kt"
+            line="4065"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvHint?.text = &quot;[OK] Play/Pause • [◄/►] ±5s • [LSK] Restart • [1] Save • [RSK] Back&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="77"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                tvTitle?.text = &quot;🎨 $emoji Viewer&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="83"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvTitle?.text = &quot;🎨 $emoji Viewer&quot;"
+        errorLine2="                                          ~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="83"
+            column="43"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvHint?.text = &quot;[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="84"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvTitle?.text = &quot;📷 Photo Viewer&quot;"
+        errorLine2="                                 ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="88"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvHint?.text = &quot;[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back&quot;"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="89"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            tvStatus?.text = &quot;Downloading photo from Telegram...\nPress [1] to prioritize download.&quot;"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="102"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvStatus?.text = &quot;Downloading photo from Telegram...\nPress [1] to prioritize download.&quot;"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="102"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvStatus?.text = &quot;Downloading photo from Telegram...\nPress [1] to prioritize download.&quot;"
+        errorLine2="                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="102"
+            column="67"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvStatus?.text = &quot;Unable to decode photo file.&quot;"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="118"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            tvStatus?.text = &quot;Downloading video/GIF from Telegram...\nPress [1] to prioritize download.&quot;"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="130"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvStatus?.text = &quot;Downloading video/GIF from Telegram...\nPress [1] to prioritize download.&quot;"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="130"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvStatus?.text = &quot;Downloading video/GIF from Telegram...\nPress [1] to prioritize download.&quot;"
+        errorLine2="                                                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="130"
+            column="71"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvZoomBadge?.text = &quot;Ended ■&quot;"
+        errorLine2="                                     ~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="149"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvZoomBadge?.text = &quot;GIF ▶&quot;"
+        errorLine2="                                     ~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="158"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvStatus?.text = &quot;Unable to play video stream on this device.&quot;"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="162"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvZoomBadge?.text = &quot;Paused ⏸&quot;"
+        errorLine2="                                 ~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="221"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvZoomBadge?.text = &quot;Playing ▶&quot;"
+        errorLine2="                                 ~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="225"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvZoomBadge?.text = &quot;Playing ▶&quot;"
+        errorLine2="                                         ~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MediaViewerDialog.kt"
+            line="273"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                tvForwarded?.text = &quot;↪ Forwarded from ${message.forwardedFrom}&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="120"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvForwarded?.text = &quot;↪ Forwarded from ${message.forwardedFrom}&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="120"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                tvReplyQuote?.text = &quot;↩ ${message.replyToPreview}&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="127"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                tvReplyQuote?.text = &quot;↩ Reply to #${message.replyToMessageId}&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="130"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                tvReplyQuote?.text = &quot;↩ Reply to #${message.replyToMessageId}&quot;"
+        errorLine2="                                      ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="130"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    tvMedia.text = &quot;🎤 [Voice Message] $icon&quot;"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="142"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvMedia.text = &quot;🎤 [Voice Message] $icon&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="142"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    tvMedia.text = &quot;📍 [Location: ${String.format(&quot;%.4f, %.4f&quot;, message.latitude, message.longitude)}]&quot;"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="146"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvMedia.text = &quot;📍 [Location: ${String.format(&quot;%.4f, %.4f&quot;, message.latitude, message.longitude)}]&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="146"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    tvMedia.text = &quot;📄 [File] ${message.mediaCaption}&quot;"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="154"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvMedia.text = &quot;📄 [File] ${message.mediaCaption}&quot;"
+        errorLine2="                                    ~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="154"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    tvMedia.text = &quot;📹 [Video$dur] ▶ Press OK to Play&quot;"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="164"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvMedia.text = &quot;📹 [Video$dur] ▶ Press OK to Play&quot;"
+        errorLine2="                                    ~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="164"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvMedia.text = &quot;📹 [Video$dur] ▶ Press OK to Play&quot;"
+        errorLine2="                                                 ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="164"
+            column="50"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvMedia.text = &quot;🎞️ [GIF] ▶ Press OK to Play&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="168"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                    tvMedia.text = &quot;📊 [$statusTag • Press OK to Vote]&quot;"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="180"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                    tvMedia.text = &quot;📊 [$statusTag • Press OK to Vote]&quot;"
+        errorLine2="                                                  ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="180"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            tvTime.text = &quot;$metaPrefix${message.time}&quot;"
+        errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/MessageAdapter.kt"
+            line="250"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            holder.tvShortcut.text = &quot;${position + 1}.&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/OptionsMenuDialog.kt"
+            line="82"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="            holder.tvShortcut.text = &quot;${position + 1}.&quot;"
+        errorLine2="                                        ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/OptionsMenuDialog.kt"
+            line="82"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="            tvEmptyTitle.text = &quot;Type a keyword to search&quot;"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/SearchDialog.kt"
+            line="187"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                        tvEmptyTitle.text = &quot;No chats found for \&quot;$trimmed\&quot;&quot;"
+        errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/SearchDialog.kt"
+            line="203"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                        tvEmptyTitle.text = &quot;No chats found for \&quot;$trimmed\&quot;&quot;"
+        errorLine2="                                             ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/SearchDialog.kt"
+            line="203"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                        tvEmptyTitle.text = &quot;No contacts found for \&quot;$trimmed\&quot;&quot;"
+        errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/SearchDialog.kt"
+            line="215"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                        tvEmptyTitle.text = &quot;No contacts found for \&quot;$trimmed\&quot;&quot;"
+        errorLine2="                                             ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/SearchDialog.kt"
+            line="215"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                        tvEmptyTitle.text = &quot;No messages found for \&quot;$trimmed\&quot;&quot;"
+        errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/SearchDialog.kt"
+            line="232"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                        tvEmptyTitle.text = &quot;No messages found for \&quot;$trimmed\&quot;&quot;"
+        errorLine2="                                             ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/teleflip/app/ui/SearchDialog.kt"
+            line="232"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📊 Create Telegram Poll&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;📊 Create Telegram Poll&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="24"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;[#] Abc&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;[#] Abc&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="33"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Poll Question:&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Poll Question:&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="48"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Ask a question...&quot;, should use `@string` resource"
+        errorLine1="            android:hint=&quot;Ask a question...&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="58"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Options (at least 2):&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Options (at least 2):&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="72"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Option 1&quot;, should use `@string` resource"
+        errorLine1="            android:hint=&quot;Option 1&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="82"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Option 2&quot;, should use `@string` resource"
+        errorLine1="            android:hint=&quot;Option 2&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="98"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Option 3 (optional)&quot;, should use `@string` resource"
+        errorLine1="            android:hint=&quot;Option 3 (optional)&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="114"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;☑ Anonymous Voting: ON&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;☑ Anonymous Voting: ON&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="129"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📊 Send Poll&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;📊 Send Poll&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="140"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Cancel&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Cancel&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_create_poll.xml"
+            line="152"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;System Diagnostics &amp; Error Log&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;System Diagnostics &amp;amp; Error Log&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_diagnostics.xml"
+            line="12"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;ADB Tag: TELEFLIP_REPORT\nLog File: /sdcard/.../teleflip_reports.log&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;ADB Tag: TELEFLIP_REPORT\nLog File: /sdcard/.../teleflip_reports.log&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_diagnostics.xml"
+            line="22"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Loading logs...&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Loading logs...&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_diagnostics.xml"
+            line="42"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Close (or Press Back)&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Close (or Press Back)&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_diagnostics.xml"
+            line="54"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📷 Photo Viewer&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;📷 Photo Viewer&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_media_viewer.xml"
+            line="24"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;1.0x&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;1.0x&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_media_viewer.xml"
+            line="35"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Media file not yet downloaded&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Media file not yet downloaded&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_media_viewer.xml"
+            line="70"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_media_viewer.xml"
+            line="103"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;➕ New Chat, Secret Chat, Group, or Channel&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;➕ New Chat, Secret Chat, Group, or Channel&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="13"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;[#] Abc&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;[#] Abc&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="46"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;1. 💬 Open / Start Chat (@user or +phone)&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;1. 💬 Open / Start Chat (@user or +phone)&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="72"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;2. ⭐ Saved Messages (Cloud Storage)&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;2. ⭐ Saved Messages (Cloud Storage)&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="84"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;3. 👥 Create New Group&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;3. 👥 Create New Group&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="95"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;4. 📢 Create New Channel&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;4. 📢 Create New Channel&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="106"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;5. 🔒 Start Secret Chat (E2E Encrypted)&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;5. 🔒 Start Secret Chat (E2E Encrypted)&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="117"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Cancel (Back)&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Cancel (Back)&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_new_chat.xml"
+            line="128"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;1.&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;1.&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_option_item.xml"
+            line="19"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Option Name&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Option Name&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_option_item.xml"
+            line="29"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Options Menu&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Options Menu&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_options_menu.xml"
+            line="13"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔍 Search&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🔍 Search&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="23"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Type keyword...&quot;, should use `@string` resource"
+        errorLine1="            android:hint=&quot;Type keyword...&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="45"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;abc&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;abc&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="59"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Chats&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Chats&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="86"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Contacts&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Contacts&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="101"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Messages&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Messages&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="116"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Type a keyword to search&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Type a keyword to search&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="158"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Clear&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Clear&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="190"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Select&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Select&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="201"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Back&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Back&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="213"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Symbols &amp; Emoji (D-Pad to choose)&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Symbols &amp;amp; Emoji (D-Pad to choose)&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_symbols.xml"
+            line="12"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Options&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Options&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/layout_softkeys.xml"
+            line="19"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Options softkey&quot;, should use `@string` resource"
+        errorLine1="        android:contentDescription=&quot;Options softkey&quot; />"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/layout_softkeys.xml"
+            line="31"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Open&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Open&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/layout_softkeys.xml"
+            line="40"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Open softkey&quot;, should use `@string` resource"
+        errorLine1="        android:contentDescription=&quot;Open softkey&quot; />"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/layout_softkeys.xml"
+            line="52"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Back&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Back&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/layout_softkeys.xml"
+            line="61"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Back softkey&quot;, should use `@string` resource"
+        errorLine1="        android:contentDescription=&quot;Back softkey&quot; />"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/layout_softkeys.xml"
+            line="73"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;TG&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;TG&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="36"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Contact Name&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;Contact Name&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="59"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;⭐&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;⭐&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="70"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;online&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;online&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="81"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;[Info]&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;[Info]&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="93"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📌 Pinned message&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;📌 Pinned message&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="120"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;↩ Replying to message...&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;↩ Replying to message...&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="171"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;✕&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;✕&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="182"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔴&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🔴&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="205"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;00:00&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;00:00&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="213"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Recording... (Press OK to Stop &amp; Send)&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Recording... (Press OK to Stop &amp;amp; Send)&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="224"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Abc&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Abc&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="254"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Type message (or use keypad)...&quot;, should use `@string` resource"
+        errorLine1="            android:hint=&quot;Type message (or use keypad)...&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="274"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Send&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Send&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_conversation.xml"
+            line="290"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;1&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;1&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_item.xml"
+            line="20"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;TG&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;TG&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_item.xml"
+            line="46"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Telegram&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;Telegram&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_item.xml"
+            line="78"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;⭐&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;⭐&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_item.xml"
+            line="89"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔇&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;🔇&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_item.xml"
+            line="99"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📌&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;📌&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_item.xml"
+            line="110"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;12:34&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;12:34&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_item.xml"
+            line="120"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Latest message text...&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Latest message text...&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_item.xml"
+            line="140"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;3&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;3&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_item.xml"
+            line="150"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;TeleFlip&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;TeleFlip&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="23"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Online&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Online&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="33"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;All&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;All&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="69"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Direct&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Direct&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="91"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Groups&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Groups&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="112"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Channels&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Channels&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="133"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Bots&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Bots&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="154"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📁 Folders&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;📁 Folders&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="175"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📦 Archive&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;📦 Archive&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="196"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;No chats found&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;No chats found&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="240"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Press [Options] to start a new chat&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Press [Options] to start a new chat&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_chat_list.xml"
+            line="249"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔒 End-to-End Encrypted Telegram Call&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🔒 End-to-End Encrypted Telegram Call&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="20"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Caller Avatar&quot;, should use `@string` resource"
+        errorLine1="                android:contentDescription=&quot;Caller Avatar&quot; />"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="38"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Contact Name&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Contact Name&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="56"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Calling...&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Calling...&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="70"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🎤 Mic: On&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;🎤 Mic: On&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="88"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔈 Earpiece&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;🔈 Earpiece&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="97"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📞 Accept Call&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;📞 Accept Call&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="114"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Mute Mic&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;Mute Mic&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="133"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Speaker&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;Speaker&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="144"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;❌ End Call&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;❌ End Call&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_in_call.xml"
+            line="155"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;TeleFlip Logo&quot;, should use `@string` resource"
+        errorLine1="            android:contentDescription=&quot;TeleFlip Logo&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="20"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;TeleFlip&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;TeleFlip&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="26"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Telegram for Flip Phones&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Telegram for Flip Phones&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="36"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Enter your phone number with country code (e.g. +1...)&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Enter your phone number with country code (e.g. +1...)&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="47"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Phone Number:&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;Phone Number:&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="75"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;[#] Abc&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;[#] Abc&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="84"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;+1 555 123 4567&quot;, should use `@string` resource"
+        errorLine1="                android:hint=&quot;+1 555 123 4567&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="94"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;QR Code for Login&quot;, should use `@string` resource"
+        errorLine1="                android:contentDescription=&quot;QR Code for Login&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="125"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Open Telegram on your smartphone -> Settings -> Devices -> Link Desktop Device, and scan this code.&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Open Telegram on your smartphone -> Settings -> Devices -> Link Desktop Device, and scan this code.&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="135"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Log in with Phone Number&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Log in with Phone Number&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="145"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Send Code&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Send Code&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="160"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Retry Connection&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Retry Connection&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="175"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Forgot Password&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Forgot Password&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="191"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Reset Account&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Reset Account&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="207"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Use SIM Phone Number&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Use SIM Phone Number&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="223"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Log in with QR Code&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Log in with QR Code&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="239"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;API Credentials &amp; Settings&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;API Credentials &amp;amp; Settings&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_login.xml"
+            line="255"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Sender Name&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Sender Name&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="29"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;↪ Forwarded message&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;↪ Forwarded message&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="41"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;↩ Reply preview&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;↩ Reply preview&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="53"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📷 [Photo]&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;📷 [Photo]&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="71"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Message content goes here...&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Message content goes here...&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="94"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;👍 ❤️&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;👍 ❤️&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="103"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;14:20&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;14:20&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="127"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot; ✓✓&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot; ✓✓&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_message_item.xml"
+            line="135"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔒&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;🔒&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_passcode_lock.xml"
+            line="13"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;TeleFlip Passcode&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;TeleFlip Passcode&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_passcode_lock.xml"
+            line="21"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Enter your 4-digit PIN on the keypad&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Enter your 4-digit PIN on the keypad&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_passcode_lock.xml"
+            line="30"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;○   ○   ○   ○&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;○   ○   ○   ○&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_passcode_lock.xml"
+            line="39"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Forgot Passcode? (Log Out)&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Forgot Passcode? (Log Out)&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_passcode_lock.xml"
+            line="59"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Profile Picture&quot;, should use `@string` resource"
+        errorLine1="                    android:contentDescription=&quot;Profile Picture&quot; />"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="33"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Contact Name&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot;Contact Name&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="56"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot; ★&quot;, should use `@string` resource"
+        errorLine1="                    android:text=&quot; ★&quot;"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="68"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;online&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;online&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="78"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Phone Number&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Phone Number&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="98"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;+1 234 567 890&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;+1 234 567 890&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="107"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Username&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Username&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="126"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Bio / Description&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Bio / Description&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="155"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;No bio provided.&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;No bio provided.&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="164"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Actions&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Actions&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="174"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📞 Call via Telegram&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;📞 Call via Telegram&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="184"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📱 Call Cellular Phone&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;📱 Call Cellular Phone&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="194"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔒 Start Encrypted Secret Chat&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🔒 Start Encrypted Secret Chat&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="204"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;⏱️ Self-Destruct Timer: Off&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;⏱️ Self-Destruct Timer: Off&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="214"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;👥 Group Members &amp; Admins&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;👥 Group Members &amp;amp; Admins&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="224"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🧵 Forum Topics / Threads&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🧵 Forum Topics / Threads&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="235"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;💬 Open Conversation&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;💬 Open Conversation&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="246"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔔 Notifications: Sound&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🔔 Notifications: Sound&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="256"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🚫 Block User&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🚫 Block User&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="266"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔍 Search Messages&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🔍 Search Messages&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_profile.xml"
+            line="277"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Settings &amp; Configuration&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Settings &amp;amp; Configuration&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="17"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Account: Not logged in&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Account: Not logged in&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="37"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Status: Disconnected&quot;, should use `@string` resource"
+        errorLine1="                android:text=&quot;Status: Disconnected&quot;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="46"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Telegram API ID:&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Telegram API ID:&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="57"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;e.g. 21724&quot;, should use `@string` resource"
+        errorLine1="            android:hint=&quot;e.g. 21724&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="67"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Telegram API Hash:&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Telegram API Hash:&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="83"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;e.g. 3e0cb5da...&quot;, should use `@string` resource"
+        errorLine1="            android:hint=&quot;e.g. 3e0cb5da...&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="93"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Multi-tap Timeout:&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Multi-tap Timeout:&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="109"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔔 Closed-Flip Background Push: ON&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🔔 Closed-Flip Background Push: ON&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="129"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;👤 Edit Profile (Name, Bio, Username)&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;👤 Edit Profile (Name, Bio, Username)&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="141"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📱 Active Sessions &amp; Devices&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;📱 Active Sessions &amp;amp; Devices&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="153"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🚫 Blocked Users&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🚫 Blocked Users&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="165"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🔒 App Passcode Lock: OFF&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🔒 App Passcode Lock: OFF&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="177"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;💾 Storage Location: Internal Storage&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;💾 Storage Location: Internal Storage&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="189"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📥 Auto-Download: Wi-Fi Only&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;📥 Auto-Download: Wi-Fi Only&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="201"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;⏳ Keep Media: Forever&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;⏳ Keep Media: Forever&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="213"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;📁 Save Media to Downloads: OFF&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;📁 Save Media to Downloads: OFF&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="225"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;🧹 Clear Local Media Cache&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;🧹 Clear Local Media Cache&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="237"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Save &amp; Reconnect&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Save &amp;amp; Reconnect&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="249"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Log Out&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Log Out&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="262"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Back&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Back&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/view_settings.xml"
+            line="274"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="RtlSymmetry"
+        message="When you define `paddingStart` you should probably also define `paddingEnd` for right-to-left symmetry"
+        errorLine1="            android:paddingStart=&quot;12dp&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="189"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="RtlSymmetry"
+        message="When you define `paddingEnd` you should probably also define `paddingStart` for right-to-left symmetry"
+        errorLine1="            android:paddingEnd=&quot;12dp&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/dialog_search.xml"
+            line="212"
+            column="13"/>
+    </issue>
+
+</issues>
