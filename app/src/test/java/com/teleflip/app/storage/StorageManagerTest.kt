@@ -19,6 +19,106 @@ class StorageManagerTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        StorageManager.invalidateCache()
+        StorageManager.setCacheTtlMs(StorageManager.DEFAULT_CACHE_TTL_MS)
+        StorageManager.timeProvider = System::currentTimeMillis
+        StorageManager.resetDiscoveryCount()
+    }
+
+    @Test
+    fun testCacheHitOnConsecutiveInvocations() {
+        assertEquals(0, StorageManager.getDiscoveryCount())
+        assertFalse(StorageManager.isCacheValid())
+
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+        assertTrue(StorageManager.isCacheValid())
+
+        // Consecutive queries read from warm cache without triggering disk traversals
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+
+        StorageManager.getSelectedStorageType(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+
+        StorageManager.getFilesDirectory(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+
+        StorageManager.getDownloadDirectory(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+    }
+
+    @Test
+    fun testSetSelectedStorageTypeInvalidatesCache() {
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+
+        StorageManager.setSelectedStorageType(context, StorageLocationType.INTERNAL)
+        // Cache was invalidated by setSelectedStorageType, so next call triggers a fresh discovery
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(2, StorageManager.getDiscoveryCount())
+    }
+
+    @Test
+    fun testCacheExpirationAfterTtl() {
+        var currentTime = 1_000_000L
+        StorageManager.timeProvider = { currentTime }
+
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+        assertTrue(StorageManager.isCacheValid())
+
+        // Advance time by 5 seconds (within 15s TTL)
+        currentTime += 5_000L
+        assertTrue(StorageManager.isCacheValid())
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+
+        // Advance time past 15s TTL (20 seconds total)
+        currentTime += 15_000L
+        assertFalse(StorageManager.isCacheValid())
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(2, StorageManager.getDiscoveryCount())
+    }
+
+    @Test
+    fun testCustomCacheTtlConfiguration() {
+        StorageManager.setCacheTtlMs(5_000L)
+        assertEquals(5_000L, StorageManager.getCacheTtlMs())
+
+        var currentTime = 1_000_000L
+        StorageManager.timeProvider = { currentTime }
+
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+
+        // Advance time past 5s TTL
+        currentTime += 6_000L
+        assertFalse(StorageManager.isCacheValid())
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(2, StorageManager.getDiscoveryCount())
+    }
+
+    @Test
+    fun testExplicitInvalidateCache() {
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+        assertTrue(StorageManager.isCacheValid())
+
+        StorageManager.invalidateCache()
+        assertFalse(StorageManager.isCacheValid())
+
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(2, StorageManager.getDiscoveryCount())
+    }
+
+    @Test
+    fun testForceRefreshBypassesCache() {
+        StorageManager.isSdCardAvailable(context)
+        assertEquals(1, StorageManager.getDiscoveryCount())
+
+        StorageManager.detectSdCardDirectory(context, forceRefresh = true)
+        assertEquals(2, StorageManager.getDiscoveryCount())
     }
 
     @Test
