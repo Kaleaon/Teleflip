@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaScannerConnection
 import android.net.Uri
@@ -28,6 +29,7 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -3859,12 +3861,45 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @VisibleForTesting
+    internal fun setSpeakerphoneEnabled(
+        audioManager: AudioManager,
+        enabled: Boolean,
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (enabled) {
+                val speakerDevice =
+                    audioManager.availableCommunicationDevices.firstOrNull {
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                    }
+                if (speakerDevice != null) {
+                    audioManager.setCommunicationDevice(speakerDevice)
+                }
+            } else {
+                audioManager.clearCommunicationDevice()
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = enabled
+        }
+    }
+
+    @VisibleForTesting
+    internal fun isSpeakerphoneEnabled(audioManager: AudioManager): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            audioManager.communicationDevice?.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn
+        }
+    }
+
     private fun setupInCallAudio() {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         try {
             audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
             audioManager.isMicrophoneMute = false
-            audioManager.isSpeakerphoneOn = false
+            setSpeakerphoneEnabled(audioManager, false)
             telegramManager.updateCallAudioState(isMuted = false, isSpeakerOn = false)
         } catch (e: Exception) {
             Log.e("MainActivity", "setupInCallAudio error: ${e.message}")
@@ -3881,8 +3916,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleInCallSpeaker() {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        val newSpeaker = !audioManager.isSpeakerphoneOn
-        audioManager.isSpeakerphoneOn = newSpeaker
+        val newSpeaker = !isSpeakerphoneEnabled(audioManager)
+        setSpeakerphoneEnabled(audioManager, newSpeaker)
         telegramManager.updateCallAudioState(isSpeakerOn = newSpeaker)
         showToast(if (newSpeaker) "Speakerphone On" else "Earpiece Active")
     }
@@ -3893,7 +3928,7 @@ class MainActivity : AppCompatActivity() {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         try {
             audioManager.isMicrophoneMute = false
-            audioManager.isSpeakerphoneOn = false
+            setSpeakerphoneEnabled(audioManager, false)
             audioManager.mode = AudioManager.MODE_NORMAL
         } catch (e: Exception) {
             Log.e("MainActivity", "cleanupInCallAudio error: ${e.message}")
