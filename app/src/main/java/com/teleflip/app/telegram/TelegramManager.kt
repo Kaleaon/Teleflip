@@ -4020,25 +4020,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
-    private fun extractStickerInfo(content: TdApi.MessageContent?): Pair<String, Boolean> {
+    @androidx.annotation.VisibleForTesting
+    internal fun extractStickerInfo(content: TdApi.MessageContent?): Pair<String, Boolean> {
         if (content == null) return Pair("", false)
         if (content.constructor == TdApi.MessageSticker.CONSTRUCTOR) {
             val sticker = (content as TdApi.MessageSticker).sticker
             if (sticker != null) {
                 val emoji = sticker.emoji ?: ""
-                val isPremium =
-                    try {
-                        val field = sticker.javaClass.getField("isPremium")
-                        field.getBoolean(sticker)
-                    } catch (e: Throwable) {
-                        try {
-                            val fullTypeField = sticker.javaClass.getField("fullType")
-                            val fullTypeObj = fullTypeField.get(sticker)
-                            fullTypeObj != null && fullTypeObj.javaClass.simpleName.contains("Premium")
-                        } catch (ex: Throwable) {
-                            false
-                        }
-                    }
+                val isPremium = sticker.fullType?.javaClass?.simpleName?.contains("Premium") == true
                 return Pair(emoji, isPremium)
             }
         }
