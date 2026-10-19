@@ -197,12 +197,13 @@ class MediaViewerDialog(
     fun panBy(
         dx: Float,
         dy: Float,
-    ) {
-        if (zoomLevel <= 1.0f) return
+    ): Boolean {
+        if (zoomLevel <= 1.0f) return false
         val maxOffset = 240f * (zoomLevel - 1.0f)
         panX = (panX + dx).coerceIn(-maxOffset, maxOffset)
         panY = (panY + dy).coerceIn(-maxOffset, maxOffset)
         applyPhotoTransform()
+        return true
     }
 
     private fun applyPhotoTransform() {
@@ -297,20 +298,16 @@ class MediaViewerDialog(
                     return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_UP -> {
-                    panBy(0f, panStepPx)
-                    return true
+                    if (panBy(0f, panStepPx)) return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    panBy(0f, -panStepPx)
-                    return true
+                    if (panBy(0f, -panStepPx)) return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    panBy(panStepPx, 0f)
-                    return true
+                    if (panBy(panStepPx, 0f)) return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    panBy(-panStepPx, 0f)
-                    return true
+                    if (panBy(-panStepPx, 0f)) return true
                 }
             }
         }
