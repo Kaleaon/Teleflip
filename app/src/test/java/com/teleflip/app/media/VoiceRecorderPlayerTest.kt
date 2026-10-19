@@ -3,7 +3,6 @@ package com.teleflip.app.media
 import android.content.Context
 import android.media.MediaPlayer
 import android.media.MediaRecorder
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,6 +11,7 @@ import org.junit.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import java.io.File
 
 class VoiceRecorderPlayerTest {
     @Test
