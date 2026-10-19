@@ -962,6 +962,9 @@ class MainActivity : AppCompatActivity() {
                 onTranscribeClick = { msg ->
                     handleTranscribeVoiceMessage(msg)
                 },
+                customEmojiResolver = { key ->
+                    telegramManager.getCustomEmojiFilePath(key)
+                },
             )
         rvMessages?.adapter = messageAdapter
 
@@ -2959,16 +2962,44 @@ class MainActivity : AppCompatActivity() {
                 "😢" to "😢 Sad",
                 "👀" to "👀 Eyes",
             )
-        val options =
-            reactionChoices.mapIndexed { idx, (emoji, label) ->
-                val hasReaction = msg.reactions.contains(emoji)
-                val prefix = if (hasReaction) "✓ " else ""
+        val options = mutableListOf<MenuOption>()
+        reactionChoices.forEachIndexed { idx, (emoji, label) ->
+            val hasReaction = msg.reactions.contains(emoji)
+            val prefix = if (hasReaction) "✓ " else ""
+            options.add(
                 MenuOption(idx + 1, "$prefix$label") {
                     telegramManager.toggleMessageReaction(msg.chatId, msg.id, emoji)
                     showToast(if (hasReaction) "Removed $emoji reaction" else "Reacted with $emoji")
-                }
-            }
+                },
+            )
+        }
+        options.add(
+            MenuOption(options.size + 1, "✨ Custom Emoji...") {
+                showCustomEmojiPickerDialog(msg)
+            },
+        )
         OptionsMenuDialog(this, "React to Message", options).show()
+    }
+
+    private fun showCustomEmojiPickerDialog(msg: MessageModel) {
+        telegramManager.fetchCustomEmojiStickers { customEmojis ->
+            val options =
+                customEmojis.mapIndexed { idx, item ->
+                    val key = "custom_emoji_${item.fileId}"
+                    val hasReaction = msg.reactions.contains(key)
+                    val prefix = if (hasReaction) "✓ " else ""
+                    val label = "$prefix${item.emoji} ${item.setName}"
+                    MenuOption(idx + 1, label) {
+                        telegramManager.toggleMessageReaction(msg.chatId, msg.id, key)
+                        showToast(if (hasReaction) "Removed custom emoji reaction" else "Reacted with ${item.emoji}")
+                    }
+                }
+            if (options.isEmpty()) {
+                showToast("No custom emojis available")
+            } else {
+                OptionsMenuDialog(this, "Select Custom Emoji", options).show()
+            }
+        }
     }
 
     private fun initiateCallFlow(chat: ChatModel) {

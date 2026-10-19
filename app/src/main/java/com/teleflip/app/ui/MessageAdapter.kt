@@ -1,5 +1,10 @@
 package com.teleflip.app.ui
 
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.ImageSpan
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -15,12 +20,15 @@ import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
+import com.teleflip.app.telegram.TelegramManager
+import java.io.File
 import java.util.Locale
 
 class MessageAdapter(
     private val onMessageFocused: ((MessageModel) -> Unit)? = null,
     private val onMessageAction: ((MessageModel) -> Unit)? = null,
     private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
+    private val customEmojiResolver: ((String) -> String?)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     private var playingMessageId: Long? = null
     private var currentSpeed: Float = 1.0f
@@ -255,7 +263,50 @@ class MessageAdapter(
 
             if (message.reactions.isNotEmpty()) {
                 tvReactions?.visibility = View.VISIBLE
-                tvReactions?.text = message.reactions.joinToString(" ")
+                val ssb = SpannableStringBuilder()
+                val density = context.resources.displayMetrics.density
+                val targetSize = (16 * density).toInt().coerceAtLeast(1)
+
+                message.reactions.forEachIndexed { idx, reaction ->
+                    if (idx > 0) ssb.append(" ")
+
+                    if (reaction.startsWith("custom_emoji_")) {
+                        val filePath =
+                            customEmojiResolver?.invoke(reaction)
+                                ?: TelegramManager.getCustomEmojiFilePath(reaction)
+                        var drawableAdded = false
+                        if (!filePath.isNullOrBlank()) {
+                            try {
+                                val file = File(filePath)
+                                if (file.exists()) {
+                                    val bitmap = BitmapFactory.decodeFile(filePath)
+                                    if (bitmap != null) {
+                                        val drawable = BitmapDrawable(context.resources, bitmap)
+                                        drawable.setBounds(0, 0, targetSize, targetSize)
+                                        val startPos = ssb.length
+                                        ssb.append(" ")
+                                        ssb.setSpan(
+                                            ImageSpan(drawable, ImageSpan.ALIGN_BOTTOM),
+                                            startPos,
+                                            startPos + 1,
+                                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                                        )
+                                        drawableAdded = true
+                                    }
+                                }
+                            } catch (_: Throwable) {
+                            }
+                        }
+                        if (!drawableAdded) {
+                            val sticker = TelegramManager.getCustomEmojiSticker(reaction)
+                            val fallbackSymbol = sticker?.emoji?.ifBlank { "✨" } ?: "✨"
+                            ssb.append(fallbackSymbol)
+                        }
+                    } else {
+                        ssb.append(reaction)
+                    }
+                }
+                tvReactions?.text = ssb
             } else {
                 tvReactions?.visibility = View.GONE
             }

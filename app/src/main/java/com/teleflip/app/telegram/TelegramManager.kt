@@ -143,6 +143,26 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     companion object {
         const val DEFAULT_CHAT_BATCH_SIZE = 10
+        private val customEmojiCache = java.util.concurrent.ConcurrentHashMap<String, StickerItem>()
+
+        fun registerCustomEmojiSticker(
+            key: String,
+            item: StickerItem,
+        ) {
+            customEmojiCache[key] = item
+        }
+
+        fun getCustomEmojiSticker(key: String): StickerItem? = customEmojiCache[key]
+
+        fun getCustomEmojiFilePath(key: String): String? {
+            val item = customEmojiCache[key] ?: return null
+            val path = item.filePath ?: return null
+            return if (File(path).exists()) path else null
+        }
+
+        fun clearCustomEmojiCache() {
+            customEmojiCache.clear()
+        }
     }
 
     private suspend fun sendQuery(query: TdApi.Function<*>): TdApi.Object =
@@ -627,9 +647,33 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         val client = tdClient ?: return
         try {
-            val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeEmoji")
-            val reactionType = reactionTypeClass.getDeclaredConstructor().newInstance()
-            reactionTypeClass.getField("emoji").set(reactionType, emoji)
+            val reactionType =
+                if (emoji.startsWith("custom_emoji_")) {
+                    val customEmojiId = emoji.removePrefix("custom_emoji_").toLongOrNull() ?: 0L
+                    if (customEmojiId != 0L) {
+                        try {
+                            val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeCustomEmoji")
+                            val inst = reactionTypeClass.getDeclaredConstructor().newInstance()
+                            reactionTypeClass.getField("customEmojiId").setLong(inst, customEmojiId)
+                            inst
+                        } catch (_: Throwable) {
+                            val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeEmoji")
+                            val inst = reactionTypeClass.getDeclaredConstructor().newInstance()
+                            reactionTypeClass.getField("emoji").set(inst, emoji)
+                            inst
+                        }
+                    } else {
+                        val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeEmoji")
+                        val inst = reactionTypeClass.getDeclaredConstructor().newInstance()
+                        reactionTypeClass.getField("emoji").set(inst, emoji)
+                        inst
+                    }
+                } else {
+                    val reactionTypeClass = Class.forName("org.drinkless.tdlib.TdApi\$ReactionTypeEmoji")
+                    val inst = reactionTypeClass.getDeclaredConstructor().newInstance()
+                    reactionTypeClass.getField("emoji").set(inst, emoji)
+                    inst
+                }
 
             val funcClassName =
                 if (added) {
@@ -1035,6 +1079,122 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             } else {
                 scope.launch(Dispatchers.Main) { onResult(emptyList()) }
             }
+        }
+    }
+
+    fun getCustomEmojiFilePath(key: String): String? = Companion.getCustomEmojiFilePath(key)
+
+    fun getCustomEmojiSticker(key: String): StickerItem? = Companion.getCustomEmojiSticker(key)
+
+    fun registerCustomEmojiSticker(
+        key: String,
+        item: StickerItem,
+    ) {
+        Companion.registerCustomEmojiSticker(key, item)
+    }
+
+    fun fetchCustomEmojiStickers(onResult: (List<StickerItem>) -> Unit) {
+        val client = tdClient
+        val resultList = mutableListOf<StickerItem>()
+
+        val defaults =
+            listOf(
+                StickerItem(fileId = 1001, emoji = "⭐", filePath = null, setName = "Custom Emoji 1001"),
+                StickerItem(fileId = 1002, emoji = "🚀", filePath = null, setName = "Custom Emoji 1002"),
+                StickerItem(fileId = 1003, emoji = "💎", filePath = null, setName = "Custom Emoji 1003"),
+                StickerItem(fileId = 1004, emoji = "⚡", filePath = null, setName = "Custom Emoji 1004"),
+                StickerItem(fileId = 1005, emoji = "🎉", filePath = null, setName = "Custom Emoji 1005"),
+            )
+        defaults.forEach { item ->
+            val key = "custom_emoji_${item.fileId}"
+            registerCustomEmojiSticker(key, item)
+        }
+
+        if (client == null) {
+            onResult(defaults)
+            return
+        }
+
+        try {
+            client.send(TdApi.GetRecentStickers(false)) { obj ->
+                if (obj is TdApi.Stickers) {
+                    obj.stickers.forEach { st ->
+                        val customEmojiId =
+                            if (st.fullType is TdApi.StickerFullTypeCustomEmoji) {
+                                (st.fullType as TdApi.StickerFullTypeCustomEmoji).customEmojiId
+                            } else {
+                                st.id
+                            }
+                        val item =
+                            StickerItem(
+                                fileId = st.sticker.id,
+                                emoji = if (st.emoji.isNotBlank()) st.emoji else "✨",
+                                filePath = if (st.sticker.local.isDownloadingCompleted) st.sticker.local.path else null,
+                                setName = "Custom Emoji $customEmojiId",
+                            )
+                        val key = "custom_emoji_$customEmojiId"
+                        registerCustomEmojiSticker(key, item)
+                        registerCustomEmojiSticker("custom_emoji_${st.sticker.id}", item)
+                        synchronized(resultList) {
+                            resultList.add(item)
+                        }
+                        if (!st.sticker.local.isDownloadingCompleted) {
+                            resolveFile(st.sticker)
+                        }
+                    }
+                }
+                client.send(TdApi.GetInstalledStickerSets(TdApi.StickerTypeCustomEmoji())) { setObj ->
+                    if (setObj is TdApi.StickerSets) {
+                        var pending = setObj.sets.size
+                        if (pending == 0) {
+                            val finalItems = (resultList + defaults).distinctBy { it.fileId }
+                            scope.launch(Dispatchers.Main) { onResult(finalItems) }
+                        } else {
+                            for (info in setObj.sets) {
+                                client.send(TdApi.GetStickerSet(info.id)) { set ->
+                                    if (set is TdApi.StickerSet) {
+                                        set.stickers.forEach { st ->
+                                            val customEmojiId =
+                                                if (st.fullType is TdApi.StickerFullTypeCustomEmoji) {
+                                                    (st.fullType as TdApi.StickerFullTypeCustomEmoji).customEmojiId
+                                                } else {
+                                                    st.id
+                                                }
+                                            val item =
+                                                StickerItem(
+                                                    fileId = st.sticker.id,
+                                                    emoji = if (st.emoji.isNotBlank()) st.emoji else "✨",
+                                                    filePath = if (st.sticker.local.isDownloadingCompleted) st.sticker.local.path else null,
+                                                    setName = set.title,
+                                                )
+                                            val key = "custom_emoji_$customEmojiId"
+                                            registerCustomEmojiSticker(key, item)
+                                            registerCustomEmojiSticker("custom_emoji_${st.sticker.id}", item)
+                                            synchronized(resultList) {
+                                                resultList.add(item)
+                                            }
+                                            if (!st.sticker.local.isDownloadingCompleted) {
+                                                resolveFile(st.sticker)
+                                            }
+                                        }
+                                    }
+                                    pending--
+                                    if (pending <= 0) {
+                                        val finalItems = (resultList + defaults).distinctBy { it.fileId }
+                                        scope.launch(Dispatchers.Main) { onResult(finalItems) }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        val finalItems = (resultList + defaults).distinctBy { it.fileId }
+                        scope.launch(Dispatchers.Main) { onResult(finalItems) }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to fetch custom emoji stickers: ${e.message}")
+            onResult(defaults)
         }
     }
 
