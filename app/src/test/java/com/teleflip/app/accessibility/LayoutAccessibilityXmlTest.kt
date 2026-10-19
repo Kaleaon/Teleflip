@@ -72,22 +72,44 @@ class LayoutAccessibilityXmlTest {
         assertEquals("assertive", errorLiveRegion)
     }
 
+    @Test
+    fun testMediaViewerLiveRegions() {
+        val file = getLayoutFile("dialog_media_viewer.xml")
+        val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
+
+        val zoomBadgeNode = findNodeById(doc, "@+id/tv_viewer_zoom_badge")
+        assertNotNull("tv_viewer_zoom_badge should exist in dialog_media_viewer.xml", zoomBadgeNode)
+        val zoomLiveRegion = zoomBadgeNode?.attributes?.getNamedItemNS(androidNs, "accessibilityLiveRegion")?.nodeValue
+        assertEquals("polite", zoomLiveRegion)
+
+        val statusNode = findNodeById(doc, "@+id/tv_viewer_status")
+        assertNotNull("tv_viewer_status should exist in dialog_media_viewer.xml", statusNode)
+        val statusLiveRegion = statusNode?.attributes?.getNamedItemNS(androidNs, "accessibilityLiveRegion")?.nodeValue
+        assertEquals("polite", statusLiveRegion)
+    }
+
     private fun findNodeById(
         node: org.w3c.dom.Node,
         targetId: String,
     ): org.w3c.dom.Node? {
+        var result: org.w3c.dom.Node? = null
         if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE) {
             val element = node as org.w3c.dom.Element
             val idAttr = element.getAttributeNS(androidNs, "id")
             if (idAttr == targetId || idAttr == targetId.replace("@+id/", "@id/")) {
-                return element
+                result = element
             }
         }
-        val children = node.childNodes
-        for (i in 0 until children.length) {
-            val found = findNodeById(children.item(i), targetId)
-            if (found != null) return found
+        if (result == null) {
+            val children = node.childNodes
+            for (i in 0 until children.length) {
+                val found = findNodeById(children.item(i), targetId)
+                if (found != null) {
+                    result = found
+                    break
+                }
+            }
         }
-        return null
+        return result
     }
 }
