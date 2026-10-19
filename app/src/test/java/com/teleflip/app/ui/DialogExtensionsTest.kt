@@ -3,14 +3,22 @@ package com.teleflip.app.ui
 import android.app.Application
 import android.app.Dialog
 import android.view.KeyEvent
+import android.widget.Button
+import android.widget.FrameLayout
+import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.teleflip.app.MainActivity
 import com.teleflip.app.R
+import com.teleflip.app.telegram.TelegramManager
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mockito.mock
+import org.robolectric.shadows.ShadowLooper
 
 @RunWith(AndroidJUnit4::class)
 class DialogExtensionsTest {
@@ -164,5 +172,91 @@ class DialogExtensionsTest {
         assertTrue(handled)
         assertTrue(actionExecuted)
         assertFalse(dialog.isShowing)
+    }
+
+    @Test
+    fun testFocusRestorationOnDialogDismissal() {
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        scenario.onActivity { activity ->
+            ShadowLooper.idleMainLooper()
+
+            val mainContainer = activity.findViewById<FrameLayout>(R.id.main_container)
+            val button =
+                Button(activity).apply {
+                    isFocusable = true
+                    isFocusableInTouchMode = true
+                }
+            mainContainer.addView(button)
+            button.requestFocus()
+
+            val currentFocus = activity.currentFocus ?: activity.window?.decorView?.findFocus()
+            assertNotNull("A view should be focused before showing dialog", currentFocus)
+
+            activity.onDialogShown()
+            activity.onDialogDismissed()
+
+            ShadowLooper.idleMainLooper()
+
+            assertTrue("Trigger view should be focused after dialog dismiss", button.isFocused)
+        }
+        scenario.close()
+    }
+
+    @Test
+    fun testNestedDialogFocusRestoration() {
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        scenario.onActivity { activity ->
+            ShadowLooper.idleMainLooper()
+
+            val mainContainer = activity.findViewById<FrameLayout>(R.id.main_container)
+            val button =
+                Button(activity).apply {
+                    isFocusable = true
+                    isFocusableInTouchMode = true
+                }
+            mainContainer.addView(button)
+            button.requestFocus()
+
+            // Open dialog 1
+            activity.onDialogShown()
+
+            // Open nested dialog 2
+            activity.onDialogShown()
+
+            // Dismiss dialog 2
+            activity.onDialogDismissed()
+            ShadowLooper.idleMainLooper()
+
+            // Dismiss dialog 1
+            activity.onDialogDismissed()
+            ShadowLooper.idleMainLooper()
+
+            assertTrue("Trigger view should be focused after all dialogs dismiss", button.isFocused)
+        }
+        scenario.close()
+    }
+
+    @Test
+    fun testSearchDialogInheritsBaseDialogLifecycle() {
+        assertTrue("SearchDialog must inherit BaseDialog", BaseDialog::class.java.isAssignableFrom(SearchDialog::class.java))
+
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        scenario.onActivity { activity ->
+            val mockTm = mock(TelegramManager::class.java)
+            val dialog =
+                SearchDialog(
+                    context = activity,
+                    telegramManager = mockTm,
+                    onChatSelected = {},
+                    onMessageSelected = { _, _ -> },
+                )
+
+            dialog.show()
+            ShadowLooper.idleMainLooper()
+
+            dialog.dismiss()
+            ShadowLooper.idleMainLooper()
+        }
+        scenario.close()
     }
 }

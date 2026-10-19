@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -34,6 +35,7 @@ class TeleFlipNotificationService : Service() {
         }
     }
 
+    @android.annotation.SuppressLint("ForegroundServiceType")
     override fun onCreate() {
         super.onCreate()
         try {
@@ -57,8 +59,15 @@ class TeleFlipNotificationService : Service() {
                     .setContentIntent(pendingIntent)
                     .build()
 
-            @Suppress("ForegroundServiceType")
-            startForeground(FG_NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    FG_NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+                )
+            } else {
+                startForeground(FG_NOTIFICATION_ID, notification)
+            }
         } catch (_: Throwable) {
         }
     }
