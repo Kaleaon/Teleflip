@@ -38,6 +38,7 @@ object PasscodeManager {
             .putString(PREF_PASSCODE_HASH, hash)
             .apply()
         isUnlockedSession = true
+        lastBackgroundTimestamp = 0L
     }
 
     fun disablePasscode(context: Context) {
@@ -47,6 +48,7 @@ object PasscodeManager {
             .remove(PREF_PASSCODE_HASH)
             .apply()
         isUnlockedSession = true
+        lastBackgroundTimestamp = 0L
     }
 
     fun verifyPasscode(
@@ -64,6 +66,7 @@ object PasscodeManager {
     ): Boolean {
         if (verifyPasscode(context, pin)) {
             isUnlockedSession = true
+            lastBackgroundTimestamp = 0L
             return true
         }
         return false
@@ -71,6 +74,7 @@ object PasscodeManager {
 
     fun lock() {
         isUnlockedSession = false
+        lastBackgroundTimestamp = 0L
     }
 
     fun getAutoLockTimeoutSeconds(context: Context): Int {
@@ -99,12 +103,16 @@ object PasscodeManager {
     }
 
     fun onAppForegrounded(context: Context) {
-        if (!isEnabled(context)) return
+        if (!isEnabled(context)) {
+            lastBackgroundTimestamp = 0L
+            return
+        }
         val timeoutSec = getAutoLockTimeoutSeconds(context)
         val elapsedSec = (System.currentTimeMillis() - lastBackgroundTimestamp) / MILLIS_PER_SEC
         if (lastBackgroundTimestamp > 0L && elapsedSec >= timeoutSec) {
             isUnlockedSession = false
         }
+        lastBackgroundTimestamp = 0L
     }
 
     private fun hashPin(pin: String): String {
