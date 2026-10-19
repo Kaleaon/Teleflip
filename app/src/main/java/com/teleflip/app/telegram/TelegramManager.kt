@@ -2559,8 +2559,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         if (client == null) {
             val lowerQuery = trimmed.lowercase()
             val results = mutableListOf<MessageSearchResult>()
+            val chatTitleMap = _chats.value.associate { it.id to it.title }
             for ((cId, msgList) in _messages.value) {
-                val chatTitle = _chats.value.find { it.id == cId }?.title ?: "Chat #$cId"
+                val chatTitle = chatTitleMap[cId] ?: "Chat #$cId"
                 for (msg in msgList) {
                     if (msg.text.lowercase().contains(lowerQuery) || msg.mediaCaption.lowercase().contains(lowerQuery)) {
                         results.add(
@@ -2598,12 +2599,13 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 val nextOff = obj.nextOffset
                 val total = obj.totalCount
                 val list = mutableListOf<MessageSearchResult>()
+                val chatTitleMap = _chats.value.associate { it.id to it.title }
                 for (msg in obj.messages) {
                     val cId = msg.chatId
                     val mId = msg.id
                     val text = extractMessageText(msg.content)
                     val time = formatTime(msg.date.toLong() * 1000)
-                    val chatTitle = _chats.value.find { it.id == cId }?.title ?: "Chat #$cId"
+                    val chatTitle = chatTitleMap[cId] ?: "Chat #$cId"
                     val sender = if (msg.isOutgoing) "You" else "Contact"
 
                     list.add(
@@ -2659,6 +2661,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         if (client == null) {
             val lower = trimmed.lowercase()
             val localMsgs = _messages.value[chatId].orEmpty()
+            val chatTitleMap = _chats.value.associate { it.id to it.title }
+            val chatTitle = chatTitleMap[chatId] ?: "Chat"
             val matches =
                 localMsgs.filter {
                     it.text.lowercase().contains(lower) || it.mediaCaption.lowercase().contains(lower)
@@ -2666,7 +2670,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     MessageSearchResult(
                         messageId = it.id,
                         chatId = it.chatId,
-                        chatTitle = _chats.value.find { c -> c.id == chatId }?.title ?: "Chat",
+                        chatTitle = chatTitle,
                         senderName = it.senderName,
                         text = it.text.ifBlank { it.mediaCaption },
                         time = it.time,
@@ -2689,7 +2693,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         client.send(req) { obj ->
             if (obj is TdApi.FoundChatMessages) {
                 val list = mutableListOf<MessageSearchResult>()
-                val chatTitle = _chats.value.find { it.id == chatId }?.title ?: "Chat"
+                val chatTitleMap = _chats.value.associate { it.id to it.title }
+                val chatTitle = chatTitleMap[chatId] ?: "Chat"
                 for (msg in obj.messages) {
                     val text = extractMessageText(msg.content)
                     val time = formatTime(msg.date.toLong() * 1000)
