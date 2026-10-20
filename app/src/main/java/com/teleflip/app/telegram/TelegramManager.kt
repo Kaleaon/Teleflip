@@ -1156,10 +1156,19 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                         if (setObj is TdApi.StickerSet) {
                             val items =
                                 setObj.stickers.map { st ->
+                                    val localPath =
+                                        if (st.sticker.local.isDownloadingCompleted && st.sticker.local.path.isNotBlank()) {
+                                            st.sticker.local.path
+                                        } else {
+                                            if (!st.sticker.local.isDownloadingActive) {
+                                                client.send(TdApi.DownloadFile(st.sticker.id, 1, 0, 0, false), null)
+                                            }
+                                            null
+                                        }
                                     StickerItem(
                                         fileId = st.sticker.id,
                                         emoji = st.emoji,
-                                        filePath = if (st.sticker.local.isDownloadingCompleted) st.sticker.local.path else null,
+                                        filePath = localPath,
                                         setName = setObj.title,
                                     )
                                 }
@@ -1330,6 +1339,110 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             scope.launch(Dispatchers.Main) {
                 onResult(list)
             }
+        }
+    }
+
+    private val fileUpdateListeners = java.util.concurrent.CopyOnWriteArrayList<(TdApi.File) -> Unit>()
+
+    fun addFileUpdateListener(listener: (TdApi.File) -> Unit) {
+        fileUpdateListeners.add(listener)
+    }
+
+    fun removeFileUpdateListener(listener: (TdApi.File) -> Unit) {
+        fileUpdateListeners.remove(listener)
+    }
+
+    private var cachedGifBotUserId: Long? = null
+
+    fun searchInlineGifs(
+        query: String,
+        chatId: Long = 0,
+        onResult: (List<SavedGifItem>) -> Unit,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult(emptyList())
+            return
+        }
+
+        fun executeSearch(botUserId: Long) {
+            client.send(TdApi.GetInlineQueryResults(botUserId, chatId, null, query, "")) { obj ->
+                if (obj is TdApi.InlineQueryResults) {
+                    val qId = obj.inlineQueryId
+                    val items = mutableListOf<SavedGifItem>()
+                    for (res in obj.results) {
+                        if (res is TdApi.InlineQueryResultAnimation) {
+                            val anim = res.animation
+                            var filePath: String? = null
+                            if (anim != null && anim.animation != null) {
+                                val file = anim.animation
+                                if (file.local.isDownloadingCompleted && file.local.path.isNotBlank()) {
+                                    filePath = file.local.path
+                                } else if (!file.local.isDownloadingActive) {
+                                    client.send(TdApi.DownloadFile(file.id, 1, 0, 0, false), null)
+                                }
+                                items.add(
+                                    SavedGifItem(
+                                        fileId = file.id,
+                                        filePath = filePath,
+                                        durationSeconds = anim.duration,
+                                        caption = res.title.ifBlank { anim.fileName.ifBlank { "GIF" } },
+                                        queryId = qId,
+                                        resultId = res.id,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    scope.launch(Dispatchers.Main) {
+                        onResult(items)
+                    }
+                } else {
+                    scope.launch(Dispatchers.Main) {
+                        onResult(emptyList())
+                    }
+                }
+            }
+        }
+
+        val botId = cachedGifBotUserId
+        if (botId != null) {
+            executeSearch(botId)
+        } else {
+            client.send(TdApi.SearchPublicChat("gif")) { chatObj ->
+                if (chatObj is TdApi.Chat && chatObj.type is TdApi.ChatTypePrivate) {
+                    val uId = (chatObj.type as TdApi.ChatTypePrivate).userId
+                    cachedGifBotUserId = uId
+                    executeSearch(uId)
+                } else {
+                    scope.launch(Dispatchers.Main) {
+                        onResult(emptyList())
+                    }
+                }
+            }
+        }
+    }
+
+    fun sendInlineQueryResult(
+        chatId: Long,
+        queryId: Long,
+        resultId: String,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
+    ) {
+        val client = tdClient ?: return
+        try {
+            val req =
+                TdApi.SendInlineQueryResultMessage().apply {
+                    this.chatId = chatId
+                    this.queryId = queryId
+                    this.resultId = resultId
+                    this.hideViaBot = false
+                    this.options = createSendOptions(disableNotification, schedulingState)
+                }
+            client.send(req, this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to send inline query result message via TDLib: ${e.message}")
         }
     }
 
@@ -4661,6 +4774,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     private fun handleFileUpdate(file: TdApi.File) {
         if (!file.local.isDownloadingCompleted || file.local.path.isBlank()) return
+
+        fileUpdateListeners.forEach { listener ->
+            try {
+                listener(file)
+            } catch (e: Exception) {
+                Log.e(tag, "Error in fileUpdateListener: ${e.message}")
+            }
+        }
 
         fileDownloadWaiters.remove(file.id)?.forEach { deferred ->
             deferred.complete(file.local.path)
