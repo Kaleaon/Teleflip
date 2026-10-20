@@ -4478,58 +4478,6 @@ class MainActivity : AppCompatActivity() {
         return null
     }
 
-    @androidx.annotation.RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    private fun getDevicePhoneNumberApi33(): String? {
-        try {
-            val sm = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
-            if (sm != null) {
-                try {
-                    @Suppress("MissingPermission")
-                    val activeList = sm.activeSubscriptionInfoList
-                    if (!activeList.isNullOrEmpty()) {
-                        for (sub in activeList) {
-                            try {
-                                @Suppress("MissingPermission")
-                                val raw = sm.getPhoneNumber(sub.subscriptionId)
-                                val formatted = cleanAndFormatPhoneNumber(raw)
-                                if (formatted != null) return formatted
-                            } catch (e: SecurityException) {
-                                org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ sub SecurityException: ${e.message}")
-                            } catch (e: Throwable) {
-                                org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ sub getPhoneNumber failed: ${e.message}")
-                            }
-                        }
-                    }
-                } catch (e: SecurityException) {
-                    org.telegram.messenger.FileLog.e(
-                        "getDevicePhoneNumber API 33+ activeSubscriptionInfoList SecurityException: ${e.message}",
-                    )
-                } catch (e: Throwable) {
-                    org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ activeSubscriptionInfoList failed: ${e.message}")
-                }
-
-                // Fallback to DEFAULT_SUBSCRIPTION_ID on API 33+
-                try {
-                    @Suppress("MissingPermission")
-                    val raw = sm.getPhoneNumber(SubscriptionManager.DEFAULT_SUBSCRIPTION_ID)
-                    val formatted = cleanAndFormatPhoneNumber(raw)
-                    if (formatted != null) return formatted
-                } catch (e: SecurityException) {
-                    org.telegram.messenger.FileLog.e(
-                        "getDevicePhoneNumber API 33+ DEFAULT_SUBSCRIPTION_ID SecurityException: ${e.message}",
-                    )
-                } catch (e: Throwable) {
-                    org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ DEFAULT_SUBSCRIPTION_ID failed: ${e.message}")
-                }
-            }
-        } catch (e: SecurityException) {
-            org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ SubscriptionManager SecurityException: ${e.message}")
-        } catch (e: Throwable) {
-            org.telegram.messenger.FileLog.e("getDevicePhoneNumber API 33+ failed: ${e.message}")
-        }
-        return null
-    }
-
     // =========================================================================
     // SCREEN 4: SETTINGS & CONFIGURATION
     // =========================================================================
