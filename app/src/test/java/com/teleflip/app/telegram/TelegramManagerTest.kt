@@ -123,6 +123,28 @@ class TelegramManagerTest {
     }
 
     @Test
+    fun testSingletonGetInstanceReturnsSameInstance() {
+        TelegramManager.resetInstance()
+        val instance1 = TelegramManager.getInstance(mockContext)
+        val instance2 = TelegramManager.getInstance(mockContext)
+
+        assertEquals("getInstance must return the identical singleton instance", instance1, instance2)
+        TelegramManager.resetInstance()
+    }
+
+    @Test
+    fun testStopSetsConnectionStateToOffline() {
+        val manager = TelegramManager(mockContext)
+        manager.setConnectionStateForTesting("Connecting...")
+        assertEquals("Connecting...", manager.connectionState.value)
+
+        manager.stop()
+        // Wait briefly for coroutine scope to set Offline
+        Thread.sleep(100)
+        assertEquals("Offline", manager.connectionState.value)
+    }
+
+    @Test
     fun testExtractStickerInfoNullOrNonStickerContent() {
         val manager = TelegramManager(mockContext)
 

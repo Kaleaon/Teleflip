@@ -350,6 +350,9 @@ class MainActivity : AppCompatActivity() {
         voiceRecorder.cancelRecording()
         voicePlayer.stop()
         cleanupInCallAudio()
+        if (!telegramManager.backgroundPushEnabled) {
+            telegramManager.stop()
+        }
     }
 
     private fun observeTelegramState() {

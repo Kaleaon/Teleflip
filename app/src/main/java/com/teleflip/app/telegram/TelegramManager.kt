@@ -80,7 +80,8 @@ sealed class AuthState {
     data class Error(val message: String) : AuthState()
 }
 
-class TelegramManager(private val context: Context) : Client.ResultHandler {
+class TelegramManager(paramContext: Context) : Client.ResultHandler {
+    private val context: Context = paramContext.applicationContext ?: paramContext
     private val tag = "TelegramManager"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs: SharedPreferences = context.getSharedPreferences("teleflip_prefs", Context.MODE_PRIVATE)
@@ -173,22 +174,38 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     companion object {
         const val DEFAULT_CHAT_BATCH_SIZE = 10
-        private val customEmojiCache = java.util.concurrent.ConcurrentHashMap<String, StickerItem>()
 
         @Volatile
         private var instance: TelegramManager? = null
 
         fun getInstance(context: Context): TelegramManager {
             return instance ?: synchronized(this) {
-                instance ?: TelegramManager(context.applicationContext).also { instance = it }
+                instance ?: TelegramManager(context.applicationContext ?: context).also { instance = it }
             }
         }
 
-        fun resetInstanceForTesting() {
+        @androidx.annotation.VisibleForTesting
+        internal fun resetInstance() {
             synchronized(this) {
                 instance = null
             }
         }
+
+        @androidx.annotation.VisibleForTesting
+        internal fun resetInstanceForTesting() {
+            synchronized(this) {
+                instance = null
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        internal fun setInstanceForTesting(manager: TelegramManager?) {
+            synchronized(this) {
+                instance = manager
+            }
+        }
+
+        private val customEmojiCache = java.util.concurrent.ConcurrentHashMap<String, StickerItem>()
 
         fun registerCustomEmojiSticker(
             key: String,
@@ -321,6 +338,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
 
     init {
+        if (instance == null) {
+            instance = this
+        }
         try {
             System.loadLibrary("tdjni")
             Client.execute(TdApi.SetLogVerbosityLevel(1))
@@ -376,6 +396,21 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 com.teleflip.app.report.AdbReporter.reportError(tag, "Client creation error: ${e.message}", e)
                 _connectionState.value = "Init error"
             }
+        }
+    }
+
+    fun stop() {
+        clearAuthTimeoutSafeguard()
+        isAuthQueryInProgress = false
+        scope.launch(Dispatchers.IO) {
+            try {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing TDLib client instance...")
+                tdClient?.send(TdApi.Close(), this@TelegramManager)
+            } catch (e: Throwable) {
+                Log.w(tag, "Error during native client teardown: ${e.message}")
+            }
+            tdClient = null
+            _connectionState.value = "Offline"
         }
     }
 
