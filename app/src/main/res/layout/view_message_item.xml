@@ -75,16 +75,41 @@
             android:visibility="gone"
             android:layout_marginBottom="2dp" />
 
-        <!-- Image Preview for Photos -->
-        <ImageView
-            android:id="@+id/iv_message_photo"
-            android:layout_width="160dp"
-            android:layout_height="120dp"
-            android:scaleType="centerCrop"
-            android:contentDescription="@string/cd_photo_attachment"
-            android:visibility="gone"
+        <!-- Container for Photo/Media Preview and Star Badge Overlay -->
+        <FrameLayout
+            android:id="@+id/layout_media_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="4dp">
+
+            <!-- Image Preview for Photos & Paid Media -->
+            <ImageView
+                android:id="@+id/iv_message_photo"
+                android:layout_width="160dp"
+                android:layout_height="120dp"
+                android:scaleType="centerCrop"
+                android:contentDescription="@string/cd_photo_attachment"
+                android:visibility="gone" />
+
+            <!-- Telegram Stars Badge Overlay -->
+            <TextView
+                android:id="@+id/tv_star_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="6dp"
+                android:background="@drawable/bg_badge"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"
+                android:text="⭐ 5 Stars"
+                android:textColor="@color/focus_highlight_gold"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <!-- Message Body Text -->
         <TextView
@@ -94,6 +119,38 @@
             android:text="Message content goes here..."
             android:textColor="@color/text_primary"
             android:textSize="14sp" />
+
+        <!-- Transcribe Button for Voice Messages -->
+        <TextView
+            android:id="@+id/btn_transcribe"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔤 Transcribe"
+            android:textColor="@color/focus_highlight"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_tab_indicator"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:focusable="true"
+            android:clickable="true"
+            android:visibility="gone"
+            android:layout_marginTop="3dp"
+            android:layout_marginBottom="3dp" />
+
+        <!-- Transcript Text View -->
+        <TextView
+            android:id="@+id/tv_transcript"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="italic"
+            android:visibility="gone"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp" />
 
         <!-- Emoji Reactions Row -->
         <TextView

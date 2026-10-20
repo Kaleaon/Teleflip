@@ -15,10 +15,10 @@ data class VoiceRecording(
 
 class VoiceRecorder(private val context: Context) {
     private val tag = "VoiceRecorder"
-    private var recorder: MediaRecorder? = null
-    private var currentFile: File? = null
+    internal var recorder: MediaRecorder? = null
+    internal var currentFile: File? = null
     private var startTimeMillis: Long = 0
-    private var isRecording = false
+    internal var isRecording = false
 
     private val handler = Handler(Looper.getMainLooper())
     private var onTickListener: ((Int) -> Unit)? = null
