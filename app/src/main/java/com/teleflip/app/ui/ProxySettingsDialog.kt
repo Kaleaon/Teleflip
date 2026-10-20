@@ -243,14 +243,38 @@ class ProxySettingsDialog(
         btnClose?.setOnClickListener { dismiss() }
     }
 
-    private fun setupDismissKeys() {
-        setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN && isBackOrRightSoftKey(keyCode)) {
-                dismiss()
-                true
-            } else {
-                false
+    override fun onBackPressed() {
+        engines.values.forEach { it.commitCurrentChar() }
+        dismiss()
+    }
+
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (isBackOrRightSoftKey(keyCode)) {
+            engines.values.forEach { it.commitCurrentChar() }
+            dismiss()
+            return true
+        }
+
+        val focusedEdit = currentFocus as? EditText
+        if (focusedEdit != null) {
+            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+                engines[focusedEdit.id]?.commitCurrentChar()
+                focusedEdit.setText("")
+                return true
+            }
+            val isInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL
+            if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
+                return true
             }
         }
+
+        return super.onKeyDown(keyCode, event)
     }
 }
