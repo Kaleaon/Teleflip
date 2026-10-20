@@ -38,6 +38,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.teleflip.app.input.InputMode
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.location.LocationHelper
 import com.teleflip.app.media.VoicePlayer
@@ -134,6 +135,9 @@ class MainActivity : AppCompatActivity() {
     // Login State
     private var etLoginInput: EditText? = null
     private var loginInputEngine: KeypadInputEngine? = null
+
+    // Settings State
+    private val settingsInputEngines = mutableMapOf<Int, KeypadInputEngine>()
 
     // Passcode Lock State
     private var passcodeEntry: String = ""
@@ -437,6 +441,7 @@ class MainActivity : AppCompatActivity() {
     private fun commitActiveInputEngines() {
         composeInputEngine?.commitCurrentChar()
         loginInputEngine?.commitCurrentChar()
+        settingsInputEngines.values.forEach { it.commitCurrentChar() }
     }
 
     // =========================================================================
@@ -4318,6 +4323,28 @@ class MainActivity : AppCompatActivity() {
             showToast(if (newState) "Closed-flip background notifications enabled" else "Background notifications disabled")
         }
 
+        settingsInputEngines.clear()
+        val tvSettingsInputMode = view.findViewById<TextView>(R.id.tv_settings_input_mode)
+        listOfNotNull(etId, etHash).forEach { field ->
+            val engine =
+                KeypadInputEngine(
+                    editText = field,
+                    modeIndicator = tvSettingsInputMode,
+                    timeoutMs = telegramManager.keypadTimeoutMs,
+                    onSymbolRequested = {
+                        com.teleflip.app.ui.SymbolsDialog(this) { sym ->
+                            settingsInputEngines[field.id]?.insertSymbol(sym)
+                        }.show()
+                    },
+                )
+            if (field.id == R.id.et_api_id) {
+                engine.setMode(InputMode.NUMERIC)
+            } else if (field.id == R.id.et_api_hash) {
+                engine.setMode(InputMode.LOWER)
+            }
+            settingsInputEngines[field.id] = engine
+        }
+
         etId.setText(telegramManager.apiId.toString())
         etHash.setText(telegramManager.apiHash)
 
@@ -4340,6 +4367,7 @@ class MainActivity : AppCompatActivity() {
             val selIndex = spTimeout.selectedItemPosition
             if (selIndex in timeoutValues.indices) {
                 telegramManager.keypadTimeoutMs = timeoutValues[selIndex]
+                settingsInputEngines.values.forEach { it.timeoutMs = timeoutValues[selIndex] }
             }
             val idStr = etId.text.toString().trim()
             val hashStr = etHash.text.toString().trim()
@@ -4879,6 +4907,21 @@ class MainActivity : AppCompatActivity() {
                     etLoginInput?.requestFocus()
                 }
                 if (loginInputEngine?.handleKeyEvent(keyCode, event) == true) {
+                    return true
+                }
+            }
+        }
+
+        // In Settings: Route keypad keys to settings input engine matching focused field
+        if (currentScreen == Screen.SETTINGS) {
+            val focusedView = currentFocus
+                ?: settingsInputEngines.keys
+                    .mapNotNull { findViewById<View>(it) }
+                    .firstOrNull { it.hasFocus() }
+            val focusedId = focusedView?.id
+            if (focusedId != null) {
+                val engine = settingsInputEngines[focusedId]
+                if (engine != null && engine.handleKeyEvent(keyCode, event)) {
                     return true
                 }
             }
