@@ -4,7 +4,6 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -42,18 +41,14 @@ class VoicePlayer(private val context: Context) {
         applyPlaybackSpeed()
     }
 
-    internal var sdkVersion: Int = Build.VERSION.SDK_INT
-
     internal fun applyPlaybackSpeed() {
         val player = mediaPlayer ?: return
-        if (sdkVersion >= Build.VERSION_CODES.M) {
-            try {
-                val params = player.playbackParams
-                player.playbackParams = params.setSpeed(currentSpeed)
-            } catch (e: Exception) {
-                Log.e(tag, "Failed to set playback params speed: ${e.message}")
-                currentSpeed = 1.0f
-            }
+        try {
+            val params = player.playbackParams
+            player.playbackParams = params.setSpeed(currentSpeed)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to set playback params speed: ${e.message}")
+            currentSpeed = 1.0f
         }
     }
 
