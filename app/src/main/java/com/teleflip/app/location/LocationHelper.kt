@@ -10,9 +10,11 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class LocationInfo(
     val latitude: Double,
@@ -48,13 +50,22 @@ class LocationHelper(private val context: Context) {
             }
 
             // Otherwise request single fresh fix
+            val isCompleted = AtomicBoolean(false)
+            val handler = Handler(Looper.getMainLooper())
+            var timeoutRunnable: Runnable? = null
+
             val listener =
                 object : LocationListener {
                     override fun onLocationChanged(loc: Location) {
-                        locationManager.removeUpdates(this)
-                        onSuccess(buildLocationInfo(loc))
+                        if (isCompleted.compareAndSet(false, true)) {
+                            timeoutRunnable?.let { handler.removeCallbacks(it) }
+                            locationManager.removeUpdates(this)
+                            onSuccess(buildLocationInfo(loc))
+                        }
                     }
 
+                    @Deprecated("Deprecated in API 29")
+                    @Suppress("DEPRECATION")
                     override fun onStatusChanged(
                         p: String?,
                         s: Int,
@@ -85,14 +96,19 @@ class LocationHelper(private val context: Context) {
             }
 
             // Fallback timeout after 6 seconds to use best last known location if still waiting
-            android.os.Handler(Looper.getMainLooper()).postDelayed({
-                locationManager.removeUpdates(listener)
-                if (bestLast != null) {
-                    onSuccess(buildLocationInfo(bestLast))
-                } else {
-                    onError("GPS timed out acquiring position. Try outdoors with clear sky view.")
+            val runnable =
+                Runnable {
+                    if (isCompleted.compareAndSet(false, true)) {
+                        locationManager.removeUpdates(listener)
+                        if (bestLast != null) {
+                            onSuccess(buildLocationInfo(bestLast))
+                        } else {
+                            onError("GPS timed out acquiring position. Try outdoors with clear sky view.")
+                        }
+                    }
                 }
-            }, 6000)
+            timeoutRunnable = runnable
+            handler.postDelayed(runnable, 6000)
         } catch (e: Exception) {
             onError("Location error: ${e.message}")
         }
