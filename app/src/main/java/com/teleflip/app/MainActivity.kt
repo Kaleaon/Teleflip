@@ -104,6 +104,25 @@ class MainActivity : AppCompatActivity() {
     private var pendingTargetMessageId: Long? = null
     private var callTimerJob: Job? = null
     private var callDurationSec: Int = 0
+    private var pendingNavigationAction: (() -> Unit)? = null
+
+    private fun navigateTo(
+        targetScreen: Screen,
+        action: () -> Unit,
+    ) {
+        if (currentScreen == Screen.IN_CALL && targetScreen != Screen.IN_CALL) {
+            cleanupInCallAudio()
+        }
+        if (PasscodeManager.isLocked(this) && targetScreen != Screen.PASSCODE_LOCK) {
+            pendingNavigationAction = action
+            renderPasscodeUnlockScreen()
+            return
+        }
+        if (targetScreen != Screen.PASSCODE_LOCK) {
+            pendingNavigationAction = null
+        }
+        action()
+    }
 
     // Chat List State
     private var currentChatTypeFilter: ChatType? = null
@@ -270,7 +289,28 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         PasscodeManager.onAppForegrounded(this)
         if (PasscodeManager.isLocked(this) && currentScreen != Screen.PASSCODE_LOCK) {
-            showPasscodeUnlockScreen()
+            val targetScreen = currentScreen
+            val restorationAction: () -> Unit =
+                when (targetScreen) {
+                    Screen.CONVERSATION -> {
+                        activeChat?.let { chat -> { renderConversation(chat, pendingTargetMessageId) } }
+                            ?: { renderChatListScreen() }
+                    }
+                    Screen.PROFILE -> {
+                        activeChat?.let { chat -> { renderProfileScreen(chat) } }
+                            ?: { renderChatListScreen() }
+                    }
+                    Screen.SETTINGS -> {
+                        { renderSettingsScreen() }
+                    }
+                    Screen.LOGIN -> {
+                        { renderLoginScreen(telegramManager.authState.value) }
+                    }
+                    else -> {
+                        { renderChatListScreen() }
+                    }
+                }
+            navigateTo(targetScreen, restorationAction)
         }
     }
 
@@ -324,9 +364,7 @@ class MainActivity : AppCompatActivity() {
                     is AuthState.WaitPasswordRecoveryCode,
                     is AuthState.Error,
                     -> {
-                        if (PasscodeManager.isLocked(this@MainActivity)) {
-                            // Locked behind passcode screen
-                        } else if (currentScreen != Screen.SETTINGS) {
+                        if (currentScreen != Screen.SETTINGS) {
                             showLoginScreen(state)
                         }
                     }
@@ -494,6 +532,12 @@ class MainActivity : AppCompatActivity() {
     // SCREEN 1: CHAT LIST
     // =========================================================================
     private fun showChatListScreen() {
+        navigateTo(Screen.CHAT_LIST) {
+            renderChatListScreen()
+        }
+    }
+
+    private fun renderChatListScreen() {
         commitActiveInputEngines()
         draftSyncJob?.cancel()
         draftSyncJob = null
@@ -1121,6 +1165,15 @@ class MainActivity : AppCompatActivity() {
     // SCREEN 2: CONVERSATION / CHAT
     // =========================================================================
     private fun openConversation(
+        chat: ChatModel,
+        targetMessageId: Long? = null,
+    ) {
+        navigateTo(Screen.CONVERSATION) {
+            renderConversation(chat, targetMessageId)
+        }
+    }
+
+    private fun renderConversation(
         chat: ChatModel,
         targetMessageId: Long? = null,
     ) {
@@ -2688,6 +2741,12 @@ class MainActivity : AppCompatActivity() {
     // Passcode Lock Implementation
     // =========================================================================
     private fun showPasscodeUnlockScreen() {
+        navigateTo(Screen.PASSCODE_LOCK) {
+            renderPasscodeUnlockScreen()
+        }
+    }
+
+    private fun renderPasscodeUnlockScreen() {
         commitActiveInputEngines()
         currentScreen = Screen.PASSCODE_LOCK
         mainContainer.removeAllViews()
@@ -2773,7 +2832,11 @@ class MainActivity : AppCompatActivity() {
         passcodeEntry = ""
         if (unlocked) {
             tvPasscodeError?.text = ""
-            if (telegramManager.authState.value is AuthState.Ready) {
+            val pending = pendingNavigationAction
+            pendingNavigationAction = null
+            if (pending != null) {
+                pending.invoke()
+            } else if (telegramManager.authState.value is AuthState.Ready) {
                 if (pendingTargetChatId != 0L) {
                     val targetId = pendingTargetChatId
                     pendingTargetChatId = 0L
@@ -3767,6 +3830,12 @@ class MainActivity : AppCompatActivity() {
     // SCREEN 3: LOGIN
     // =========================================================================
     private fun showLoginScreen(state: AuthState) {
+        navigateTo(Screen.LOGIN) {
+            renderLoginScreen(state)
+        }
+    }
+
+    private fun renderLoginScreen(state: AuthState) {
         commitActiveInputEngines()
         currentScreen = Screen.LOGIN
         mainContainer.removeAllViews()
@@ -4202,7 +4271,7 @@ class MainActivity : AppCompatActivity() {
                 val sm = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
                 if (sm != null) {
                     try {
-                        @Suppress("MissingPermission")
+                        @Suppress("MissingPermission", "NewApi")
                         val activeList = sm.activeSubscriptionInfoList
                         if (!activeList.isNullOrEmpty()) {
                             for (sub in activeList) {
@@ -4330,6 +4399,12 @@ class MainActivity : AppCompatActivity() {
     // SCREEN 4: SETTINGS & CONFIGURATION
     // =========================================================================
     private fun showSettingsScreen() {
+        navigateTo(Screen.SETTINGS) {
+            renderSettingsScreen()
+        }
+    }
+
+    private fun renderSettingsScreen() {
         commitActiveInputEngines()
         currentScreen = Screen.SETTINGS
         mainContainer.removeAllViews()
@@ -4527,6 +4602,12 @@ class MainActivity : AppCompatActivity() {
     // SCREEN 4: IN-CALL SCREEN (FLIP PHONE OPTIMIZED)
     // =========================================================================
     private fun showInCallScreen(call: ActiveCall) {
+        navigateTo(Screen.IN_CALL) {
+            renderInCallScreen(call)
+        }
+    }
+
+    private fun renderInCallScreen(call: ActiveCall) {
         commitActiveInputEngines()
         currentScreen = Screen.IN_CALL
         mainContainer.removeAllViews()
@@ -4729,6 +4810,12 @@ class MainActivity : AppCompatActivity() {
     // SCREEN 5: PROFILE & CHAT INFO (FLIP PHONE OPTIMIZED)
     // =========================================================================
     private fun showProfileScreen(chat: ChatModel) {
+        navigateTo(Screen.PROFILE) {
+            renderProfileScreen(chat)
+        }
+    }
+
+    private fun renderProfileScreen(chat: ChatModel) {
         commitActiveInputEngines()
         currentScreen = Screen.PROFILE
         mainContainer.removeAllViews()
