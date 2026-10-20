@@ -7,6 +7,7 @@ import android.media.PlaybackParams
 import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -411,5 +412,108 @@ class MediaViewerDialogTest {
 
         shadowOf(android.os.Looper.getMainLooper()).idle()
         // Should close cleanly without crashing or updating dismissed views
+    }
+
+    @Test
+    fun testProgressLayoutVisibility_videoAndAnimation_visibleWhenFileExists() {
+        val sampleVideoFile = tempFolder.newFile("sample_video.mp4")
+        FileOutputStream(sampleVideoFile).use { it.write("fake video content".toByteArray()) }
+
+        val videoMessage = MessageModel(
+            id = 10,
+            chatId = 100,
+            senderName = "Test",
+            text = "Video test",
+            time = "10:00 AM",
+            isOutbound = false,
+            mediaType = MediaType.VIDEO,
+            mediaFilePath = sampleVideoFile.absolutePath,
+        )
+
+        val dialog = MediaViewerDialog(context, videoMessage, {}, {})
+        dialog.show()
+
+        val layoutProgress = dialog.findViewById<View>(R.id.layout_viewer_progress)
+        assertNotNull(layoutProgress)
+        assertEquals(View.VISIBLE, layoutProgress.visibility)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testProgressLayoutVisibility_photoAndSticker_gone() {
+        val photoMessage = MessageModel(
+            id = 11,
+            chatId = 100,
+            senderName = "Test",
+            text = "Photo test",
+            time = "10:00 AM",
+            isOutbound = false,
+            mediaType = MediaType.PHOTO,
+            mediaFilePath = samplePhotoFile.absolutePath,
+        )
+
+        val dialog = MediaViewerDialog(context, photoMessage, {}, {})
+        dialog.show()
+
+        val layoutProgress = dialog.findViewById<View>(R.id.layout_viewer_progress)
+        assertNotNull(layoutProgress)
+        assertEquals(View.GONE, layoutProgress.visibility)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testFormatTimeMs_formatsMinutesAndSecondsAccurately() {
+        val message = createTestMessage(MediaType.VIDEO)
+        val dialog = MediaViewerDialog(context, message, {}, {})
+
+        assertEquals("00:00", dialog.formatTimeMs(0))
+        assertEquals("00:05", dialog.formatTimeMs(5000))
+        assertEquals("01:05", dialog.formatTimeMs(65000))
+        assertEquals("10:00", dialog.formatTimeMs(600000))
+        assertEquals("00:00", dialog.formatTimeMs(-1000))
+    }
+
+    @Test
+    fun testUpdateProgressUI_withValidDuration_updatesProgressBarAndText() {
+        val message = createTestMessage(MediaType.VIDEO)
+        val dialog = MediaViewerDialog(context, message, {}, {})
+        dialog.show()
+
+        val pb = dialog.findViewById<ProgressBar>(R.id.pb_viewer_progress)
+        val tv = dialog.findViewById<TextView>(R.id.tv_viewer_time)
+
+        dialog.updateProgressUI(currentMs = 15000, totalMs = 60000)
+
+        assertEquals(60000, pb.max)
+        assertEquals(15000, pb.progress)
+        assertEquals("00:15 / 01:00", tv.text.toString())
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testUpdateProgressUI_withZeroOrNegativeDuration_showsFallback() {
+        val message = createTestMessage(MediaType.VIDEO)
+        val dialog = MediaViewerDialog(context, message, {}, {})
+        dialog.show()
+
+        val pb = dialog.findViewById<ProgressBar>(R.id.pb_viewer_progress)
+        val tv = dialog.findViewById<TextView>(R.id.tv_viewer_time)
+
+        dialog.updateProgressUI(currentMs = 0, totalMs = 0)
+
+        assertEquals(100, pb.max)
+        assertEquals(0, pb.progress)
+        assertEquals("0:00 / 0:00", tv.text.toString())
+
+        dialog.updateProgressUI(currentMs = 5000, totalMs = -1)
+
+        assertEquals(100, pb.max)
+        assertEquals(0, pb.progress)
+        assertEquals("0:00 / 0:00", tv.text.toString())
+
+        dialog.dismiss()
     }
 }

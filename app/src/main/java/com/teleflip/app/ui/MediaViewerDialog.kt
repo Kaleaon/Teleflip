@@ -7,6 +7,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.VideoView
 import androidx.core.view.ViewCompat
@@ -16,8 +17,11 @@ import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -38,6 +42,10 @@ class MediaViewerDialog(
     private var tvStatus: TextView? = null
     private var tvCaption: TextView? = null
     private var tvHint: TextView? = null
+    private var layoutProgress: View? = null
+    private var pbProgress: ProgressBar? = null
+    private var tvTime: TextView? = null
+    private var progressJob: Job? = null
 
     var zoomLevel: Float = 1.0f
         private set
@@ -74,6 +82,9 @@ class MediaViewerDialog(
         tvStatus = findViewById(R.id.tv_viewer_status)
         tvCaption = findViewById(R.id.tv_viewer_caption)
         tvHint = findViewById(R.id.tv_viewer_controls_hint)
+        layoutProgress = findViewById(R.id.layout_viewer_progress)
+        pbProgress = findViewById(R.id.pb_viewer_progress)
+        tvTime = findViewById(R.id.tv_viewer_time)
 
         val captionStr = message.mediaCaption.ifBlank { message.text }
         if (captionStr.isNotBlank()) {
@@ -112,6 +123,7 @@ class MediaViewerDialog(
         filePath: String?,
         fileExists: Boolean,
     ) {
+        layoutProgress?.visibility = View.GONE
         if (!fileExists || filePath == null) {
             ivPhoto?.visibility = View.GONE
             tvStatus?.visibility = View.VISIBLE
@@ -154,6 +166,7 @@ class MediaViewerDialog(
         isLoopingGif: Boolean,
     ) {
         if (!fileExists || filePath == null) {
+            layoutProgress?.visibility = View.GONE
             vvVideo?.visibility = View.GONE
             tvStatus?.visibility = View.VISIBLE
             tvStatus?.text = "Downloading video/GIF from Telegram...\nPress [1] to prioritize download."
@@ -163,6 +176,7 @@ class MediaViewerDialog(
             return
         }
 
+        layoutProgress?.visibility = View.VISIBLE
         vvVideo?.visibility = View.VISIBLE
         tvStatus?.visibility = View.GONE
         vvVideo?.setVideoURI(Uri.fromFile(File(filePath)))
@@ -173,10 +187,15 @@ class MediaViewerDialog(
             isVideoPlaying = true
             applyPlaybackSpeed()
             updateSpeedBadge()
+            updateProgressUI()
+            startProgressTracking()
             val playingDesc = context.getString(R.string.cd_video_state_playing)
             vvVideo?.let { ViewCompat.setStateDescription(it, playingDesc) }
         }
         vvVideo?.setOnCompletionListener {
+            stopProgressTracking()
+            val totalMs = vvVideo?.duration ?: 0
+            updateProgressUI(currentMs = totalMs, totalMs = totalMs)
             if (!isLoopingGif) {
                 isVideoPlaying = false
                 tvZoomBadge?.text = "Ended ■"
@@ -185,6 +204,8 @@ class MediaViewerDialog(
             }
         }
         vvVideo?.setOnErrorListener { _, _, _ ->
+            stopProgressTracking()
+            layoutProgress?.visibility = View.GONE
             if (isLoopingGif) {
                 vvVideo?.visibility = View.GONE
                 ivPhoto?.visibility = View.VISIBLE
@@ -284,17 +305,63 @@ class MediaViewerDialog(
         }
     }
 
+    internal fun startProgressTracking() {
+        stopProgressTracking()
+        progressJob = dialogScope.launch {
+            while (isActive) {
+                updateProgressUI()
+                delay(250L)
+            }
+        }
+    }
+
+    internal fun stopProgressTracking() {
+        progressJob?.cancel()
+        progressJob = null
+    }
+
+    internal fun updateProgressUI(
+        currentMs: Int = vvVideo?.currentPosition ?: 0,
+        totalMs: Int = vvVideo?.duration ?: 0,
+    ) {
+        val pb = pbProgress ?: return
+        val tv = tvTime ?: return
+
+        if (totalMs <= 0) {
+            pb.max = 100
+            pb.progress = 0
+            tv.text = "0:00 / 0:00"
+        } else {
+            pb.max = totalMs
+            val safeCurrent = currentMs.coerceIn(0, totalMs)
+            pb.progress = safeCurrent
+            tv.text = "${formatTimeMs(safeCurrent)} / ${formatTimeMs(totalMs)}"
+        }
+    }
+
+    internal fun formatTimeMs(ms: Int): String {
+        val safeMs = ms.coerceAtLeast(0)
+        val totalSec = safeMs / 1000
+        val min = totalSec / 60
+        val sec = totalSec % 60
+        return String.format(Locale.US, "%02d:%02d", min, sec)
+    }
+
     private fun toggleVideoPlayback() {
         val vv = vvVideo ?: return
         if (vv.isPlaying) {
             vv.pause()
             isVideoPlaying = false
+            stopProgressTracking()
+            updateProgressUI()
             tvZoomBadge?.text = "Paused ⏸"
             val pausedDesc = context.getString(R.string.cd_video_state_paused)
             ViewCompat.setStateDescription(vv, pausedDesc)
         } else {
             vv.start()
             isVideoPlaying = true
+            updateProgressUI()
+            startProgressTracking()
             tvZoomBadge?.text = "Playing ▶"
             val playingDesc = context.getString(R.string.cd_video_state_playing)
             ViewCompat.setStateDescription(vv, playingDesc)
@@ -306,9 +373,11 @@ class MediaViewerDialog(
         val duration = vv.duration.coerceAtLeast(0)
         val target = (vv.currentPosition + deltaMs).coerceIn(0, if (duration > 0) duration else Int.MAX_VALUE)
         vv.seekTo(target)
+        updateProgressUI(currentMs = target, totalMs = duration)
     }
 
     override fun onStop() {
+        stopProgressTracking()
         try {
             vvVideo?.stopPlayback()
         } catch (_: Exception) {
@@ -351,6 +420,8 @@ class MediaViewerDialog(
                     vvVideo?.start()
                     isVideoPlaying = true
                     updateSpeedBadge()
+                    updateProgressUI(currentMs = 0, totalMs = vvVideo?.duration ?: 0)
+                    startProgressTracking()
                     return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_4 -> {
