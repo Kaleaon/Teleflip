@@ -18,6 +18,11 @@ abstract class BaseDialog(
     context: Context,
     themeResId: Int = R.style.Theme_TeleFlip,
 ) : Dialog(context, themeResId) {
+    override fun show() {
+        context.findMainActivity()?.captureFocusForDialog()
+        super.show()
+    }
+
     override fun onStart() {
         super.onStart()
         context.findMainActivity()?.onDialogShown()
