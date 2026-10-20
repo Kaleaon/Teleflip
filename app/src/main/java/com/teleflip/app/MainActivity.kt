@@ -177,6 +177,9 @@ class MainActivity : AppCompatActivity() {
         ) {
             phonePerms.add(Manifest.permission.READ_PHONE_NUMBERS)
         }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            phonePerms.add(Manifest.permission.READ_CONTACTS)
+        }
         if (phonePerms.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, phonePerms.toTypedArray(), REQ_PHONE_PERM)
         }
@@ -4202,6 +4205,7 @@ class MainActivity : AppCompatActivity() {
         val etHash = view.findViewById<EditText>(R.id.et_api_hash)
         val spTimeout = view.findViewById<Spinner>(R.id.sp_keypad_timeout)
         val btnBgPush = view.findViewById<Button>(R.id.btn_toggle_bg_notifications)
+        val btnSyncContacts = view.findViewById<Button>(R.id.btn_sync_contacts)
         val btnEditProfile = view.findViewById<Button>(R.id.btn_edit_profile)
         val btnActiveSessions = view.findViewById<Button>(R.id.btn_active_sessions)
         val btnBlockedUsers = view.findViewById<Button>(R.id.btn_blocked_users)
@@ -4316,6 +4320,26 @@ class MainActivity : AppCompatActivity() {
             updateBgPushLabel(newState)
             TeleFlipNotificationService.startOrStop(this, newState)
             showToast(if (newState) "Closed-flip background notifications enabled" else "Background notifications disabled")
+        }
+
+        fun updateSyncContactsLabel(enabled: Boolean) {
+            btnSyncContacts?.text = if (enabled) "👥 Sync Contacts: ON" else "👥 Sync Contacts: OFF"
+        }
+        updateSyncContactsLabel(telegramManager.syncContactsEnabled)
+        btnSyncContacts?.setOnClickListener {
+            val newState = !telegramManager.syncContactsEnabled
+            telegramManager.syncContactsEnabled = newState
+            updateSyncContactsLabel(newState)
+            if (newState) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                    telegramManager.syncContacts()
+                    showToast("Contact sync enabled")
+                } else {
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_CONTACTS), REQ_PHONE_PERM)
+                }
+            } else {
+                showToast("Contact sync disabled")
+            }
         }
 
         etId.setText(telegramManager.apiId.toString())
@@ -5039,7 +5063,12 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == REQ_LOC_PERM && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             activeChat?.let { sendLocationFlow(it) }
         }
-        if (requestCode == REQ_PHONE_PERM && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == REQ_PHONE_PERM && grantResults.isNotEmpty()) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                if (telegramManager.authState.value is AuthState.Ready && telegramManager.syncContactsEnabled) {
+                    telegramManager.syncContacts()
+                }
+            }
             if (currentScreen == Screen.LOGIN) {
                 showLoginScreen(telegramManager.authState.value)
             }
