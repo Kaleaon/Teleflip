@@ -40,6 +40,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.location.LocationHelper
+import com.teleflip.app.ui.ProxySettingsDialog
 import com.teleflip.app.media.VoicePlayer
 import com.teleflip.app.media.VoiceRecorder
 import com.teleflip.app.model.ActiveCall
@@ -251,8 +252,24 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        intent?.data?.let { uri ->
+            if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
+                telegramManager.handleDeepLinkProxy(uri)
+            }
+        }
+
         if (PasscodeManager.isLocked(this)) {
             showPasscodeUnlockScreen()
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent?.data?.let { uri ->
+            if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
+                telegramManager.handleDeepLinkProxy(uri)
+            }
         }
     }
 
@@ -322,6 +339,21 @@ class MainActivity : AppCompatActivity() {
             telegramManager.isAuthQueryInProgressFlow.collectLatest { inProgress ->
                 if (currentScreen == Screen.LOGIN) {
                     updateLoginProgressState(inProgress)
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            telegramManager.failoverStatus.collectLatest { failoverMsg ->
+                if (!failoverMsg.isNullOrBlank() && currentScreen == Screen.LOGIN) {
+                    val tvStatus = findViewById<TextView>(R.id.tv_login_status)
+                    tvStatus?.text = failoverMsg
+                    if (failoverMsg.startsWith("🟢")) {
+                        tvStatus?.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.focus_highlight_gold))
+                    } else if (failoverMsg.startsWith("🔴") || failoverMsg.startsWith("⚠️")) {
+                        tvStatus?.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_error))
+                    }
+                    tvStatus?.announceForAccessibility(failoverMsg)
                 }
             }
         }
@@ -3651,7 +3683,14 @@ class MainActivity : AppCompatActivity() {
         val btnForgotPassword = view.findViewById<Button>(R.id.btn_forgot_password)
         val btnResetAccount = view.findViewById<Button>(R.id.btn_reset_account)
         val btnUseSim = view.findViewById<Button>(R.id.btn_use_sim_number)
+        val btnProxySettings = view.findViewById<Button>(R.id.btn_login_proxy_settings)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
+
+        btnProxySettings?.setOnClickListener {
+            ProxySettingsDialog(this, telegramManager) {
+                updateLoginConnectionState(telegramManager.connectionState.value)
+            }.show()
+        }
 
         btnQrLogin?.setOnClickListener {
             telegramManager.requestQrCodeLogin()
