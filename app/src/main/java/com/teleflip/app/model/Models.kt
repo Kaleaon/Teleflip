@@ -29,6 +29,7 @@ data class ForumTopicModel(
     val unreadCount: Int = 0,
     val iconEmoji: String = "💬",
     val isClosed: Boolean = false,
+    val isPinned: Boolean = false,
 )
 
 data class ChatFolderModel(
@@ -79,6 +80,7 @@ enum class MediaType {
     VIDEO,
     ANIMATION,
     POLL,
+    PAID_MEDIA,
 }
 
 data class MessageModel(
@@ -111,6 +113,9 @@ data class MessageModel(
     val pollTotalVoters: Int = 0,
     val messageThreadId: Long = 0L,
     val selfDestructSeconds: Int = 0,
+    val transcript: String = "",
+    val starCount: Long = 0L,
+    val isPaidMediaLocked: Boolean = false,
 )
 
 data class MessageSearchResult(
@@ -211,4 +216,20 @@ data class SessionModel(
     val ip: String,
     val country: String,
     val activeDate: String,
+)
+
+enum class ProxyType {
+    SOCKS5,
+    MTPROTO,
+}
+
+data class ProxyItem(
+    val id: Int = 0,
+    val server: String = "",
+    val port: Int = 1080,
+    val type: ProxyType = ProxyType.SOCKS5,
+    val username: String = "",
+    val password: String = "",
+    val secret: String = "",
+    val isEnabled: Boolean = false,
 )
