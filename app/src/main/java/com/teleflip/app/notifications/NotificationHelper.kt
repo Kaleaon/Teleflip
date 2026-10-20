@@ -8,6 +8,7 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import com.teleflip.app.MainActivity
@@ -157,6 +158,7 @@ object NotificationHelper {
             }
 
             nm.notify(chatId.hashCode(), builder.build())
+            acquireWakeLock(context, 3000L)
         } catch (_: Throwable) {
             // Safe no-op in headless unit tests where NotificationManager is mocked
         }
@@ -206,6 +208,20 @@ object NotificationHelper {
                     .build()
 
             nm.notify(900000 + callId, notification)
+            acquireWakeLock(context, 10000L)
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun acquireWakeLock(
+        context: Context,
+        timeoutMs: Long,
+    ) {
+        try {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val wl = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "teleflip:notification_wake")
+            wl?.setReferenceCounted(false)
+            wl?.acquire(timeoutMs)
         } catch (_: Throwable) {
         }
     }
