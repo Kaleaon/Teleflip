@@ -2592,6 +2592,63 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         tdClient?.send(TdApi.GetChatHistory(chatId, fromMessageId, 0, limit, false), this)
     }
 
+    suspend fun getChatHistoryBatch(
+        chatId: Long,
+        fromMessageId: Long = 0,
+        limit: Int = 100,
+    ): List<TdApi.Message> {
+        return try {
+            val res = sendQuery(TdApi.GetChatHistory(chatId, fromMessageId, 0, limit, false))
+            if (res is TdApi.Messages) {
+                res.messages.toList()
+            } else {
+                emptyList()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun resolveSenderName(sender: TdApi.MessageSender?): String {
+        if (sender == null) return "Unknown"
+        return when (sender) {
+            is TdApi.MessageSenderUser -> {
+                val cachedUser = userCache[sender.userId]
+                if (cachedUser != null) {
+                    val name = "${cachedUser.firstName} ${cachedUser.lastName}".trim()
+                    if (name.isNotEmpty()) return name
+                }
+                try {
+                    val res = sendQuery(TdApi.GetUser(sender.userId))
+                    if (res is TdApi.User) {
+                        userCache[sender.userId] = res
+                        val name = "${res.firstName} ${res.lastName}".trim()
+                        if (name.isNotEmpty()) name else "User ${sender.userId}"
+                    } else {
+                        "User ${sender.userId}"
+                    }
+                } catch (_: Exception) {
+                    "User ${sender.userId}"
+                }
+            }
+            is TdApi.MessageSenderChat -> {
+                val cachedChat = _chats.value.find { it.id == sender.chatId }
+                if (cachedChat != null) return cachedChat.title
+                try {
+                    val res = sendQuery(TdApi.GetChat(sender.chatId))
+                    if (res is TdApi.Chat) {
+                        res.title
+                    } else {
+                        "Chat ${sender.chatId}"
+                    }
+                } catch (_: Exception) {
+                    "Chat ${sender.chatId}"
+                }
+            }
+            else -> "Unknown"
+        }
+    }
+
     fun getSenderDisplayName(message: TdApi.Message): String {
         if (message.isOutgoing) return "You"
         when (val sender = message.senderId) {
