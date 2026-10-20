@@ -72,6 +72,71 @@ class LayoutAccessibilityXmlTest {
         assertEquals("polite", statusLiveRegion)
     }
 
+    @Test
+    fun testFormLayoutsUseLabeledInputView() {
+        val formLayoutsWithExpectedIds =
+            mapOf(
+                "view_login.xml" to listOf("@+id/liv_login_input"),
+                "dialog_search.xml" to listOf("@+id/liv_search_input"),
+                "dialog_create_poll.xml" to
+                    listOf(
+                        "@+id/liv_poll_question",
+                        "@+id/liv_poll_opt1",
+                        "@+id/liv_poll_opt2",
+                        "@+id/liv_poll_opt3",
+                    ),
+                "dialog_new_chat.xml" to listOf("@+id/liv_new_chat_input"),
+                "dialog_proxy_settings.xml" to
+                    listOf(
+                        "@+id/liv_proxy_server",
+                        "@+id/liv_proxy_port",
+                        "@+id/liv_proxy_username",
+                        "@+id/liv_proxy_password",
+                        "@+id/liv_proxy_secret",
+                    ),
+                "view_settings.xml" to
+                    listOf(
+                        "@+id/liv_api_id",
+                        "@+id/liv_api_hash",
+                    ),
+            )
+
+        for ((layoutName, expectedIds) in formLayoutsWithExpectedIds) {
+            val file = getLayoutFile(layoutName)
+            val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
+            for (id in expectedIds) {
+                val node = findNodeById(doc, id)
+                assertNotNull("Expected node $id in $layoutName", node)
+                assertEquals(
+                    "Node $id in $layoutName must be LabeledInputView",
+                    "com.teleflip.app.ui.LabeledInputView",
+                    node?.nodeName,
+                )
+            }
+
+            val directEditTexts = findNodesByTagName(doc, "EditText")
+            assertEquals("Form layout $layoutName should not contain direct EditText elements", 0, directEditTexts.size)
+        }
+    }
+
+    private fun findNodesByTagName(
+        node: org.w3c.dom.Node,
+        tagName: String,
+        results: MutableList<org.w3c.dom.Element> = mutableListOf(),
+    ): List<org.w3c.dom.Element> {
+        if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE) {
+            val element = node as org.w3c.dom.Element
+            if (element.tagName == tagName || element.nodeName == tagName) {
+                results.add(element)
+            }
+        }
+        val children = node.childNodes
+        for (i in 0 until children.length) {
+            findNodesByTagName(children.item(i), tagName, results)
+        }
+        return results
+    }
+
     private fun findNodeById(
         node: org.w3c.dom.Node,
         targetId: String,

@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.widget.Button
 import android.widget.EditText
-import android.widget.TextView
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 
@@ -26,8 +25,9 @@ class NewChatDialog(
         setContentView(R.layout.dialog_new_chat)
         setupDismissKeys()
 
-        val input = findViewById<EditText>(R.id.et_new_chat_input)
-        val tvMode = findViewById<TextView>(R.id.tv_new_chat_input_mode)
+        val livInput = findViewById<LabeledInputView>(R.id.liv_new_chat_input)
+        val input = livInput?.editText
+        val tvMode = livInput?.modeView
         val btnDirect = findViewById<Button>(R.id.btn_start_direct_chat)
         val btnSaved = findViewById<Button>(R.id.btn_open_saved_messages)
         val btnGroup = findViewById<Button>(R.id.btn_create_group)

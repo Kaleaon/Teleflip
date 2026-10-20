@@ -63,6 +63,7 @@ import com.teleflip.app.telegram.TelegramManager
 import com.teleflip.app.ui.ChatExportDialog
 import com.teleflip.app.ui.ChatExportProgressDialog
 import com.teleflip.app.ui.ChatListAdapter
+import com.teleflip.app.ui.LabeledInputView
 import com.teleflip.app.ui.MediaViewerDialog
 import com.teleflip.app.ui.MenuOption
 import com.teleflip.app.ui.MessageAdapter
@@ -3635,13 +3636,12 @@ class MainActivity : AppCompatActivity() {
 
         val view = LayoutInflater.from(this).inflate(R.layout.view_login, mainContainer, true)
 
+        val livLoginInput = view.findViewById<LabeledInputView>(R.id.liv_login_input)
         val tvStatus = view.findViewById<TextView>(R.id.tv_login_status)
-        val tvLabel = view.findViewById<TextView>(R.id.tv_input_label)
-        val tvMode = view.findViewById<TextView>(R.id.tv_login_input_mode)
-        etLoginInput = view.findViewById(R.id.et_login_input)
+        val tvMode = livLoginInput?.modeView
+        etLoginInput = livLoginInput?.editText
         val btnSubmit = view.findViewById<Button>(R.id.btn_login_submit)
 
-        val layoutInputContainer = view.findViewById<View>(R.id.layout_login_input_container)
         val layoutQrContainer = view.findViewById<View>(R.id.layout_qr_container)
         val ivQrCode = view.findViewById<ImageView>(R.id.iv_login_qr)
         val btnPhoneLogin = view.findViewById<Button>(R.id.btn_phone_login)
@@ -3677,18 +3677,20 @@ class MainActivity : AppCompatActivity() {
 
         when (state) {
             is AuthState.WaitPhoneNumber -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.let { liv ->
+                    liv.visibility = View.VISIBLE
+                    liv.labelText = "Phone Number (with +country code):"
+                    liv.modeView.visibility = View.VISIBLE
+                }
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.VISIBLE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_PHONE
                 etLoginInput?.typeface = tf
-                tvMode?.visibility = View.VISIBLE
                 loginInputEngine?.isModeSwitchingEnabled = true
                 loginInputEngine?.isSymbolPickerEnabled = true
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
-                tvLabel.text = "Phone Number (with +country code):"
                 etLoginInput?.hint = "+1 555 123 4567"
                 btnSubmit.text = "Send Code"
 
@@ -3724,7 +3726,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitOtherDeviceConfirmation -> {
-                layoutInputContainer?.visibility = View.GONE
+                livLoginInput?.visibility = View.GONE
                 layoutQrContainer?.visibility = View.VISIBLE
                 btnSubmit.visibility = View.GONE
                 btnUseSim?.visibility = View.GONE
@@ -3746,19 +3748,21 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitCode -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.let { liv ->
+                    liv.visibility = View.VISIBLE
+                    liv.labelText = "Verification Code (numbers only):"
+                    liv.modeView.visibility = View.GONE
+                }
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_NUMBER
                 etLoginInput?.typeface = tf
-                tvMode?.visibility = View.GONE
                 loginInputEngine?.isModeSwitchingEnabled = false
                 loginInputEngine?.isSymbolPickerEnabled = false
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
                 btnUseSim?.visibility = View.GONE
-                tvLabel.text = "Verification Code (numbers only):"
                 etLoginInput?.hint = "12345"
                 btnSubmit.text = "Verify Code"
                 if (state.errorMessage != null) {
@@ -3772,14 +3776,17 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitPassword -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.let { liv ->
+                    liv.visibility = View.VISIBLE
+                    liv.labelText = "2-Step Verification Password:"
+                    liv.modeView.visibility = View.VISIBLE
+                }
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
                 etLoginInput?.typeface = tf
-                tvMode?.visibility = View.VISIBLE
                 loginInputEngine?.isModeSwitchingEnabled = true
                 loginInputEngine?.isSymbolPickerEnabled = true
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.LOWER)
@@ -3800,7 +3807,6 @@ class MainActivity : AppCompatActivity() {
                 btnResetAccount?.setOnClickListener {
                     showAccountResetConfirmationDialog()
                 }
-                tvLabel.text = "2-Step Verification Password:"
                 etLoginInput?.hint = "Cloud Password (letters, numbers, symbols)"
                 btnSubmit.text = "Submit Password"
                 if (state.errorMessage != null) {
@@ -3821,14 +3827,17 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitPasswordRecoveryCode -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.let { liv ->
+                    liv.visibility = View.VISIBLE
+                    liv.labelText = "Email Recovery Code (numbers only):"
+                    liv.modeView.visibility = View.GONE
+                }
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_NUMBER
                 etLoginInput?.typeface = tf
-                tvMode?.visibility = View.GONE
                 loginInputEngine?.isModeSwitchingEnabled = false
                 loginInputEngine?.isSymbolPickerEnabled = false
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
@@ -3839,7 +3848,6 @@ class MainActivity : AppCompatActivity() {
                 btnSubmit.nextFocusDownId = R.id.btn_config_credentials
                 btnConfig.nextFocusUpId = R.id.btn_login_submit
 
-                tvLabel.text = "Email Recovery Code (numbers only):"
                 etLoginInput?.hint = "123456"
                 etLoginInput?.setText("")
                 btnSubmit.text = "Submit Recovery Code"
@@ -3858,7 +3866,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.Error -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.visibility = View.VISIBLE
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
@@ -4005,7 +4013,7 @@ class MainActivity : AppCompatActivity() {
         val btnConfig = findViewById<Button>(R.id.btn_config_credentials) ?: return
 
         etInput.nextFocusDownId = R.id.btn_login_submit
-        btnSubmit.nextFocusUpId = R.id.et_login_input
+        btnSubmit.nextFocusUpId = R.id.liv_login_input
 
         var prevId = R.id.btn_login_submit
 
@@ -4198,8 +4206,10 @@ class MainActivity : AppCompatActivity() {
 
         val view = LayoutInflater.from(this).inflate(R.layout.view_settings, mainContainer, true)
 
-        val etId = view.findViewById<EditText>(R.id.et_api_id)
-        val etHash = view.findViewById<EditText>(R.id.et_api_hash)
+        val livId = view.findViewById<LabeledInputView>(R.id.liv_api_id)
+        val livHash = view.findViewById<LabeledInputView>(R.id.liv_api_hash)
+        val etId = livId?.editText
+        val etHash = livHash?.editText
         val spTimeout = view.findViewById<Spinner>(R.id.sp_keypad_timeout)
         val btnBgPush = view.findViewById<Button>(R.id.btn_toggle_bg_notifications)
         val btnEditProfile = view.findViewById<Button>(R.id.btn_edit_profile)
@@ -4318,8 +4328,8 @@ class MainActivity : AppCompatActivity() {
             showToast(if (newState) "Closed-flip background notifications enabled" else "Background notifications disabled")
         }
 
-        etId.setText(telegramManager.apiId.toString())
-        etHash.setText(telegramManager.apiHash)
+        etId?.setText(telegramManager.apiId.toString())
+        etHash?.setText(telegramManager.apiHash)
 
         val timeoutValues = listOf(300L, 500L, 900L)
         val timeoutLabels = listOf("300 ms (Fast)", "500 ms (Normal)", "900 ms (Slow)")
@@ -4341,8 +4351,8 @@ class MainActivity : AppCompatActivity() {
             if (selIndex in timeoutValues.indices) {
                 telegramManager.keypadTimeoutMs = timeoutValues[selIndex]
             }
-            val idStr = etId.text.toString().trim()
-            val hashStr = etHash.text.toString().trim()
+            val idStr = etId?.text?.toString()?.trim() ?: ""
+            val hashStr = etHash?.text?.toString()?.trim() ?: ""
             if (idStr.isNotEmpty() && hashStr.isNotEmpty()) {
                 telegramManager.apiId = idStr.toIntOrNull() ?: telegramManager.apiId
                 telegramManager.apiHash = hashStr
@@ -4382,7 +4392,7 @@ class MainActivity : AppCompatActivity() {
             },
         )
 
-        etId.requestFocus()
+        livId?.requestFocus()
     }
 
     // =========================================================================
