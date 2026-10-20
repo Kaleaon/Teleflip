@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.R
+import com.teleflip.app.accessibility.AccessibilityActionManager
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
@@ -30,6 +31,7 @@ class MessageAdapter(
     private val onMessageAction: ((MessageModel) -> Unit)? = null,
     private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
     private val customEmojiResolver: ((String) -> String?)? = null,
+    private val onMessageAccessibilityAction: ((actionId: Int, message: MessageModel) -> Boolean)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     companion object {
         const val PAYLOAD_PLAYBACK_STATE = "PAYLOAD_PLAYBACK_STATE"
@@ -117,6 +119,7 @@ class MessageAdapter(
     override fun onViewRecycled(holder: MessageViewHolder) {
         super.onViewRecycled(holder)
         holder.clearImage()
+        AccessibilityActionManager.clearActions(holder.itemView)
     }
 
     inner class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -402,6 +405,10 @@ class MessageAdapter(
 
             itemView.setOnClickListener {
                 onMessageAction?.invoke(message)
+            }
+
+            AccessibilityActionManager.bindActions(itemView, message) { actionId, item ->
+                onMessageAccessibilityAction?.invoke(actionId, item) ?: false
             }
         }
 

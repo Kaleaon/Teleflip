@@ -466,9 +466,14 @@ class MainActivity : AppCompatActivity() {
         rvChats = view.findViewById(R.id.rv_chats)
         rvChats?.layoutManager = LinearLayoutManager(this)
         chatListAdapter =
-            ChatListAdapter { chat ->
-                openConversation(chat)
-            }
+            ChatListAdapter(
+                onChatSelected = { chat ->
+                    openConversation(chat)
+                },
+                onChatAction = { actionId, chat ->
+                    handleChatAccessibilityAction(actionId, chat)
+                },
+            )
         rvChats?.adapter = chatListAdapter
 
         // Lazy loading / pagination on scroll
@@ -1146,6 +1151,9 @@ class MainActivity : AppCompatActivity() {
                 },
                 customEmojiResolver = { key ->
                     telegramManager.getCustomEmojiFilePath(key)
+                },
+                onMessageAccessibilityAction = { actionId, msg ->
+                    handleMessageAccessibilityAction(actionId, msg)
                 },
             )
         rvMessages?.adapter = messageAdapter
@@ -3598,6 +3606,81 @@ class MainActivity : AppCompatActivity() {
         )
 
         OptionsMenuDialog(this, "Message Actions", options).show()
+    }
+
+    private fun handleChatAccessibilityAction(
+        actionId: Int,
+        chat: ChatModel,
+    ): Boolean {
+        return when (actionId) {
+            R.id.action_chat_open -> {
+                openConversation(chat)
+                true
+            }
+            R.id.action_chat_pin, R.id.action_chat_unpin -> {
+                telegramManager.toggleChatPin(chat.id, chat.isPinned) { isPinned ->
+                    showToast(if (isPinned) "Chat pinned" else "Chat unpinned")
+                }
+                true
+            }
+            R.id.action_chat_mute, R.id.action_chat_unmute -> {
+                telegramManager.toggleChatMute(chat.id, chat.isMuted) { isMuted ->
+                    showToast(if (isMuted) "Chat muted" else "Chat unmuted")
+                }
+                true
+            }
+            R.id.action_chat_archive, R.id.action_chat_unarchive -> {
+                telegramManager.toggleChatArchived(chat.id, chat.isArchived) { isArchived ->
+                    showToast(if (isArchived) "Chat archived" else "Chat unarchived")
+                }
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun handleMessageAccessibilityAction(
+        actionId: Int,
+        msg: MessageModel,
+    ): Boolean {
+        return when (actionId) {
+            R.id.action_message_reply -> {
+                startReplyToMessage(msg)
+                true
+            }
+            R.id.action_message_react -> {
+                showReactionPickerDialog(msg)
+                true
+            }
+            R.id.action_message_copy -> {
+                if (msg.text.isNotBlank()) {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Telegram Message", msg.text))
+                    showToast("Copied to clipboard")
+                    true
+                } else false
+            }
+            R.id.action_message_delete -> {
+                telegramManager.deleteMessage(msg.chatId, msg.id)
+                showToast("Message deleted")
+                true
+            }
+            R.id.action_message_transcribe -> {
+                handleTranscribeVoiceMessage(msg)
+                true
+            }
+            R.id.action_message_play_voice -> {
+                handlePlayVoiceMessage(msg)
+                true
+            }
+            R.id.action_message_pin, R.id.action_message_unpin -> {
+                telegramManager.togglePinMessage(msg.chatId, msg.id, msg.isPinned) { isNowPinned ->
+                    showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                }
+                true
+            }
+            else -> false
+        }
     }
 
     private fun showQuickRepliesMenu(chat: ChatModel) {

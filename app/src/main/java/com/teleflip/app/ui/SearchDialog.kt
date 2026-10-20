@@ -96,16 +96,34 @@ class SearchDialog(
         rvResults.layoutManager = LinearLayoutManager(context)
 
         chatAdapter =
-            ChatListAdapter { chat ->
-                dismiss()
-                onChatSelected(chat)
-            }
+            ChatListAdapter(
+                onChatSelected = { chat ->
+                    dismiss()
+                    onChatSelected(chat)
+                },
+                onChatAction = { actionId, chat ->
+                    if (actionId == com.teleflip.app.R.id.action_chat_open) {
+                        dismiss()
+                        onChatSelected(chat)
+                        true
+                    } else false
+                },
+            )
 
         messageSearchAdapter =
-            MessageSearchResultAdapter { result ->
-                dismiss()
-                onMessageSelected(result.chatId, result.messageId)
-            }
+            MessageSearchResultAdapter(
+                onItemClick = { result ->
+                    dismiss()
+                    onMessageSelected(result.chatId, result.messageId)
+                },
+                onSearchResultAccessibilityAction = { actionId, result ->
+                    if (actionId == com.teleflip.app.R.id.action_search_jump) {
+                        dismiss()
+                        onMessageSelected(result.chatId, result.messageId)
+                        true
+                    } else false
+                },
+            )
 
         setupTabs()
         setupSearchInput()
