@@ -25,7 +25,11 @@ import com.teleflip.app.model.StickerItem
 import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.model.UserProfileModel
 import com.teleflip.app.notifications.NotificationHelper
+import com.teleflip.app.storage.ChatExportManager
+import com.teleflip.app.storage.ChatExportOptions
+import com.teleflip.app.storage.ChatExportProgress
 import com.teleflip.app.storage.ProxyStorage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,6 +49,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.coroutines.resume
 
 sealed class AuthState {
     object Initial : AuthState()
@@ -74,7 +80,8 @@ sealed class AuthState {
     data class Error(val message: String) : AuthState()
 }
 
-class TelegramManager(private val context: Context) : Client.ResultHandler {
+class TelegramManager(paramContext: Context) : Client.ResultHandler {
+    private val context: Context = paramContext.applicationContext ?: paramContext
     private val tag = "TelegramManager"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs: SharedPreferences = context.getSharedPreferences("teleflip_prefs", Context.MODE_PRIVATE)
@@ -107,6 +114,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     var scopeGroupChatsMuted = false
     var scopeChannelChatsMuted = false
     private val prefMutedChatsKey = "teleflip_muted_chat_ids"
+    val fileDownloadWaiters =
+        java.util.concurrent.ConcurrentHashMap<Int, CopyOnWriteArrayList<CompletableDeferred<String?>>>()
 
     private val _chatFolders = MutableStateFlow<List<ChatFolderModel>>(emptyList())
     val chatFolders: StateFlow<List<ChatFolderModel>> = _chatFolders.asStateFlow()
@@ -129,6 +138,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     @androidx.annotation.VisibleForTesting
     internal fun setMessagesForTesting(messages: Map<Long, List<MessageModel>>) {
         _messages.value = messages
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun handleIncomingMessageForTesting(msg: TdApi.Message) {
+        handleIncomingMessage(msg)
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun handleMessagesListForTesting(msgs: Array<TdApi.Message>) {
+        handleMessagesList(msgs)
     }
 
     @androidx.annotation.VisibleForTesting
@@ -155,6 +174,37 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     companion object {
         const val DEFAULT_CHAT_BATCH_SIZE = 10
+
+        @Volatile
+        private var instance: TelegramManager? = null
+
+        fun getInstance(context: Context): TelegramManager {
+            return instance ?: synchronized(this) {
+                instance ?: TelegramManager(context.applicationContext ?: context).also { instance = it }
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        internal fun resetInstance() {
+            synchronized(this) {
+                instance = null
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        internal fun resetInstanceForTesting() {
+            synchronized(this) {
+                instance = null
+            }
+        }
+
+        @androidx.annotation.VisibleForTesting
+        internal fun setInstanceForTesting(manager: TelegramManager?) {
+            synchronized(this) {
+                instance = manager
+            }
+        }
+
         private val customEmojiCache = java.util.concurrent.ConcurrentHashMap<String, StickerItem>()
 
         fun registerCustomEmojiSticker(
@@ -288,6 +338,9 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
 
     init {
+        if (instance == null) {
+            instance = this
+        }
         try {
             System.loadLibrary("tdjni")
             Client.execute(TdApi.SetLogVerbosityLevel(1))
@@ -297,38 +350,96 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    private val clientLock = Any()
+
+    @Volatile
+    private var isStartingClient = false
+
+    @Volatile
+    private var isClosingClient = false
+
+    @Volatile
+    private var reconnectPending = false
+
     fun start() {
+        synchronized(clientLock) {
+            if (tdClient != null || isStartingClient) {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib Client already active or starting; skipping start()")
+                return
+            }
+            if (isClosingClient) {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib Client is closing; queuing reconnect on close")
+                reconnectPending = true
+                return
+            }
+            isStartingClient = true
+        }
         scope.launch(Dispatchers.IO) {
             try {
                 _connectionState.value = "Connecting..."
                 com.teleflip.app.report.AdbReporter.reportInfo(tag, "Creating TDLib Client...")
                 val client = Client.create(this@TelegramManager, null, null)
-                if (client == null) {
-                    _connectionState.value = "Init error"
-                    com.teleflip.app.report.AdbReporter.reportError(tag, "Client.create returned null")
-                } else {
-                    tdClient = client
-                    applySavedProxy()
+                synchronized(clientLock) {
+                    isStartingClient = false
+                    if (client == null) {
+                        _connectionState.value = "Init error"
+                        com.teleflip.app.report.AdbReporter.reportError(tag, "Client.create returned null")
+                    } else {
+                        tdClient = client
+                        applySavedProxy()
+                    }
                 }
             } catch (e: Throwable) {
+                synchronized(clientLock) {
+                    isStartingClient = false
+                }
                 com.teleflip.app.report.AdbReporter.reportError(tag, "Client creation error: ${e.message}", e)
                 _connectionState.value = "Init error"
             }
         }
     }
 
-    fun retryConnection() {
+    fun stop() {
         clearAuthTimeoutSafeguard()
         isAuthQueryInProgress = false
         scope.launch(Dispatchers.IO) {
             try {
-                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing previous TDLib client instance...")
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing TDLib client instance...")
                 tdClient?.send(TdApi.Close(), this@TelegramManager)
             } catch (e: Throwable) {
                 Log.w(tag, "Error during native client teardown: ${e.message}")
             }
             tdClient = null
-            start()
+            _connectionState.value = "Offline"
+        }
+    }
+
+    fun retryConnection() {
+        clearAuthTimeoutSafeguard()
+        isAuthQueryInProgress = false
+        val activeClient: Client?
+        synchronized(clientLock) {
+            activeClient = tdClient
+            if (activeClient == null && !isStartingClient) {
+                reconnectPending = false
+                start()
+                return
+            }
+            isClosingClient = true
+            reconnectPending = true
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing TDLib client for clean reconnection...")
+                activeClient?.send(TdApi.Close(), this@TelegramManager)
+            } catch (e: Throwable) {
+                Log.w(tag, "Error during native client teardown: ${e.message}")
+                synchronized(clientLock) {
+                    isClosingClient = false
+                    tdClient = null
+                }
+                start()
+            }
         }
     }
 
@@ -2481,6 +2592,277 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         tdClient?.send(TdApi.GetChatHistory(chatId, fromMessageId, 0, limit, false), this)
     }
 
+    suspend fun getChatHistoryBatch(
+        chatId: Long,
+        fromMessageId: Long = 0,
+        limit: Int = 100,
+    ): List<TdApi.Message> {
+        return try {
+            val res = sendQuery(TdApi.GetChatHistory(chatId, fromMessageId, 0, limit, false))
+            if (res is TdApi.Messages) {
+                res.messages.toList()
+            } else {
+                emptyList()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun resolveSenderName(sender: TdApi.MessageSender?): String {
+        if (sender == null) return "Unknown"
+        return when (sender) {
+            is TdApi.MessageSenderUser -> {
+                val cachedUser = userCache[sender.userId]
+                if (cachedUser != null) {
+                    val name = "${cachedUser.firstName} ${cachedUser.lastName}".trim()
+                    if (name.isNotEmpty()) return name
+                }
+                try {
+                    val res = sendQuery(TdApi.GetUser(sender.userId))
+                    if (res is TdApi.User) {
+                        userCache[sender.userId] = res
+                        val name = "${res.firstName} ${res.lastName}".trim()
+                        if (name.isNotEmpty()) name else "User ${sender.userId}"
+                    } else {
+                        "User ${sender.userId}"
+                    }
+                } catch (_: Exception) {
+                    "User ${sender.userId}"
+                }
+            }
+            is TdApi.MessageSenderChat -> {
+                val cachedChat = _chats.value.find { it.id == sender.chatId }
+                if (cachedChat != null) return cachedChat.title
+                try {
+                    val res = sendQuery(TdApi.GetChat(sender.chatId))
+                    if (res is TdApi.Chat) {
+                        res.title
+                    } else {
+                        "Chat ${sender.chatId}"
+                    }
+                } catch (_: Exception) {
+                    "Chat ${sender.chatId}"
+                }
+            }
+            else -> "Unknown"
+        }
+    }
+
+    fun getSenderDisplayName(message: TdApi.Message): String {
+        if (message.isOutgoing) return "You"
+        when (val sender = message.senderId) {
+            is TdApi.MessageSenderUser -> {
+                val user = userCache[sender.userId]
+                if (user != null) {
+                    val fullName = "${user.firstName} ${user.lastName.orEmpty()}".trim()
+                    return if (fullName.isNotBlank()) fullName else "Contact"
+                }
+            }
+            is TdApi.MessageSenderChat -> {
+                val chat = _chats.value.find { it.id == sender.chatId }
+                if (chat != null) return chat.title
+            }
+        }
+        return "Contact"
+    }
+
+    suspend fun downloadFileSuspending(
+        fileId: Int,
+        timeoutMs: Long = 30_000L,
+    ): String? {
+        if (fileId == 0) return null
+        val client = tdClient ?: return null
+
+        val currentFile =
+            suspendCancellableCoroutine<TdApi.File?> { cont ->
+                client.send(TdApi.GetFile(fileId)) { res ->
+                    cont.resume(res as? TdApi.File)
+                }
+            }
+
+        if (currentFile != null && currentFile.local.isDownloadingCompleted && currentFile.local.path.isNotBlank()) {
+            return currentFile.local.path
+        }
+
+        val deferred = CompletableDeferred<String?>()
+        val list = fileDownloadWaiters.computeIfAbsent(fileId) { CopyOnWriteArrayList() }
+        list.add(deferred)
+
+        try {
+            client.send(TdApi.DownloadFile(fileId, 32, 0, 0, false)) { res ->
+                val f = res as? TdApi.File
+                if (f != null && f.local.isDownloadingCompleted && f.local.path.isNotBlank()) {
+                    deferred.complete(f.local.path)
+                }
+            }
+            return withTimeoutOrNull(timeoutMs) { deferred.await() }
+        } finally {
+            list.remove(deferred)
+            if (list.isEmpty()) {
+                fileDownloadWaiters.remove(fileId)
+            }
+        }
+    }
+
+    suspend fun fetchAllCloudMessages(
+        chatId: Long,
+        onProgress: ((loadedCount: Int) -> Unit)? = null,
+    ): List<TdApi.Message> {
+        val allMessages = mutableListOf<TdApi.Message>()
+        var fromMessageId = 0L
+        val client = tdClient ?: return emptyList()
+
+        while (true) {
+            val batch =
+                suspendCancellableCoroutine<Array<TdApi.Message>?> { cont ->
+                    client.send(TdApi.GetChatHistory(chatId, fromMessageId, 0, 100, false)) { result ->
+                        if (result is TdApi.Messages) {
+                            cont.resume(result.messages)
+                        } else {
+                            cont.resume(null)
+                        }
+                    }
+                }
+
+            if (batch.isNullOrEmpty()) {
+                break
+            }
+
+            allMessages.addAll(batch)
+            onProgress?.invoke(allMessages.size)
+
+            val oldest = batch.last()
+            if (oldest.id == fromMessageId || batch.size < 100) {
+                break
+            }
+            fromMessageId = oldest.id
+        }
+
+        return allMessages
+    }
+
+    suspend fun importChatHistoryFromCloud(
+        chatId: Long,
+        autoDownloadMedia: Boolean = true,
+        onProgress: ((loadedMessages: Int, queuedMedia: Int) -> Unit)? = null,
+    ): Pair<Int, Int> {
+        val rawMessages =
+            fetchAllCloudMessages(chatId) { count ->
+                onProgress?.invoke(count, 0)
+            }
+
+        val convertedList =
+            rawMessages.map { msg ->
+                val mediaInfo = extractMediaFileInfo(msg.content)
+                val stickerInfo = extractStickerInfo(msg.content)
+                MessageModel(
+                    id = msg.id,
+                    chatId = msg.chatId,
+                    senderName = getSenderDisplayName(msg),
+                    text = extractMessageText(msg.content),
+                    time = formatTime(msg.date.toLong() * 1000),
+                    isOutbound = msg.isOutgoing,
+                    status = MessageStatus.READ,
+                    mediaType = extractMediaType(msg.content),
+                    mediaCaption = extractMediaCaption(msg.content),
+                    mediaFilePath = mediaInfo.second,
+                    mediaFileId = mediaInfo.first,
+                    stickerEmoji = stickerInfo.first,
+                    isPremiumSticker = stickerInfo.second,
+                    transcript = extractVoiceTranscript(msg.content),
+                )
+            }
+
+        withContext(Dispatchers.Main) {
+            val currentMap = _messages.value.toMutableMap()
+            val existing = currentMap[chatId] ?: emptyList()
+            val merged = (convertedList + existing).distinctBy { it.id }.sortedBy { it.id }
+            currentMap[chatId] = merged
+            _messages.value = currentMap
+        }
+
+        var queuedMediaCount = 0
+        if (autoDownloadMedia) {
+            for (msg in rawMessages) {
+                val mediaInfo = extractMediaFileInfo(msg.content)
+                if (mediaInfo.first != 0 && mediaInfo.second.isNullOrBlank()) {
+                    tdClient?.send(TdApi.DownloadFile(mediaInfo.first, 1, 0, 0, false), this)
+                    queuedMediaCount++
+                    onProgress?.invoke(rawMessages.size, queuedMediaCount)
+                }
+            }
+        }
+
+        return Pair(rawMessages.size, queuedMediaCount)
+    }
+
+    suspend fun exportChatHistory(
+        chatId: Long,
+        chatTitle: String,
+        options: ChatExportOptions,
+        onProgress: ((ChatExportProgress) -> Unit)? = null,
+    ): Result<File> {
+        onProgress?.invoke(
+            ChatExportProgress(
+                stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
+                statusText = "Syncing complete cloud history for \"$chatTitle\"...",
+            ),
+        )
+
+        val rawMessages =
+            if (tdClient != null) {
+                fetchAllCloudMessages(chatId) { count ->
+                    onProgress?.invoke(
+                        ChatExportProgress(
+                            stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
+                            messagesProcessed = count,
+                            totalMessages = count,
+                            statusText = "Loaded $count cloud messages...",
+                        ),
+                    )
+                }
+            } else {
+                emptyList()
+            }
+
+        val messagesToExport =
+            if (rawMessages.isNotEmpty()) {
+                rawMessages.reversed().map { msg ->
+                    val mediaInfo = extractMediaFileInfo(msg.content)
+                    val stickerInfo = extractStickerInfo(msg.content)
+                    MessageModel(
+                        id = msg.id,
+                        chatId = msg.chatId,
+                        senderName = getSenderDisplayName(msg),
+                        text = extractMessageText(msg.content),
+                        time = formatTime(msg.date.toLong() * 1000),
+                        isOutbound = msg.isOutgoing,
+                        status = MessageStatus.READ,
+                        mediaType = extractMediaType(msg.content),
+                        mediaCaption = extractMediaCaption(msg.content),
+                        mediaFilePath = mediaInfo.second,
+                        mediaFileId = mediaInfo.first,
+                        stickerEmoji = stickerInfo.first,
+                        isPremiumSticker = stickerInfo.second,
+                        transcript = extractVoiceTranscript(msg.content),
+                    )
+                }
+            } else {
+                _messages.value[chatId] ?: emptyList()
+            }
+
+        return ChatExportManager.exportChat(
+            context = context,
+            chatId = chatId,
+            chatTitle = chatTitle,
+            messages = messagesToExport,
+            options = options,
+            fileDownloader = { fileId -> downloadFileSuspending(fileId) },
+            onProgress = onProgress,
+        )
+    }
+
     fun searchChats(
         query: String,
         onResult: (List<ChatModel>) -> Unit,
@@ -3792,7 +4174,28 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     }
 
     fun logOut() {
+        synchronized(clientLock) {
+            reconnectPending = false
+        }
         tdClient?.send(TdApi.LogOut(), this)
+    }
+
+    fun close() {
+        val client: Client?
+        synchronized(clientLock) {
+            reconnectPending = false
+            client = tdClient
+            if (client == null || isClosingClient) return
+            isClosingClient = true
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing TDLib client gracefully...")
+                client?.send(TdApi.Close(), this@TelegramManager)
+            } catch (e: Throwable) {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "Error during native close: ${e.message}")
+            }
+        }
     }
 
     override fun onResult(obj: TdApi.Object?) {
@@ -3903,6 +4306,15 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 isAuthQueryInProgress = false
                 val err = obj as TdApi.Error
                 com.teleflip.app.report.AdbReporter.reportError(tag, "TDLib Server Error [Code: ${err.code}]: ${err.message}")
+                val msg = err.message ?: ""
+                if (msg.contains("lock file", ignoreCase = true) || msg.contains("already in use", ignoreCase = true)) {
+                    com.teleflip.app.report.AdbReporter.reportWarning(tag, "Database lock contention detected. Attempting clean retry after release...")
+                    scope.launch(Dispatchers.IO) {
+                        delay(1500L)
+                        retryConnection()
+                    }
+                    return
+                }
                 when (val curr = _authState.value) {
                     is AuthState.WaitPhoneNumber -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitOtherDeviceConfirmation -> _authState.value = curr.copy(errorMessage = err.message)
@@ -3910,7 +4322,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitPasswordRecoveryCode -> _authState.value = curr.copy(errorMessage = err.message)
                     else -> {
-                        if (_authState.value !is AuthState.Ready) {
+                        if (_authState.value !is AuthState.Ready && _authState.value !is AuthState.Initial && _authState.value !is AuthState.WaitParameters) {
                             _authState.value = AuthState.WaitPhoneNumber(errorMessage = err.message)
                         }
                     }
@@ -3929,7 +4341,15 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Please configure your Telegram API ID & Hash in Settings (Config)")
                     return
                 }
-                val dbDir = File(context.filesDir, "tdlib_${this@TelegramManager.apiId}").absolutePath
+                val targetDbDir = File(context.filesDir, "tdlib_${this@TelegramManager.apiId}")
+                val legacyDbDir = File(context.filesDir, "tdlib")
+                if (!targetDbDir.exists() && legacyDbDir.exists() && legacyDbDir.isDirectory) {
+                    legacyDbDir.renameTo(targetDbDir)
+                }
+                if (!targetDbDir.exists()) {
+                    targetDbDir.mkdirs()
+                }
+                val dbDir = targetDbDir.absolutePath
                 val filesDir = com.teleflip.app.storage.StorageManager.getFilesDirectory(context).absolutePath
                 val params =
                     TdApi.SetTdlibParameters().apply {
@@ -3976,9 +4396,42 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 loadChatFolders()
                 loadScopeNotificationSettings()
             }
-            TdApi.AuthorizationStateClosed.CONSTRUCTOR -> {
+            TdApi.AuthorizationStateClosing.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib is closing gracefully...")
+            }
+            TdApi.AuthorizationStateLoggingOut.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib is logging out...")
                 _authState.value = AuthState.Initial
-                start()
+            }
+            TdApi.AuthorizationStateWaitRegistration.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "TDLib requires registration (new user)")
+                _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Registration required - please sign up with official Telegram first.")
+            }
+            TdApi.AuthorizationStateWaitEmailAddress.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "TDLib requires email address")
+                _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Email verification required. Please log in on another device first.")
+            }
+            TdApi.AuthorizationStateWaitEmailCode.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "TDLib requires email code")
+                _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Email verification code required.")
+            }
+            TdApi.AuthorizationStateWaitPremiumPurchase.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "TDLib requires premium purchase")
+                _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Premium subscription required.")
+            }
+            TdApi.AuthorizationStateClosed.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "AuthorizationStateClosed received. Previous client released.")
+                val shouldRestart: Boolean
+                synchronized(clientLock) {
+                    tdClient = null
+                    isClosingClient = false
+                    shouldRestart = reconnectPending
+                    reconnectPending = false
+                }
+                _authState.value = AuthState.Initial
+                if (shouldRestart) {
+                    start()
+                }
             }
         }
     }
@@ -4192,6 +4645,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     ) {
         val newText = extractMessageText(newContent)
         val newCaption = extractMediaCaption(newContent)
+        val newMediaType = extractMediaType(newContent)
+        val newMediaInfo = extractMediaFileInfo(newContent)
+        val starCount = extractStarCount(newContent)
+        val isLocked = extractIsPaidMediaLocked(newContent)
         val newTranscript = extractVoiceTranscript(newContent)
         val currentMap = _messages.value.toMutableMap()
         val list = (currentMap[chatId] ?: return).toMutableList()
@@ -4202,6 +4659,11 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 old.copy(
                     text = if (newText.isNotBlank()) newText else old.text,
                     mediaCaption = newCaption,
+                    mediaType = newMediaType,
+                    mediaFileId = if (newMediaInfo.first != 0) newMediaInfo.first else old.mediaFileId,
+                    mediaFilePath = newMediaInfo.second ?: old.mediaFilePath,
+                    starCount = starCount,
+                    isPaidMediaLocked = isLocked,
                     transcript = if (newTranscript.isNotBlank()) newTranscript else old.transcript,
                     isEdited = true,
                 )
@@ -4245,6 +4707,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 mediaFileId = mediaInfo.first,
                 stickerEmoji = stickerInfo.first,
                 isPremiumSticker = stickerInfo.second,
+                starCount = extractStarCount(msg.content),
+                isPaidMediaLocked = extractIsPaidMediaLocked(msg.content),
                 transcript = extractVoiceTranscript(msg.content),
             )
 
@@ -4285,6 +4749,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     mediaFileId = mediaInfo.first,
                     stickerEmoji = stickerInfo.first,
                     isPremiumSticker = stickerInfo.second,
+                    starCount = extractStarCount(msg.content),
+                    isPaidMediaLocked = extractIsPaidMediaLocked(msg.content),
                     transcript = extractVoiceTranscript(msg.content),
                 )
             }
@@ -4297,6 +4763,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     private fun handleFileUpdate(file: TdApi.File) {
         if (!file.local.isDownloadingCompleted || file.local.path.isBlank()) return
+
+        fileDownloadWaiters.remove(file.id)?.forEach { deferred ->
+            deferred.complete(file.local.path)
+        }
 
         synchronized(pendingChats) {
             for ((id, chat) in pendingChats) {
@@ -4358,6 +4828,49 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    private fun extractStarCount(content: TdApi.MessageContent?): Long {
+        if (content == null) return 0L
+        return if (content.constructor == TdApi.MessagePaidMedia.CONSTRUCTOR) {
+            (content as TdApi.MessagePaidMedia).starCount
+        } else {
+            0L
+        }
+    }
+
+    private fun extractIsPaidMediaLocked(content: TdApi.MessageContent?): Boolean {
+        if (content == null) return false
+        if (content.constructor == TdApi.MessagePaidMedia.CONSTRUCTOR) {
+            val paidMedia = content as TdApi.MessagePaidMedia
+            if (paidMedia.media.isEmpty()) return true
+            return paidMedia.media.any { it.constructor == TdApi.PaidMediaPreview.CONSTRUCTOR }
+        }
+        return false
+    }
+
+    fun unlockPaidMedia(
+        chatId: Long,
+        messageId: Long,
+        callback: ((Boolean) -> Unit)? = null,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            callback?.invoke(false)
+            return
+        }
+        client.send(
+            TdApi.OpenMessageContent(chatId, messageId),
+            object : Client.ResultHandler {
+                override fun onResult(obj: TdApi.Object?) {
+                    val success = obj is TdApi.Ok
+                    if (!success && obj is TdApi.Error) {
+                        Log.e("TelegramManager", "Failed to unlock paid media: ${obj.message}")
+                    }
+                    callback?.invoke(success)
+                }
+            },
+        )
+    }
+
     private fun extractMediaCaption(content: TdApi.MessageContent?): String {
         if (content == null) return ""
         return when (content.constructor) {
@@ -4367,6 +4880,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 doc.caption.text.ifBlank { doc.document.fileName }
             }
             TdApi.MessageVideo.CONSTRUCTOR -> (content as TdApi.MessageVideo).caption.text
+            TdApi.MessagePaidMedia.CONSTRUCTOR -> (content as TdApi.MessagePaidMedia).caption.text
             else -> ""
         }
     }
@@ -4402,6 +4916,23 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessageDocument.CONSTRUCTOR -> {
                 val doc = (content as TdApi.MessageDocument).document
                 resolveFile(doc.document)
+            }
+            TdApi.MessagePaidMedia.CONSTRUCTOR -> {
+                val paidMedia = content as TdApi.MessagePaidMedia
+                for (m in paidMedia.media) {
+                    when (m.constructor) {
+                        TdApi.PaidMediaPhoto.CONSTRUCTOR -> {
+                            val photo = (m as TdApi.PaidMediaPhoto).photo
+                            val size = photo.sizes.lastOrNull()
+                            if (size != null) return resolveFile(size.photo)
+                        }
+                        TdApi.PaidMediaVideo.CONSTRUCTOR -> {
+                            val video = (m as TdApi.PaidMediaVideo).video
+                            if (video != null) return resolveFile(video.video)
+                        }
+                    }
+                }
+                Pair(0, null)
             }
             else -> Pair(0, null)
         }
@@ -4443,6 +4974,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessageVideo.CONSTRUCTOR -> MediaType.VIDEO
             TdApi.MessageAnimation.CONSTRUCTOR -> MediaType.ANIMATION
             TdApi.MessagePoll.CONSTRUCTOR -> MediaType.POLL
+            TdApi.MessagePaidMedia.CONSTRUCTOR -> MediaType.PAID_MEDIA
             else -> MediaType.NONE
         }
     }
@@ -4462,6 +4994,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             TdApi.MessageSticker.CONSTRUCTOR -> {
                 val emoji = (content as TdApi.MessageSticker).sticker?.emoji ?: ""
                 if (emoji.isNotBlank()) "🎨 [Sticker $emoji]" else "🎨 [Sticker]"
+            }
+            TdApi.MessagePaidMedia.CONSTRUCTOR -> {
+                val paid = content as TdApi.MessagePaidMedia
+                val isLocked = extractIsPaidMediaLocked(content)
+                val lockTag = if (isLocked) "🔒 Locked" else "🔓 Unlocked"
+                val cap = paid.caption.text
+                val base = "⭐ ${paid.starCount} Stars • $lockTag"
+                if (cap.isNotBlank()) "$base • $cap" else base
             }
             else -> "[Message]"
         }
