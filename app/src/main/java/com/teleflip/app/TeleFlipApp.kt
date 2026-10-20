@@ -7,6 +7,8 @@ import coil.ImageLoader
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import com.teleflip.app.notifications.NotificationHelper
+import com.teleflip.app.notifications.TeleFlipNotificationService
+import com.teleflip.app.telegram.TelegramManager
 import org.telegram.messenger.ApplicationLoader
 
 class TeleFlipApp : Application() {
@@ -14,6 +16,11 @@ class TeleFlipApp : Application() {
         super.onCreate()
         ApplicationLoader.applicationContext = this
         NotificationHelper.ensureChannels(this)
+
+        val telegramManager = TelegramManager.getInstance(this)
+        if (telegramManager.backgroundPushEnabled) {
+            TeleFlipNotificationService.startOrStop(this, true)
+        }
 
         val imageLoader =
             ImageLoader.Builder(this)

@@ -1,92 +1,114 @@
 package com.teleflip.app.notifications
 
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.spy
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Build.VERSION_CODES.P])
 class NotificationHelperTest {
-    private lateinit var context: Context
-    private lateinit var notificationManager: NotificationManager
-
     @Before
     fun setUp() {
-        context = ApplicationProvider.getApplicationContext()
-        notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        NotificationHelper.channelsCreated = false
+        NotificationHelper.resetChannelsCreatedForTests()
     }
 
     @Test
-    fun testEnsureChannelsRegistersChannelsOnFirstExecution() {
-        assertFalse(NotificationHelper.channelsCreated)
+    fun testEnsureChannelsRegistersChannelsOnceAndIsIdempotent() {
+        val context = mock(Context::class.java)
+        val notificationManager = mock(NotificationManager::class.java)
+        `when`(context.getSystemService(Context.NOTIFICATION_SERVICE)).thenReturn(notificationManager)
+
+        NotificationHelper.ensureChannels(context)
+        NotificationHelper.ensureChannels(context)
+        NotificationHelper.ensureChannels(context)
+
+        @Suppress("UNCHECKED_CAST")
+        val captor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<NotificationChannel>>
+        verify(notificationManager, times(1)).createNotificationChannels(captor.capture())
+
+        val channels = captor.value
+        assertEquals(3, channels.size)
+        val channelIds = channels.map { it.id }.toSet()
+        assertTrue(channelIds.contains(NotificationHelper.CHANNEL_MESSAGES))
+        assertTrue(channelIds.contains(NotificationHelper.CHANNEL_CALLS))
+        assertTrue(channelIds.contains(NotificationHelper.CHANNEL_BACKGROUND_SYNC))
+    }
+
+    @Test
+    fun testEnsureChannelsWithNullNotificationManagerDoesNotSetGuard() {
+        val context = mock(Context::class.java)
+        `when`(context.getSystemService(Context.NOTIFICATION_SERVICE)).thenReturn(null)
 
         NotificationHelper.ensureChannels(context)
 
-        assertTrue(NotificationHelper.channelsCreated)
-        assertNotNull(notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_MESSAGES))
-        assertNotNull(notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_CALLS))
-        assertNotNull(notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_BACKGROUND_SYNC))
-    }
+        val notificationManager = mock(NotificationManager::class.java)
+        `when`(context.getSystemService(Context.NOTIFICATION_SERVICE)).thenReturn(notificationManager)
 
-    @Test
-    fun testEnsureChannelsReturnsImmediatelyOnSubsequentCalls() {
         NotificationHelper.ensureChannels(context)
-        assertTrue(NotificationHelper.channelsCreated)
-
-        val spyContext = spy(context)
-        NotificationHelper.ensureChannels(spyContext)
-
-        verify(spyContext, never()).getSystemService(Context.NOTIFICATION_SERVICE)
+        verify(notificationManager, times(1)).createNotificationChannels(anyList())
     }
 
     @Test
-    fun testEnsureChannelsRetriesWhenNotificationManagerIsNull() {
-        val mockContext = mock(Context::class.java)
-        `when`(mockContext.getSystemService(Context.NOTIFICATION_SERVICE)).thenReturn(null)
+    fun testEnsureChannelsIsThreadSafe() {
+        val context = mock(Context::class.java)
+        val notificationManager = mock(NotificationManager::class.java)
+        `when`(context.getSystemService(Context.NOTIFICATION_SERVICE)).thenReturn(notificationManager)
 
-        NotificationHelper.ensureChannels(mockContext)
-
-        assertFalse(NotificationHelper.channelsCreated)
-    }
-
-    @Test
-    fun testEnsureChannelsThreadSafety() {
         val threadCount = 10
-        val executor = Executors.newFixedThreadPool(threadCount)
-        val latch = CountDownLatch(threadCount)
+        val service = Executors.newFixedThreadPool(threadCount)
+        val startLatch = CountDownLatch(1)
+        val doneLatch = CountDownLatch(threadCount)
 
         repeat(threadCount) {
-            executor.execute {
+            service.submit {
                 try {
+                    startLatch.await()
                     NotificationHelper.ensureChannels(context)
                 } finally {
-                    latch.countDown()
+                    doneLatch.countDown()
                 }
             }
         }
 
-        latch.await()
-        executor.shutdown()
+        startLatch.countDown()
+        doneLatch.await()
+        service.shutdown()
 
-        assertTrue(NotificationHelper.channelsCreated)
-        assertEquals(3, notificationManager.notificationChannels.size)
+        verify(notificationManager, times(1)).createNotificationChannels(anyList())
+    }
+
+    @Test
+    fun testRobolectricEnsureChannelsIntegration() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        NotificationHelper.ensureChannels(context)
+
+        val channelMessages = notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_MESSAGES)
+        val channelCalls = notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_CALLS)
+        val channelSync = notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_BACKGROUND_SYNC)
+
+        assertNotNull(channelMessages)
+        assertNotNull(channelCalls)
+        assertNotNull(channelSync)
+
+        assertEquals("Telegram Messages", channelMessages.name)
+        assertEquals("Telegram Voice Calls", channelCalls.name)
+        assertEquals("Background Flip-Closed Push Sync", channelSync.name)
     }
 }
