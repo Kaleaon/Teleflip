@@ -4021,6 +4021,11 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
             }
         }
     }
+
+    fun setNetworkType(type: TdApi.NetworkType) {
+        tdClient?.send(TdApi.SetNetworkType(type)) { /* no-op */ }
+    }
+
     fun setChatNotificationMute(
         chatId: Long,
         muteForSeconds: Int,
@@ -4054,6 +4059,12 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                     this.disablePinnedMessageNotifications = currentSettings.disablePinnedMessageNotifications
                     this.useDefaultDisableMentionNotifications = currentSettings.useDefaultDisableMentionNotifications
                     this.disableMentionNotifications = currentSettings.disableMentionNotifications
+                } else {
+                    this.useDefaultSound = true
+                    this.useDefaultShowPreview = true
+                    this.useDefaultMuteStories = true
+                    this.useDefaultDisablePinnedMessageNotifications = true
+                    this.useDefaultDisableMentionNotifications = true
                 }
                 this.useDefaultMuteFor = false
                 this.muteFor = muteForSeconds
@@ -4391,7 +4402,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
             }
             TdApi.AuthorizationStateReady.CONSTRUCTOR -> {
                 _authState.value = AuthState.Ready
-                loadChats()
+                loadChats(100)
                 loadCurrentUser()
                 loadChatFolders()
                 loadScopeNotificationSettings()
@@ -4714,8 +4725,52 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
 
         appendMessage(msg.chatId, model)
         if (!msg.isOutgoing && backgroundPushEnabled) {
+            val targetChat = _chats.value.find { it.id == msg.chatId }
+            val cachedSettings = chatNotificationSettingsCache[msg.chatId]
+            if (targetChat == null && cachedSettings == null) {
+                val client = tdClient
+                if (client != null) {
+                    client.send(TdApi.GetChat(msg.chatId)) { obj ->
+                        if (obj is TdApi.Chat) {
+                            val settings = obj.notificationSettings
+                            if (settings != null) {
+                                chatNotificationSettingsCache[msg.chatId] = settings
+                                val isMuted = isNotificationSettingsMuted(settings, ChatType.DIRECT)
+                                persistChatMuted(msg.chatId, isMuted)
+                                if (!isMuted) {
+                                    NotificationHelper.showIncomingMessageNotification(
+                                        context = context,
+                                        chatId = msg.chatId,
+                                        chatTitle = obj.title.ifBlank { "Telegram" },
+                                        senderName = model.senderName,
+                                        messageText = model.text,
+                                    )
+                                }
+                            } else if (!isChatMuted(msg.chatId)) {
+                                NotificationHelper.showIncomingMessageNotification(
+                                    context = context,
+                                    chatId = msg.chatId,
+                                    chatTitle = obj.title.ifBlank { "Telegram" },
+                                    senderName = model.senderName,
+                                    messageText = model.text,
+                                )
+                            }
+                        } else {
+                            if (!isChatMuted(msg.chatId)) {
+                                NotificationHelper.showIncomingMessageNotification(
+                                    context = context,
+                                    chatId = msg.chatId,
+                                    chatTitle = "Telegram",
+                                    senderName = model.senderName,
+                                    messageText = model.text,
+                                )
+                            }
+                        }
+                    }
+                    return
+                }
+            }
             if (!isChatMuted(msg.chatId)) {
-                val targetChat = _chats.value.find { it.id == msg.chatId }
                 val chatTitle = targetChat?.title ?: "Telegram"
                 NotificationHelper.showIncomingMessageNotification(
                     context = context,
