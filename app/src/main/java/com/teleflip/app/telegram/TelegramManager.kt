@@ -163,7 +163,16 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
     companion object {
         const val DEFAULT_CHAT_BATCH_SIZE = 10
-        private val customEmojiCache = java.util.concurrent.ConcurrentHashMap<String, StickerItem>()
+        private val DEFAULT_CUSTOM_EMOJIS =
+            mapOf(
+                "custom_emoji_1001" to StickerItem(fileId = 1001, emoji = "⭐", filePath = null, setName = "Custom Emoji 1001"),
+                "custom_emoji_1002" to StickerItem(fileId = 1002, emoji = "🚀", filePath = null, setName = "Custom Emoji 1002"),
+                "custom_emoji_1003" to StickerItem(fileId = 1003, emoji = "💎", filePath = null, setName = "Custom Emoji 1003"),
+                "custom_emoji_1004" to StickerItem(fileId = 1004, emoji = "⚡", filePath = null, setName = "Custom Emoji 1004"),
+                "custom_emoji_1005" to StickerItem(fileId = 1005, emoji = "🎉", filePath = null, setName = "Custom Emoji 1005"),
+            )
+
+        private val customEmojiCache = java.util.concurrent.ConcurrentHashMap<String, StickerItem>(DEFAULT_CUSTOM_EMOJIS)
 
         @Volatile
         private var instance: TelegramManager? = null
@@ -187,10 +196,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             customEmojiCache[key] = item
         }
 
-        fun getCustomEmojiSticker(key: String): StickerItem? = customEmojiCache[key]
+        fun getCustomEmojiSticker(key: String): StickerItem? = customEmojiCache[key] ?: DEFAULT_CUSTOM_EMOJIS[key]
 
         fun getCustomEmojiFilePath(key: String): String? {
-            val item = customEmojiCache[key] ?: return null
+            val item = getCustomEmojiSticker(key) ?: return null
             val path = item.filePath ?: return null
             return if (File(path).exists()) path else null
         }
