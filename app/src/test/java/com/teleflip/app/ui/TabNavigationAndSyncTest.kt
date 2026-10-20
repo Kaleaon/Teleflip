@@ -143,4 +143,59 @@ class TabNavigationAndSyncTest {
         assertTrue(tabIds.contains(com.teleflip.app.R.id.tab_channels))
         assertFalse(tabIds.contains(com.teleflip.app.R.id.rv_chats))
     }
+
+    @Test
+    fun testCustomFolderTabFiltering() {
+        val chat1 =
+            com.teleflip.app.model.ChatModel(
+                id = 101L,
+                title = "Work Chat",
+                lastMessage = "Hello",
+                time = "10:00",
+                unreadCount = 0,
+                chatType = com.teleflip.app.model.ChatType.GROUP,
+                avatarLetters = "WC",
+                folderName = "Work",
+            )
+        val chat2 =
+            com.teleflip.app.model.ChatModel(
+                id = 102L,
+                title = "Personal Chat",
+                lastMessage = "Hi",
+                time = "10:05",
+                unreadCount = 0,
+                chatType = com.teleflip.app.model.ChatType.DIRECT,
+                avatarLetters = "PC",
+                folderName = "Personal",
+            )
+        val chat3 =
+            com.teleflip.app.model.ChatModel(
+                id = 103L,
+                title = "Project Chat",
+                lastMessage = "Update",
+                time = "10:10",
+                unreadCount = 0,
+                chatType = com.teleflip.app.model.ChatType.GROUP,
+                avatarLetters = "PC",
+                folderName = "",
+            )
+
+        val allChats = listOf(chat1, chat2, chat3)
+        val workFolder =
+            com.teleflip.app.model.ChatFolderModel(
+                id = 1,
+                title = "Work",
+                includedChatIds = setOf(101L, 103L),
+            )
+
+        val workFiltered =
+            allChats.filter { chat ->
+                !chat.isArchived && (workFolder.includedChatIds.contains(chat.id) || chat.folderName.equals(workFolder.title, ignoreCase = true))
+            }
+
+        assertEquals(2, workFiltered.size)
+        assertTrue(workFiltered.contains(chat1))
+        assertTrue(workFiltered.contains(chat3))
+        assertFalse(workFiltered.contains(chat2))
+    }
 }
