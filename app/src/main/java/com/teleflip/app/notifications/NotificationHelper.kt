@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.teleflip.app.MainActivity
@@ -12,8 +14,10 @@ import com.teleflip.app.R
 
 object NotificationHelper {
     const val CHANNEL_MESSAGES = "teleflip_messages"
+    const val CHANNEL_MESSAGES_SILENT = "teleflip_messages_silent"
     const val CHANNEL_CALLS = "teleflip_calls"
     const val CHANNEL_BACKGROUND_SYNC = "teleflip_bg_sync"
+    const val CHANNEL_CHAT_PREFIX = "teleflip_chat_"
     const val EXTRA_OPEN_CHAT_ID = "extra_open_chat_id"
 
     fun ensureChannels(context: Context) {
@@ -27,6 +31,18 @@ object NotificationHelper {
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 description = "Alerts for new Telegram messages when flip phone is closed"
+                enableVibration(true)
+                enableLights(true)
+            }
+
+        val msgSilentChannel =
+            NotificationChannel(
+                CHANNEL_MESSAGES_SILENT,
+                "Telegram Messages (Silent)",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Silent alerts for new Telegram messages"
+                setSound(null, null)
                 enableVibration(true)
                 enableLights(true)
             }
@@ -53,6 +69,7 @@ object NotificationHelper {
             }
 
         nm.createNotificationChannel(msgChannel)
+        nm.createNotificationChannel(msgSilentChannel)
         nm.createNotificationChannel(callChannel)
         nm.createNotificationChannel(syncChannel)
     }
@@ -63,6 +80,8 @@ object NotificationHelper {
         chatTitle: String,
         senderName: String,
         messageText: String,
+        isSoundMuted: Boolean = false,
+        customSoundUri: String? = null,
     ) {
         try {
             ensureChannels(context)
@@ -81,9 +100,36 @@ object NotificationHelper {
                 }
             val pendingIntent = PendingIntent.getActivity(context, chatId.toInt(), openIntent, pendingFlags)
 
+            val channelId = if (isSoundMuted) {
+                CHANNEL_MESSAGES_SILENT
+            } else if (!customSoundUri.isNullOrBlank()) {
+                val perChatChannelId = "${CHANNEL_CHAT_PREFIX}${chatId}"
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val uri = Uri.parse(customSoundUri)
+                    val audioAttrs = AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .build()
+                    val chatChannel = NotificationChannel(
+                        perChatChannelId,
+                        "$chatTitle Notifications",
+                        NotificationManager.IMPORTANCE_HIGH,
+                    ).apply {
+                        description = "Custom notifications for $chatTitle"
+                        setSound(uri, audioAttrs)
+                        enableVibration(true)
+                        enableLights(true)
+                    }
+                    nm.createNotificationChannel(chatChannel)
+                }
+                perChatChannelId
+            } else {
+                CHANNEL_MESSAGES
+            }
+
             val contentTitle = if (senderName.isNotBlank() && senderName != chatTitle) "$chatTitle ($senderName)" else chatTitle
-            val notification =
-                NotificationCompat.Builder(context, CHANNEL_MESSAGES)
+            val builder =
+                NotificationCompat.Builder(context, channelId)
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentTitle(contentTitle)
                     .setContentText(messageText)
@@ -91,9 +137,15 @@ object NotificationHelper {
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
-                    .build()
 
-            nm.notify(chatId.hashCode(), notification)
+            if (isSoundMuted) {
+                builder.setSound(null)
+                builder.setDefaults(0)
+            } else if (!customSoundUri.isNullOrBlank()) {
+                builder.setSound(Uri.parse(customSoundUri))
+            }
+
+            nm.notify(chatId.hashCode(), builder.build())
         } catch (_: Throwable) {
             // Safe no-op in headless unit tests where NotificationManager is mocked
         }

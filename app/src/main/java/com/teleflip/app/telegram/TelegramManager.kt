@@ -113,6 +113,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     var scopeGroupChatsMuted = false
     var scopeChannelChatsMuted = false
     private val prefMutedChatsKey = "teleflip_muted_chat_ids"
+    private val prefMutedSoundChatsKey = "teleflip_muted_sound_chat_ids"
+    private val prefChatSoundUriPrefix = "teleflip_chat_sound_uri_"
     val fileDownloadWaiters =
         java.util.concurrent.ConcurrentHashMap<Int, CopyOnWriteArrayList<CompletableDeferred<String?>>>()
 
@@ -3878,6 +3880,63 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         return getPersistedMutedChatIds().contains(chatId.toString())
     }
 
+    fun getPersistedMutedSoundChatIds(): MutableSet<String> {
+        val raw =
+            try {
+                prefs.getStringSet(prefMutedSoundChatsKey, null)
+            } catch (_: Exception) {
+                null
+            } ?: emptySet()
+        return raw.toMutableSet()
+    }
+
+    fun persistChatSoundMuted(
+        chatId: Long,
+        isMuted: Boolean,
+    ) {
+        val currentSet = getPersistedMutedSoundChatIds()
+        val idStr = chatId.toString()
+        val changed =
+            if (isMuted) {
+                currentSet.add(idStr)
+            } else {
+                currentSet.remove(idStr)
+            }
+        if (changed) {
+            prefs.edit()?.putStringSet(prefMutedSoundChatsKey, HashSet(currentSet))?.apply()
+        }
+    }
+
+    fun isChatSoundMuted(chatId: Long): Boolean {
+        val settings = chatNotificationSettingsCache[chatId]
+        if (settings != null) {
+            if (!settings.useDefaultSound && settings.soundId == 0L) {
+                return true
+            }
+        }
+        return getPersistedMutedSoundChatIds().contains(chatId.toString())
+    }
+
+    fun getChatSoundUri(chatId: Long): String? {
+        return try {
+            prefs.getString(prefChatSoundUriPrefix + chatId, null)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun persistChatSoundUri(
+        chatId: Long,
+        uri: String?,
+    ) {
+        val key = prefChatSoundUriPrefix + chatId
+        if (uri.isNullOrBlank()) {
+            prefs.edit()?.remove(key)?.apply()
+        } else {
+            prefs.edit()?.putString(key, uri)?.apply()
+        }
+    }
+
     fun handleChatNotificationSettingsUpdated(
         chatId: Long,
         notificationSettings: TdApi.ChatNotificationSettings,
@@ -3887,6 +3946,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val chatType = existingChat?.chatType ?: ChatType.DIRECT
         val isMuted = isNotificationSettingsMuted(notificationSettings, chatType)
         persistChatMuted(chatId, isMuted)
+
+        val isSoundMuted = !notificationSettings.useDefaultSound && notificationSettings.soundId == 0L
+        persistChatSoundMuted(chatId, isSoundMuted)
+
         if (isMuted) {
             NotificationHelper.cancelMessageNotification(context, chatId)
         }
@@ -3956,8 +4019,28 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         muteForSeconds: Int,
         onResult: ((Boolean) -> Unit)? = null,
     ) {
+        setChatNotificationSettings(
+            chatId = chatId,
+            muteForSeconds = muteForSeconds,
+            isSoundMuted = isChatSoundMuted(chatId),
+            customSoundUri = getChatSoundUri(chatId),
+            onResult = onResult,
+        )
+    }
+
+    fun setChatNotificationSettings(
+        chatId: Long,
+        muteForSeconds: Int,
+        isSoundMuted: Boolean = false,
+        customSoundUri: String? = null,
+        soundId: Long = if (isSoundMuted) 0L else 1L,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
         val isMuted = muteForSeconds > 0
         persistChatMuted(chatId, isMuted)
+        persistChatSoundMuted(chatId, isSoundMuted)
+        persistChatSoundUri(chatId, customSoundUri)
+
         if (isMuted) {
             NotificationHelper.cancelMessageNotification(context, chatId)
         }
@@ -3965,6 +4048,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             _chats.value.map {
                 if (it.id == chatId) it.copy(isMuted = isMuted) else it
             }
+
         val client = tdClient
         if (client == null) {
             onResult?.invoke(isMuted)
@@ -3974,8 +4058,6 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val settings =
             TdApi.ChatNotificationSettings().apply {
                 if (currentSettings != null) {
-                    this.useDefaultSound = currentSettings.useDefaultSound
-                    this.soundId = currentSettings.soundId
                     this.useDefaultShowPreview = currentSettings.useDefaultShowPreview
                     this.showPreview = currentSettings.showPreview
                     this.useDefaultMuteStories = currentSettings.useDefaultMuteStories
@@ -3987,6 +4069,14 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 }
                 this.useDefaultMuteFor = false
                 this.muteFor = muteForSeconds
+
+                if (isSoundMuted) {
+                    this.useDefaultSound = false
+                    this.soundId = 0L
+                } else {
+                    this.useDefaultSound = (soundId == 0L && currentSettings?.useDefaultSound != false && customSoundUri == null)
+                    this.soundId = if (soundId != 0L) soundId else (currentSettings?.soundId ?: 1L)
+                }
             }
         chatNotificationSettingsCache[chatId] = settings
         val req = TdApi.SetChatNotificationSettings(chatId, settings)
@@ -4623,6 +4713,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     chatTitle = chatTitle,
                     senderName = model.senderName,
                     messageText = model.text,
+                    isSoundMuted = isChatSoundMuted(msg.chatId),
+                    customSoundUri = getChatSoundUri(msg.chatId),
                 )
             }
         }

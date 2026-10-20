@@ -63,6 +63,7 @@ import com.teleflip.app.telegram.TelegramManager
 import com.teleflip.app.ui.ChatExportDialog
 import com.teleflip.app.ui.ChatExportProgressDialog
 import com.teleflip.app.ui.ChatListAdapter
+import com.teleflip.app.ui.ChatNotificationSettingsDialog
 import com.teleflip.app.ui.MediaViewerDialog
 import com.teleflip.app.ui.MenuOption
 import com.teleflip.app.ui.MessageAdapter
@@ -2840,51 +2841,15 @@ class MainActivity : AppCompatActivity() {
         onMuteStateChanged: ((Boolean) -> Unit)? = null,
     ) {
         commitActiveInputEngines()
-        val options = mutableListOf<MenuOption>()
-        if (isCurrentlyMuted) {
-            options.add(
-                MenuOption(1, "🔔 Unmute Notifications") {
-                    telegramManager.setChatNotificationMute(chatId, 0) { isMuted ->
-                        showToast("Unmuted $chatTitle")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-        } else {
-            options.add(
-                MenuOption(1, "🔇 Mute for 1 Hour") {
-                    telegramManager.setChatNotificationMute(chatId, MUTE_1_HOUR_SEC) { isMuted ->
-                        showToast("Muted $chatTitle for 1 hour")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-            options.add(
-                MenuOption(2, "🔇 Mute for 8 Hours") {
-                    telegramManager.setChatNotificationMute(chatId, MUTE_8_HOURS_SEC) { isMuted ->
-                        showToast("Muted $chatTitle for 8 hours")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-            options.add(
-                MenuOption(3, "🔇 Mute for 2 Days") {
-                    telegramManager.setChatNotificationMute(chatId, MUTE_2_DAYS_SEC) { isMuted ->
-                        showToast("Muted $chatTitle for 2 days")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-            options.add(
-                MenuOption(4, "🔇 Mute Forever") {
-                    telegramManager.setChatNotificationMute(chatId, MUTE_FOREVER_SEC) { isMuted ->
-                        showToast("Muted $chatTitle forever")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-        }
-        OptionsMenuDialog(this, "Notifications: $chatTitle", options).show()
+        ChatNotificationSettingsDialog(
+            context = this,
+            telegramManager = telegramManager,
+            chatId = chatId,
+            chatTitle = chatTitle,
+            onSettingsChanged = { isMuted ->
+                onMuteStateChanged?.invoke(isMuted)
+            },
+        ).show()
     }
 
     // =========================================================================
