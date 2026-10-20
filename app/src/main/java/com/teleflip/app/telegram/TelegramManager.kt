@@ -2644,89 +2644,15 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         chatId: Long,
         autoDownloadMedia: Boolean = true,
         onProgress: ((loadedMessages: Int, queuedMedia: Int) -> Unit)? = null,
-    ): Pair<Int, Int> {
-        val rawMessages =
-            fetchAllCloudMessages(chatId) { count ->
-                onProgress?.invoke(count, 0)
-            }
-
-        val convertedList =
-            rawMessages.map { msg ->
-                val mediaInfo = extractMediaFileInfo(msg.content)
-                val stickerInfo = extractStickerInfo(msg.content)
-                MessageModel(
-                    id = msg.id,
-                    chatId = msg.chatId,
-                    senderName = getSenderDisplayName(msg),
-                    text = extractMessageText(msg.content),
-                    time = formatTime(msg.date.toLong() * 1000),
-                    isOutbound = msg.isOutgoing,
-                    status = MessageStatus.READ,
-                    mediaType = extractMediaType(msg.content),
-                    mediaCaption = extractMediaCaption(msg.content),
-                    mediaFilePath = mediaInfo.second,
-                    mediaFileId = mediaInfo.first,
-                    stickerEmoji = stickerInfo.first,
-                    isPremiumSticker = stickerInfo.second,
-                    transcript = extractVoiceTranscript(msg.content),
-                )
-            }
-
-        withContext(Dispatchers.Main) {
-            val currentMap = _messages.value.toMutableMap()
-            val existing = currentMap[chatId] ?: emptyList()
-            val merged = (convertedList + existing).distinctBy { it.id }.sortedBy { it.id }
-            currentMap[chatId] = merged
-            _messages.value = currentMap
-        }
-
-        var queuedMediaCount = 0
-        if (autoDownloadMedia) {
-            for (msg in rawMessages) {
-                val mediaInfo = extractMediaFileInfo(msg.content)
-                if (mediaInfo.first != 0 && mediaInfo.second.isNullOrBlank()) {
-                    tdClient?.send(TdApi.DownloadFile(mediaInfo.first, 1, 0, 0, false), this)
-                    queuedMediaCount++
-                    onProgress?.invoke(rawMessages.size, queuedMediaCount)
-                }
-            }
-        }
-
-        return Pair(rawMessages.size, queuedMediaCount)
-    }
-
-    suspend fun exportChatHistory(
-        chatId: Long,
-        chatTitle: String,
-        options: ChatExportOptions,
-        onProgress: ((ChatExportProgress) -> Unit)? = null,
-    ): Result<File> {
-        onProgress?.invoke(
-            ChatExportProgress(
-                stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
-                statusText = "Syncing complete cloud history for \"$chatTitle\"...",
-            ),
-        )
-
-        val rawMessages =
-            if (tdClient != null) {
+    ): Pair<Int, Int> =
+        withContext(Dispatchers.Default) {
+            val rawMessages =
                 fetchAllCloudMessages(chatId) { count ->
-                    onProgress?.invoke(
-                        ChatExportProgress(
-                            stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
-                            messagesProcessed = count,
-                            totalMessages = count,
-                            statusText = "Loaded $count cloud messages...",
-                        ),
-                    )
+                    onProgress?.invoke(count, 0)
                 }
-            } else {
-                emptyList()
-            }
 
-        val messagesToExport =
-            if (rawMessages.isNotEmpty()) {
-                rawMessages.reversed().map { msg ->
+            val convertedList =
+                rawMessages.map { msg ->
                     val mediaInfo = extractMediaFileInfo(msg.content)
                     val stickerInfo = extractStickerInfo(msg.content)
                     MessageModel(
@@ -2746,20 +2672,94 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                         transcript = extractVoiceTranscript(msg.content),
                     )
                 }
-            } else {
-                _messages.value[chatId] ?: emptyList()
+
+            val currentMap = _messages.value.toMutableMap()
+            val existing = currentMap[chatId] ?: emptyList()
+            val merged = (convertedList + existing).distinctBy { it.id }.sortedBy { it.id }
+            currentMap[chatId] = merged
+            _messages.value = currentMap
+
+            var queuedMediaCount = 0
+            if (autoDownloadMedia) {
+                for (msg in rawMessages) {
+                    val mediaInfo = extractMediaFileInfo(msg.content)
+                    if (mediaInfo.first != 0 && mediaInfo.second.isNullOrBlank()) {
+                        tdClient?.send(TdApi.DownloadFile(mediaInfo.first, 1, 0, 0, false), this@TelegramManager)
+                        queuedMediaCount++
+                        onProgress?.invoke(rawMessages.size, queuedMediaCount)
+                    }
+                }
             }
 
-        return ChatExportManager.exportChat(
-            context = context,
-            chatId = chatId,
-            chatTitle = chatTitle,
-            messages = messagesToExport,
-            options = options,
-            fileDownloader = { fileId -> downloadFileSuspending(fileId) },
-            onProgress = onProgress,
-        )
-    }
+            Pair(rawMessages.size, queuedMediaCount)
+        }
+
+    suspend fun exportChatHistory(
+        chatId: Long,
+        chatTitle: String,
+        options: ChatExportOptions,
+        onProgress: ((ChatExportProgress) -> Unit)? = null,
+    ): Result<File> =
+        withContext(Dispatchers.Default) {
+            onProgress?.invoke(
+                ChatExportProgress(
+                    stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
+                    statusText = "Syncing complete cloud history for \"$chatTitle\"...",
+                ),
+            )
+
+            val rawMessages =
+                if (tdClient != null) {
+                    fetchAllCloudMessages(chatId) { count ->
+                        onProgress?.invoke(
+                            ChatExportProgress(
+                                stage = com.teleflip.app.storage.ExportStage.FETCHING_CLOUD_HISTORY,
+                                messagesProcessed = count,
+                                totalMessages = count,
+                                statusText = "Loaded $count cloud messages...",
+                            ),
+                        )
+                    }
+                } else {
+                    emptyList()
+                }
+
+            val messagesToExport =
+                if (rawMessages.isNotEmpty()) {
+                    rawMessages.reversed().map { msg ->
+                        val mediaInfo = extractMediaFileInfo(msg.content)
+                        val stickerInfo = extractStickerInfo(msg.content)
+                        MessageModel(
+                            id = msg.id,
+                            chatId = msg.chatId,
+                            senderName = getSenderDisplayName(msg),
+                            text = extractMessageText(msg.content),
+                            time = formatTime(msg.date.toLong() * 1000),
+                            isOutbound = msg.isOutgoing,
+                            status = MessageStatus.READ,
+                            mediaType = extractMediaType(msg.content),
+                            mediaCaption = extractMediaCaption(msg.content),
+                            mediaFilePath = mediaInfo.second,
+                            mediaFileId = mediaInfo.first,
+                            stickerEmoji = stickerInfo.first,
+                            isPremiumSticker = stickerInfo.second,
+                            transcript = extractVoiceTranscript(msg.content),
+                        )
+                    }
+                } else {
+                    _messages.value[chatId] ?: emptyList()
+                }
+
+            ChatExportManager.exportChat(
+                context = context,
+                chatId = chatId,
+                chatTitle = chatTitle,
+                messages = messagesToExport,
+                options = options,
+                fileDownloader = { fileId -> downloadFileSuspending(fileId) },
+                onProgress = onProgress,
+            )
+        }
 
     fun searchChats(
         query: String,
