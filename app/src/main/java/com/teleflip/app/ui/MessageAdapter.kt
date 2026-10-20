@@ -227,7 +227,7 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    tvMedia.text = "📄 [File] ${message.mediaCaption}"
+                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "📄 [File] ${message.mediaCaption}" else "📄 [File]"
                 }
                 MediaType.STICKER -> {
                     ViewCompat.setStateDescription(tvMedia, null)
@@ -241,13 +241,19 @@ class MessageAdapter(
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
                     val dur = if (message.durationSeconds > 0) " (${message.durationSeconds}s)" else ""
-                    tvMedia.text = "📹 [Video$dur] ▶ Press OK to Play"
+                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "📹 [Video$dur] ${message.mediaCaption}" else "📹 [Video$dur] ▶ Press OK to Play"
                 }
                 MediaType.ANIMATION -> {
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    tvMedia.text = "🎞️ [GIF] ▶ Press OK to Play"
+                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "🎞️ [GIF] ${message.mediaCaption}" else "🎞️ [GIF] ▶ Press OK to Play"
+                }
+                MediaType.AUDIO -> {
+                    ViewCompat.setStateDescription(tvMedia, null)
+                    tvMedia.contentDescription = null
+                    tvMedia.visibility = View.VISIBLE
+                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "🎵 [Audio] ${message.mediaCaption}" else "🎵 [Audio]"
                 }
                 MediaType.POLL -> {
                     ViewCompat.setStateDescription(tvMedia, null)

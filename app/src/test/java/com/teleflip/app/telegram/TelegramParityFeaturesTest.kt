@@ -440,4 +440,67 @@ class TelegramParityFeaturesTest {
         }
         assertTrue(unblockCallbackCalled)
     }
+
+    @Test
+    fun testEditMessageCaptionUpdatesMediaCaptionAndIsEdited() {
+        val chatId = 40L
+        val chat = ChatModel(chatId, "Alice", "Photo msg", "12:00", 0, ChatType.DIRECT, "A")
+        val msg =
+            MessageModel(
+                id = 901L,
+                chatId = chatId,
+                senderName = "You",
+                text = "📷 [Photo] Initial caption",
+                time = "12:00",
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.PHOTO,
+                mediaCaption = "Initial caption",
+            )
+        telegramManager.setChatsForTesting(listOf(chat))
+        telegramManager.setMessagesForTesting(mapOf(chatId to listOf(msg)))
+
+        var editSuccess = false
+        telegramManager.editMessageCaption(chatId, 901L, "Updated photo caption") { ok ->
+            editSuccess = ok
+        }
+
+        assertTrue(editSuccess)
+        val updatedMsg = telegramManager.messages.value[chatId]?.first()
+        assertNotNull(updatedMsg)
+        assertEquals("Updated photo caption", updatedMsg?.mediaCaption)
+        assertTrue(updatedMsg?.isEdited == true)
+        assertEquals("📷 [Photo] Initial caption", telegramManager.chats.value.first().lastMessage)
+    }
+
+    @Test
+    fun testEditMessageCaptionWithTdClientSendsQuery() {
+        val mockClient = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(mockClient)
+        val chatId = 50L
+        val msg =
+            MessageModel(
+                id = 902L,
+                chatId = chatId,
+                senderName = "You",
+                text = "📄 doc.pdf",
+                time = "12:00",
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.DOCUMENT,
+                mediaCaption = "",
+            )
+        telegramManager.setMessagesForTesting(mapOf(chatId to listOf(msg)))
+
+        telegramManager.editMessageCaption(chatId, 902L, "Quarterly Report Q3")
+
+        val queryCaptor = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        Mockito.verify(mockClient).send(queryCaptor.capture(), Mockito.any())
+        val query = queryCaptor.value
+        assertTrue(query is TdApi.EditMessageCaption)
+        val editReq = query as TdApi.EditMessageCaption
+        assertEquals(chatId, editReq.chatId)
+        assertEquals(902L, editReq.messageId)
+        assertEquals("Quarterly Report Q3", editReq.caption.text)
+    }
 }

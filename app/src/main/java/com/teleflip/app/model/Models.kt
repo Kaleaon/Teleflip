@@ -80,6 +80,7 @@ enum class MediaType {
     VIDEO,
     ANIMATION,
     POLL,
+    AUDIO,
 }
 
 data class MessageModel(
