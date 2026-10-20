@@ -6,12 +6,14 @@ import coil.Coil
 import coil.ImageLoader
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import com.teleflip.app.notifications.NotificationHelper
 import org.telegram.messenger.ApplicationLoader
 
 class TeleFlipApp : Application() {
     override fun onCreate() {
         super.onCreate()
         ApplicationLoader.applicationContext = this
+        NotificationHelper.ensureChannels(this)
 
         val imageLoader =
             ImageLoader.Builder(this)
