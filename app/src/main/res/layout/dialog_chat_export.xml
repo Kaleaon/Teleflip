@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/bg_dark_card">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/tv_export_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💾 Download Chat History"
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tv_export_chat_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Chat Title"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:paddingBottom="6dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/softkey_divider"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Select media to include:"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_toggle_text"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="[1] ☑ Text Messages"
+            android:gravity="left|center_vertical"
+            android:paddingLeft="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_toggle_photos"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="[2] ☑ Photos &amp; Images"
+            android:gravity="left|center_vertical"
+            android:paddingLeft="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_toggle_gifs"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="[3] ☑ GIFs &amp; Animations"
+            android:gravity="left|center_vertical"
+            android:paddingLeft="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_toggle_videos"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="[4] ☑ Videos"
+            android:gravity="left|center_vertical"
+            android:paddingLeft="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_toggle_voice"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="[5] ☑ Voice Notes &amp; Audio"
+            android:gravity="left|center_vertical"
+            android:paddingLeft="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_toggle_documents"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="[6] ☑ Documents &amp; Files"
+            android:gravity="left|center_vertical"
+            android:paddingLeft="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Destination Storage:"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_toggle_storage"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="[7] 💾 SD Card"
+            android:gravity="left|center_vertical"
+            android:paddingLeft="8dp"
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="12sp"
+            android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_start_export"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="📥 Download"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:background="@drawable/bg_button_selector"
+                android:layout_marginRight="4dp" />
+
+            <Button
+                android:id="@+id/btn_cancel_export"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="Cancel"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:background="@drawable/bg_button_selector"
+                android:layout_marginLeft="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
