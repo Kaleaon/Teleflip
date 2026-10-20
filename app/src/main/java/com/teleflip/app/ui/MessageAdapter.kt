@@ -30,6 +30,8 @@ class MessageAdapter(
     private val onMessageAction: ((MessageModel) -> Unit)? = null,
     private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
     private val customEmojiResolver: ((String) -> String?)? = null,
+    private val onReplyQuoteClick: ((MessageModel) -> Unit)? = null,
+    private val onReactionsClick: ((MessageModel) -> Unit)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     companion object {
         const val PAYLOAD_PLAYBACK_STATE = "PAYLOAD_PLAYBACK_STATE"
@@ -181,12 +183,24 @@ class MessageAdapter(
 
             if (message.replyToPreview.isNotBlank()) {
                 tvReplyQuote?.visibility = View.VISIBLE
-                tvReplyQuote?.text = "↩ ${message.replyToPreview}"
+                val text = "↩ ${message.replyToPreview}"
+                tvReplyQuote?.text = text
+                tvReplyQuote?.contentDescription = "Quoted reply: ${message.replyToPreview}"
+                tvReplyQuote?.setOnClickListener {
+                    onReplyQuoteClick?.invoke(message)
+                }
             } else if (message.replyToMessageId != 0L) {
                 tvReplyQuote?.visibility = View.VISIBLE
-                tvReplyQuote?.text = "↩ Reply to #${message.replyToMessageId}"
+                val text = "↩ Reply to #${message.replyToMessageId}"
+                tvReplyQuote?.text = text
+                tvReplyQuote?.contentDescription = "Quoted reply to message #${message.replyToMessageId}"
+                tvReplyQuote?.setOnClickListener {
+                    onReplyQuoteClick?.invoke(message)
+                }
             } else {
                 tvReplyQuote?.visibility = View.GONE
+                tvReplyQuote?.contentDescription = null
+                tvReplyQuote?.setOnClickListener(null)
             }
 
             // Media attachment preview
@@ -338,6 +352,10 @@ class MessageAdapter(
 
             if (message.reactions.isNotEmpty()) {
                 tvReactions?.visibility = View.VISIBLE
+                tvReactions?.contentDescription = "Reactions: ${message.reactions.joinToString(", ")}"
+                tvReactions?.setOnClickListener {
+                    onReactionsClick?.invoke(message)
+                }
                 val ssb = SpannableStringBuilder()
                 val density = context.resources.displayMetrics.density
                 val targetSize = (16 * density).toInt().coerceAtLeast(1)
@@ -384,6 +402,8 @@ class MessageAdapter(
                 tvReactions?.text = ssb
             } else {
                 tvReactions?.visibility = View.GONE
+                tvReactions?.contentDescription = null
+                tvReactions?.setOnClickListener(null)
             }
 
             val metaPrefix =
