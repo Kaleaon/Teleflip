@@ -31,9 +31,11 @@
         android:layout_marginBottom="6dp" />
 
     <ScrollView
+        android:id="@+id/scroll_diag_logs"
         android:layout_width="match_parent"
         android:layout_height="220dp"
-        android:focusable="true">
+        android:focusable="true"
+        android:focusableInTouchMode="true">
 
         <TextView
             android:id="@+id/tv_diag_logs"
