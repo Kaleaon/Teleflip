@@ -37,28 +37,29 @@ object ChatExportEngine {
             val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
 
             try {
-                while (coroutineContext.isActive) {
+                var hasMore = true
+                while (coroutineContext.isActive && hasMore) {
                     val batch = telegramManager.getChatHistoryBatch(chatId, fromMessageId, limit)
                     if (batch.isEmpty()) {
-                        break
-                    }
+                        hasMore = false
+                    } else {
+                        for (msg in batch) {
+                            if (!coroutineContext.isActive) break
+                            val senderName = telegramManager.resolveSenderName(msg.senderId)
+                            val parsed = parseMessage(msg, senderName, dateFormat)
+                            allMessages.add(parsed)
+                        }
 
-                    for (msg in batch) {
-                        if (!coroutineContext.isActive) break
-                        val senderName = telegramManager.resolveSenderName(msg.senderId)
-                        val parsed = parseMessage(msg, senderName, dateFormat)
-                        allMessages.add(parsed)
-                    }
+                        fromMessageId = batch.last().id
 
-                    fromMessageId = batch.last().id
+                        val currentSize = allMessages.size
+                        withContext(mainDispatcher) {
+                            onProgress(currentSize)
+                        }
 
-                    val currentSize = allMessages.size
-                    withContext(mainDispatcher) {
-                        onProgress(currentSize)
-                    }
-
-                    if (batch.size < limit) {
-                        break
+                        if (batch.size < limit) {
+                            hasMore = false
+                        }
                     }
                 }
 
@@ -210,12 +211,17 @@ object ChatExportEngine {
     }
 
     fun getExportDirectory(context: Context): File {
-        val documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val documentsDir =
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+                ?: context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
         val exportDir = File(documentsDir, "TeleFlip_Exports")
         if (!exportDir.exists()) {
             val created = exportDir.mkdirs()
             if (!created) {
-                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val downloadsDir =
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                        ?: context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                        ?: context.filesDir
                 val fallbackDir = File(downloadsDir, "TeleFlip_Exports")
                 if (!fallbackDir.exists()) {
                     fallbackDir.mkdirs()

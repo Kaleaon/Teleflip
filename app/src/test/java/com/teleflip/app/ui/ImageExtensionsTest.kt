@@ -51,10 +51,17 @@ class ImageExtensionsTest {
                     add(
                         coil.intercept.Interceptor { chain ->
                             val data = chain.request.data
-                            if (data is File) {
-                                if (data.name.contains("corrupted") || (data.exists() && data.length() < 100 && runCatching { data.readText() }.getOrDefault("").let { it.contains("Not an image") || it.contains("invalid") })) {
-                                    throw java.io.IOException("Corrupted image file")
-                                }
+                            val isCorrupted =
+                                data is File && (
+                                    data.name.contains("corrupted") || (
+                                        data.exists() && data.length() < 100 &&
+                                            runCatching { data.readText() }.getOrDefault("").let {
+                                                it.contains("Not an image") || it.contains("invalid")
+                                            }
+                                    )
+                                )
+                            if (isCorrupted) {
+                                throw java.io.IOException("Corrupted image file")
                             }
                             chain.proceed(chain.request)
                         },

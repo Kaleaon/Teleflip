@@ -2903,36 +2903,38 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @JvmName("attemptPasscodeUnlock")
     internal fun attemptPasscodeUnlock() {
         val unlocked = PasscodeManager.unlock(this, passcodeEntry)
         passcodeEntry = ""
         if (unlocked) {
             tvPasscodeError?.text = ""
-            val pending = pendingNavigationAction
-            pendingNavigationAction = null
-            if (pending != null) {
-                pending.invoke()
-            } else if (telegramManager.authState.value is AuthState.Ready) {
-                if (pendingTargetChatId != 0L) {
-                    val targetId = pendingTargetChatId
-                    pendingTargetChatId = 0L
-                    val targetChat =
-                        telegramManager.chats.value.find { it.id == targetId }
-                            ?: ChatModel(
-                                id = targetId,
-                                title = "Chat #$targetId",
-                                lastMessage = "",
-                                time = "",
-                                unreadCount = 0,
-                                chatType = ChatType.DIRECT,
-                                avatarLetters = "TG",
-                            )
-                    openConversation(targetChat)
-                } else {
-                    showChatListScreen()
-                }
+            if (pendingTargetChatId != 0L) {
+                val targetId = pendingTargetChatId
+                pendingTargetChatId = 0L
+                pendingNavigationAction = null
+                val targetChat =
+                    telegramManager.chats.value.find { it.id == targetId }
+                        ?: ChatModel(
+                            id = targetId,
+                            title = "Chat #$targetId",
+                            lastMessage = "",
+                            time = "",
+                            unreadCount = 0,
+                            chatType = ChatType.DIRECT,
+                            avatarLetters = "TG",
+                        )
+                openConversation(targetChat)
             } else {
-                showLoginScreen(telegramManager.authState.value)
+                val pending = pendingNavigationAction
+                pendingNavigationAction = null
+                if (pending != null) {
+                    pending.invoke()
+                } else if (telegramManager.authState.value is AuthState.Ready) {
+                    showChatListScreen()
+                } else {
+                    showLoginScreen(telegramManager.authState.value)
+                }
             }
         } else {
             updatePasscodeDotsDisplay()

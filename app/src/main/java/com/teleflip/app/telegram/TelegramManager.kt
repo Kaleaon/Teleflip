@@ -4223,7 +4223,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         scope.launch(Dispatchers.IO) {
             try {
                 com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing TDLib client gracefully...")
-                client.send(TdApi.Close(), this@TelegramManager)
+                client?.send(TdApi.Close(), this@TelegramManager)
             } catch (e: Throwable) {
                 com.teleflip.app.report.AdbReporter.reportWarning(tag, "Error during native close: ${e.message}")
             }
