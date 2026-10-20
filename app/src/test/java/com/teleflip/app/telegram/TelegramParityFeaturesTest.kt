@@ -240,6 +240,49 @@ class TelegramParityFeaturesTest {
     }
 
     @Test
+    fun testSendQuizPollWithExplanationAndMultipleAnswers() {
+        val chatId = 55L
+        telegramManager.setChatsForTesting(
+            listOf(ChatModel(chatId, "Quiz Group", "", "12:00", 0, ChatType.GROUP, "QG")),
+        )
+
+        // Send Quiz poll
+        telegramManager.sendPoll(
+            chatId = chatId,
+            question = "Which primary key toggles case?",
+            options = listOf("Key 1", "Key 0", "Key #"),
+            isAnonymous = false,
+            isQuiz = true,
+            correctOptionIndex = 2,
+            explanation = "Key # switches between Abc, abc, ABC, and 123",
+        )
+
+        val quizMsg = telegramManager.messages.value[chatId]?.last()
+        assertNotNull(quizMsg)
+        assertEquals(MediaType.POLL, quizMsg?.mediaType)
+        assertTrue(quizMsg?.pollIsQuiz == true)
+        assertEquals(2, quizMsg?.pollCorrectOptionIndex)
+        assertEquals("Key # switches between Abc, abc, ABC, and 123", quizMsg?.pollExplanation)
+        assertFalse(quizMsg?.pollIsAnonymous == true)
+
+        // Send Regular Poll with multiple answers
+        telegramManager.sendPoll(
+            chatId = chatId,
+            question = "Select favorite colors",
+            options = listOf("Red", "Blue", "Green"),
+            isAnonymous = true,
+            isQuiz = false,
+            allowsMultipleAnswers = true,
+        )
+
+        val regularMsg = telegramManager.messages.value[chatId]?.last()
+        assertNotNull(regularMsg)
+        assertEquals(MediaType.POLL, regularMsg?.mediaType)
+        assertFalse(regularMsg?.pollIsQuiz == true)
+        assertTrue(regularMsg?.pollAllowsMultipleAnswers == true)
+    }
+
+    @Test
     fun testGroupMembersAdminRoleAndRemoval() {
         val chatId = 60L
         val members = telegramManager.getGroupMembers(chatId)

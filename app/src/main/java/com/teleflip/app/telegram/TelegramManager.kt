@@ -1482,6 +1482,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         question: String,
         options: List<String>,
         isAnonymous: Boolean = true,
+        isQuiz: Boolean = false,
+        correctOptionIndex: Int = -1,
+        explanation: String = "",
+        allowsMultipleAnswers: Boolean = false,
         disableNotification: Boolean = false,
         schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
@@ -1491,12 +1495,21 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val pollOpts = cleanOptions.map { PollOption(text = it, voterCount = 0, votePercentage = 0, isChosen = false) }
+        val headerPrefix = if (isQuiz) "💡 Quiz: " else "📊 Poll: "
+        val safeCorrectIndex =
+            if (isQuiz && correctOptionIndex in cleanOptions.indices) {
+                correctOptionIndex
+            } else if (isQuiz) {
+                0
+            } else {
+                -1
+            }
         val newMsg =
             MessageModel(
                 id = System.currentTimeMillis(),
                 chatId = chatId,
                 senderName = "You",
-                text = "📊 Poll: $trimmedQuestion",
+                text = "$headerPrefix$trimmedQuestion",
                 time = timeStr,
                 isOutbound = true,
                 status = MessageStatus.SENT,
@@ -1506,6 +1519,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 pollIsAnonymous = isAnonymous,
                 pollIsClosed = false,
                 pollTotalVoters = 0,
+                pollIsQuiz = isQuiz,
+                pollCorrectOptionIndex = safeCorrectIndex,
+                pollExplanation = if (isQuiz) explanation.trim() else "",
+                pollAllowsMultipleAnswers = if (!isQuiz) allowsMultipleAnswers else false,
             )
         appendMessage(chatId, newMsg)
 
@@ -1513,7 +1530,15 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             val pollContent =
                 TdApi.InputMessagePoll().apply {
                     this.isAnonymous = isAnonymous
-                    this.type = TdApi.InputPollTypeRegular(false)
+                    this.allowsMultipleAnswers = if (!isQuiz) allowsMultipleAnswers else false
+                    if (isQuiz) {
+                        val validIndex = if (correctOptionIndex in cleanOptions.indices) correctOptionIndex else 0
+                        val correctOptionIds = intArrayOf(validIndex)
+                        val formattedExp = TdApi.FormattedText(explanation.trim(), emptyArray())
+                        this.type = TdApi.InputPollTypeQuiz(correctOptionIds, formattedExp, null)
+                    } else {
+                        this.type = TdApi.InputPollTypeRegular(false)
+                    }
                 }
             setPollQuestionAndOptionsCompat(pollContent, trimmedQuestion, cleanOptions)
             val sendReq =
@@ -4590,10 +4615,63 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
     }
 
+    private data class PollData(
+        val question: String = "",
+        val options: List<PollOption> = emptyList(),
+        val isAnonymous: Boolean = true,
+        val isClosed: Boolean = false,
+        val totalVoters: Int = 0,
+        val isQuiz: Boolean = false,
+        val correctOptionIndex: Int = -1,
+        val explanation: String = "",
+        val allowsMultipleAnswers: Boolean = false,
+    )
+
+    private fun extractPollData(content: TdApi.MessageContent?): PollData {
+        if (content !is TdApi.MessagePoll) return PollData()
+        val poll = content.poll ?: return PollData()
+        val questionText = poll.question?.text ?: ""
+        val optionsList =
+            poll.options?.map { opt ->
+                PollOption(
+                    text = opt.text?.text ?: "",
+                    voterCount = opt.voterCount,
+                    votePercentage = opt.votePercentage,
+                    isChosen = opt.isChosen,
+                )
+            } ?: emptyList()
+
+        var isQuizMode = false
+        var correctIndex = -1
+        var explanationText = ""
+
+        when (val pollType = poll.type) {
+            is TdApi.PollTypeQuiz -> {
+                isQuizMode = true
+                correctIndex = pollType.correctOptionIds?.firstOrNull() ?: -1
+                explanationText = pollType.explanation?.text ?: ""
+            }
+            else -> {}
+        }
+
+        return PollData(
+            question = questionText,
+            options = optionsList,
+            isAnonymous = poll.isAnonymous,
+            isClosed = poll.isClosed,
+            totalVoters = poll.totalVoterCount,
+            isQuiz = isQuizMode,
+            correctOptionIndex = correctIndex,
+            explanation = explanationText,
+            allowsMultipleAnswers = poll.allowsMultipleAnswers,
+        )
+    }
+
     private fun handleIncomingMessage(msg: TdApi.Message) {
         val mediaType = extractMediaType(msg.content)
         val mediaInfo = extractMediaFileInfo(msg.content)
         val stickerInfo = extractStickerInfo(msg.content)
+        val pollData = extractPollData(msg.content)
         val model =
             MessageModel(
                 id = msg.id,
@@ -4610,6 +4688,15 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 stickerEmoji = stickerInfo.first,
                 isPremiumSticker = stickerInfo.second,
                 transcript = extractVoiceTranscript(msg.content),
+                pollQuestion = pollData.question,
+                pollOptions = pollData.options,
+                pollIsAnonymous = pollData.isAnonymous,
+                pollIsClosed = pollData.isClosed,
+                pollTotalVoters = pollData.totalVoters,
+                pollIsQuiz = pollData.isQuiz,
+                pollCorrectOptionIndex = pollData.correctOptionIndex,
+                pollExplanation = pollData.explanation,
+                pollAllowsMultipleAnswers = pollData.allowsMultipleAnswers,
             )
 
         appendMessage(msg.chatId, model)
@@ -4635,6 +4722,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
             msgs.reversed().map { msg ->
                 val mediaInfo = extractMediaFileInfo(msg.content)
                 val stickerInfo = extractStickerInfo(msg.content)
+                val pollData = extractPollData(msg.content)
                 MessageModel(
                     id = msg.id,
                     chatId = msg.chatId,
@@ -4650,6 +4738,15 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     stickerEmoji = stickerInfo.first,
                     isPremiumSticker = stickerInfo.second,
                     transcript = extractVoiceTranscript(msg.content),
+                    pollQuestion = pollData.question,
+                    pollOptions = pollData.options,
+                    pollIsAnonymous = pollData.isAnonymous,
+                    pollIsClosed = pollData.isClosed,
+                    pollTotalVoters = pollData.totalVoters,
+                    pollIsQuiz = pollData.isQuiz,
+                    pollCorrectOptionIndex = pollData.correctOptionIndex,
+                    pollExplanation = pollData.explanation,
+                    pollAllowsMultipleAnswers = pollData.allowsMultipleAnswers,
                 )
             }
         val currentMap = _messages.value.toMutableMap()

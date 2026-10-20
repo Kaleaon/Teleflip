@@ -253,15 +253,23 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    val statusTag =
+                    val icon = if (message.pollIsQuiz) "💡" else "📊"
+                    val actionLabel =
                         if (message.pollIsClosed) {
                             "Closed"
-                        } else if (message.pollIsAnonymous) {
-                            "Anonymous Poll"
+                        } else if (message.pollIsQuiz) {
+                            "Press OK to Answer"
                         } else {
-                            "Public Poll"
+                            "Press OK to Vote"
                         }
-                    tvMedia.text = "📊 [$statusTag • Press OK to Vote]"
+                    val modeTag =
+                        when {
+                            message.pollIsQuiz -> "Quiz Mode"
+                            message.pollAllowsMultipleAnswers -> "Multiple Choice"
+                            message.pollIsAnonymous -> "Anonymous Poll"
+                            else -> "Public Poll"
+                        }
+                    tvMedia.text = "$icon [$modeTag • $actionLabel]"
                 }
                 MediaType.NONE -> {
                     ViewCompat.setStateDescription(tvMedia, null)
@@ -306,10 +314,24 @@ class MessageAdapter(
             if (message.mediaType == MediaType.POLL && message.pollOptions.isNotEmpty()) {
                 val pollBody =
                     buildString {
-                        appendLine(message.pollQuestion.ifBlank { message.text })
+                        val headerPrefix = if (message.pollIsQuiz && !message.pollQuestion.startsWith("💡")) "💡 Quiz: " else ""
+                        appendLine("$headerPrefix${message.pollQuestion.ifBlank { message.text }}")
                         message.pollOptions.forEachIndexed { idx, opt ->
-                            val mark = if (opt.isChosen) "[✓]" else "[ ]"
+                            val isCorrect = message.pollIsQuiz && idx == message.pollCorrectOptionIndex
+                            val mark =
+                                when {
+                                    opt.isChosen && isCorrect -> "[✓ Correct]"
+                                    opt.isChosen -> "[✓]"
+                                    isCorrect && (opt.isChosen || message.pollOptions.any { it.isChosen } || message.pollIsClosed) -> "[Correct Answer]"
+                                    else -> "[ ]"
+                                }
                             appendLine("${idx + 1}. $mark ${opt.text} (${opt.votePercentage}% • ${opt.voterCount})")
+                        }
+                        if (message.pollAllowsMultipleAnswers && !message.pollIsQuiz) {
+                            appendLine("Multiple answers allowed")
+                        }
+                        if (message.pollIsQuiz && message.pollExplanation.isNotBlank()) {
+                            appendLine("Explanation: ${message.pollExplanation}")
                         }
                         append("Total votes: ${message.pollTotalVoters}")
                     }
