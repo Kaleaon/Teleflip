@@ -838,10 +838,10 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         val currentMap = _messages.value.toMutableMap()
         val chatMsgs =
             (currentMap[chatId] ?: emptyList()).map { msg ->
-                when {
-                    msg.id == messageId -> msg.copy(isPinned = newPinned)
-                    newPinned -> msg.copy(isPinned = false)
-                    else -> msg
+                if (msg.id == messageId) {
+                    msg.copy(isPinned = newPinned)
+                } else {
+                    msg
                 }
             }
         currentMap[chatId] = chatMsgs
@@ -850,7 +850,18 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         _chats.value =
             _chats.value.map { chat ->
                 if (chat.id == chatId) {
-                    chat.copy(pinnedMessageId = if (newPinned) messageId else 0L)
+                    val currentPinnedIds = chat.getEffectivePinnedMessageIds()
+                    val newPinnedIds =
+                        if (newPinned) {
+                            if (currentPinnedIds.contains(messageId)) currentPinnedIds else currentPinnedIds + messageId
+                        } else {
+                            currentPinnedIds.filter { it != messageId }
+                        }
+                    val newPinnedSingleId = newPinnedIds.lastOrNull() ?: 0L
+                    chat.copy(
+                        pinnedMessageId = newPinnedSingleId,
+                        pinnedMessageIds = newPinnedIds,
+                    )
                 } else {
                     chat
                 }
@@ -4456,6 +4467,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         }
         val draftStr = chatDrafts[chat.id] ?: cloudDraft
 
+        val existingPinnedIds = existingModel?.getEffectivePinnedMessageIds() ?: emptyList()
         val newModel =
             ChatModel(
                 id = chat.id,
@@ -4471,7 +4483,8 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                 isPremium = isPremium,
                 isMuted = isMutedChat,
                 draftText = draftStr,
-                pinnedMessageId = existingModel?.pinnedMessageId ?: 0L,
+                pinnedMessageId = existingModel?.pinnedMessageId ?: existingPinnedIds.lastOrNull() ?: 0L,
+                pinnedMessageIds = existingPinnedIds,
             )
 
         synchronized(pendingChats) {
@@ -4631,10 +4644,17 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
     private fun handleMessagesList(msgs: Array<TdApi.Message>) {
         if (msgs.isEmpty()) return
         val chatId = msgs.first().chatId
+        val currentMap = _messages.value.toMutableMap()
+        val existing = currentMap[chatId] ?: emptyList()
+        val existingMap = existing.associateBy { it.id }
+        val chat = _chats.value.find { it.id == chatId }
+        val pinnedIds = chat?.getEffectivePinnedMessageIds() ?: emptyList()
+
         val list =
             msgs.reversed().map { msg ->
                 val mediaInfo = extractMediaFileInfo(msg.content)
                 val stickerInfo = extractStickerInfo(msg.content)
+                val wasPinned = existingMap[msg.id]?.isPinned == true || pinnedIds.contains(msg.id)
                 MessageModel(
                     id = msg.id,
                     chatId = msg.chatId,
@@ -4650,13 +4670,30 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
                     stickerEmoji = stickerInfo.first,
                     isPremiumSticker = stickerInfo.second,
                     transcript = extractVoiceTranscript(msg.content),
+                    isPinned = wasPinned,
                 )
             }
-        val currentMap = _messages.value.toMutableMap()
-        val existing = currentMap[chatId] ?: emptyList()
         val merged = (list + existing).distinctBy { it.id }.sortedBy { it.id }
         currentMap[chatId] = merged
         _messages.value = currentMap
+
+        val allPinnedMsgIds = merged.filter { it.isPinned }.map { it.id }
+        if (allPinnedMsgIds.isNotEmpty() && chat != null) {
+            val updatedPinnedIds = (chat.getEffectivePinnedMessageIds() + allPinnedMsgIds).distinct()
+            if (updatedPinnedIds != chat.pinnedMessageIds) {
+                _chats.value =
+                    _chats.value.map { c ->
+                        if (c.id == chatId) {
+                            c.copy(
+                                pinnedMessageIds = updatedPinnedIds,
+                                pinnedMessageId = updatedPinnedIds.lastOrNull() ?: c.pinnedMessageId,
+                            )
+                        } else {
+                            c
+                        }
+                    }
+            }
+        }
     }
 
     private fun handleFileUpdate(file: TdApi.File) {

@@ -73,10 +73,12 @@ import com.teleflip.app.ui.SoftkeyManager
 import com.teleflip.app.ui.SoftkeyUtils
 import com.teleflip.app.ui.SymbolsDialog
 import com.teleflip.app.ui.loadCircularAvatarOrFallback
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.Locale
 
@@ -125,6 +127,7 @@ class MainActivity : AppCompatActivity() {
     private var tvReplyEditPreview: TextView? = null
     private var layoutPinnedBanner: View? = null
     private var tvPinnedBannerText: TextView? = null
+    private val activePinnedIndexMap: MutableMap<Long, Int> = mutableMapOf()
 
     // Voice Recording State
     private var layoutVoiceRecording: LinearLayout? = null
@@ -403,8 +406,6 @@ class MainActivity : AppCompatActivity() {
                                     rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
                                 }
                                 pendingTargetMessageId = null
-                            } else if (list.isNotEmpty()) {
-                                rvMessages?.scrollToPosition(list.size - 1)
                             }
                         } else if (list.isNotEmpty()) {
                             rvMessages?.scrollToPosition(list.size - 1)
@@ -1681,25 +1682,62 @@ class MainActivity : AppCompatActivity() {
         chat: ChatModel,
         messagesList: List<MessageModel>,
     ) {
-        val pinnedMsg =
-            messagesList.find { it.isPinned }
-                ?: if (chat.pinnedMessageId != 0L) messagesList.find { it.id == chat.pinnedMessageId } else null
+        val pinnedIds = chat.getEffectivePinnedMessageIds()
+        if (pinnedIds.isEmpty()) {
+            layoutPinnedBanner?.visibility = View.GONE
+            return
+        }
 
-        if (pinnedMsg != null) {
-            layoutPinnedBanner?.visibility = View.VISIBLE
-            val snippet = pinnedMsg.text.ifBlank { pinnedMsg.mediaCaption }.ifBlank { "Attachment" }
-            tvPinnedBannerText?.text = "📌 Pinned: $snippet"
-            layoutPinnedBanner?.setOnClickListener {
-                val pos = messageAdapter?.getPositionForMessageId(pinnedMsg.id) ?: -1
-                if (pos >= 0) {
-                    rvMessages?.scrollToPosition(pos)
-                    rvMessages?.post {
-                        rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+        layoutPinnedBanner?.visibility = View.VISIBLE
+        val currentIndex = activePinnedIndexMap.getOrDefault(chat.id, 0)
+        val idx = if (currentIndex in pinnedIds.indices) currentIndex else 0
+        activePinnedIndexMap[chat.id] = idx
+
+        val targetId = pinnedIds[idx]
+        val pinnedMsg = messagesList.find { it.id == targetId }
+        val snippet =
+            if (pinnedMsg != null) {
+                pinnedMsg.text.ifBlank { pinnedMsg.mediaCaption }.ifBlank { "Attachment" }
+            } else {
+                "Message #$targetId"
+            }
+        tvPinnedBannerText?.text = "📌 Pinned: $snippet"
+
+        layoutPinnedBanner?.setOnClickListener {
+            val currentPinnedIds = chat.getEffectivePinnedMessageIds()
+            if (currentPinnedIds.isEmpty()) return@setOnClickListener
+
+            val activeIdx = activePinnedIndexMap.getOrDefault(chat.id, 0) % currentPinnedIds.size
+            val currentTargetId = currentPinnedIds[activeIdx]
+
+            val pos = messageAdapter?.getPositionForMessageId(currentTargetId) ?: -1
+            if (pos >= 0) {
+                rvMessages?.scrollToPosition(pos)
+                rvMessages?.post {
+                    rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+                }
+            } else {
+                pendingTargetMessageId = currentTargetId
+                lifecycleScope.launch(Dispatchers.IO) {
+                    kotlin.runCatching {
+                        withTimeoutOrNull(5000L) {
+                            telegramManager.loadMessages(chat.id, fromMessageId = currentTargetId, limit = 50)
+                        }
                     }
                 }
             }
-        } else {
-            layoutPinnedBanner?.visibility = View.GONE
+
+            val nextIdx = (activeIdx + 1) % currentPinnedIds.size
+            activePinnedIndexMap[chat.id] = nextIdx
+            val nextTargetId = currentPinnedIds[nextIdx]
+            val nextMsg = messagesList.find { it.id == nextTargetId }
+            val nextSnippet =
+                if (nextMsg != null) {
+                    nextMsg.text.ifBlank { nextMsg.mediaCaption }.ifBlank { "Attachment" }
+                } else {
+                    "Message #$nextTargetId"
+                }
+            tvPinnedBannerText?.text = "📌 Pinned: $nextSnippet"
         }
     }
 
