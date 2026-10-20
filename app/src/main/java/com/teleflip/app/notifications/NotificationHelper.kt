@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import com.teleflip.app.MainActivity
 import com.teleflip.app.R
@@ -15,44 +16,56 @@ object NotificationHelper {
     const val CHANNEL_BACKGROUND_SYNC = "teleflip_bg_sync"
     const val EXTRA_OPEN_CHAT_ID = "extra_open_chat_id"
 
+    @Volatile
+    private var channelsCreated = false
+
+    @VisibleForTesting
+    fun resetChannelsCreatedForTests() {
+        channelsCreated = false
+    }
+
     fun ensureChannels(context: Context) {
+        if (channelsCreated) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
-        val msgChannel =
-            NotificationChannel(
-                CHANNEL_MESSAGES,
-                "Telegram Messages",
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = "Alerts for new Telegram messages when flip phone is closed"
-                enableVibration(true)
-                enableLights(true)
-            }
+        synchronized(this) {
+            if (!channelsCreated) {
+                val msgChannel =
+                    NotificationChannel(
+                        CHANNEL_MESSAGES,
+                        "Telegram Messages",
+                        NotificationManager.IMPORTANCE_HIGH,
+                    ).apply {
+                        description = "Alerts for new Telegram messages when flip phone is closed"
+                        enableVibration(true)
+                        enableLights(true)
+                    }
 
-        val callChannel =
-            NotificationChannel(
-                CHANNEL_CALLS,
-                "Telegram Voice Calls",
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = "Incoming encrypted Telegram voice calls"
-                enableVibration(true)
-                enableLights(true)
-            }
+                val callChannel =
+                    NotificationChannel(
+                        CHANNEL_CALLS,
+                        "Telegram Voice Calls",
+                        NotificationManager.IMPORTANCE_HIGH,
+                    ).apply {
+                        description = "Incoming encrypted Telegram voice calls"
+                        enableVibration(true)
+                        enableLights(true)
+                    }
 
-        val syncChannel =
-            NotificationChannel(
-                CHANNEL_BACKGROUND_SYNC,
-                "Background Flip-Closed Push Sync",
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = "Keeps MTProto connection alive while the flip phone is closed"
-                setShowBadge(false)
-            }
+                val syncChannel =
+                    NotificationChannel(
+                        CHANNEL_BACKGROUND_SYNC,
+                        "Background Flip-Closed Push Sync",
+                        NotificationManager.IMPORTANCE_LOW,
+                    ).apply {
+                        description = "Keeps MTProto connection alive while the flip phone is closed"
+                        setShowBadge(false)
+                    }
 
-        nm.createNotificationChannel(msgChannel)
-        nm.createNotificationChannel(callChannel)
-        nm.createNotificationChannel(syncChannel)
+                nm.createNotificationChannels(listOf(msgChannel, callChannel, syncChannel))
+                channelsCreated = true
+            }
+        }
     }
 
     fun showIncomingMessageNotification(
@@ -89,6 +102,17 @@ object NotificationHelper {
             nm.notify(chatId.hashCode(), notification)
         } catch (_: Throwable) {
             // Safe no-op in headless unit tests where NotificationManager is mocked
+        }
+    }
+
+    fun cancelMessageNotification(
+        context: Context,
+        chatId: Long,
+    ) {
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            nm.cancel(chatId.hashCode())
+        } catch (_: Throwable) {
         }
     }
 
