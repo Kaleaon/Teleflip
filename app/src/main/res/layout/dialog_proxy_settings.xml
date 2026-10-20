@@ -35,6 +35,16 @@
             android:background="@color/softkey_divider"
             android:layout_marginBottom="8dp" />
 
+        <TextView
+            android:id="@+id/tv_proxy_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_error"
+            android:textSize="12sp"
+            android:visibility="gone"
+            android:accessibilityLiveRegion="assertive"
+            android:layout_marginBottom="8dp" />
+
         <!-- Current Active Status -->
         <TextView
             android:id="@+id/tv_proxy_active_status"

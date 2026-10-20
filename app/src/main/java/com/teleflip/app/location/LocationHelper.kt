@@ -12,7 +12,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.widget.Toast
+import com.teleflip.app.ui.StatusMessageDispatcher
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -153,7 +153,7 @@ class LocationHelper(private val context: Context) {
                     context.startActivity(genericIntent)
                 } catch (e2: Exception) {
                     com.teleflip.app.report.AdbReporter.reportPopup("LocationHelper", "No map application found to view coordinates", true)
-                    Toast.makeText(context, "No map application found to view coordinates", Toast.LENGTH_SHORT).show()
+                    StatusMessageDispatcher.showStatus(context, "No map application found to view coordinates", isError = true)
                 }
             }
         }
@@ -167,7 +167,7 @@ class LocationHelper(private val context: Context) {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText("Google Maps Location", link))
             com.teleflip.app.report.AdbReporter.reportPopup("LocationHelper", "Google Maps link copied to clipboard!", false)
-            Toast.makeText(context, "Google Maps link copied to clipboard!", Toast.LENGTH_SHORT).show()
+            StatusMessageDispatcher.showStatus(context, "Google Maps link copied to clipboard!", isError = false)
         }
     }
 }
