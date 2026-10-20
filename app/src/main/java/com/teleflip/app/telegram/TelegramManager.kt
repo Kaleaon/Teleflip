@@ -191,8 +191,7 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
 
         fun getCustomEmojiFilePath(key: String): String? {
             val item = customEmojiCache[key] ?: return null
-            val path = item.filePath ?: return null
-            return if (File(path).exists()) path else null
+            return item.filePath?.ifBlank { null }
         }
 
         fun clearCustomEmojiCache() {

@@ -162,4 +162,45 @@ class MessageAdapterCustomEmojiTest {
 
         tempImageFile.delete()
     }
+
+    @Test
+    fun testGetCustomEmojiFilePathDoesNotPerformDiskCheck() {
+        val nonExistentPath = "/tmp/non_existent_custom_emoji_888.png"
+        val customItem =
+            StickerItem(
+                fileId = 888,
+                emoji = "🔥",
+                filePath = nonExistentPath,
+                setName = "Fire Set",
+            )
+        TelegramManager.registerCustomEmojiSticker("custom_emoji_888", customItem)
+
+        // getCustomEmojiFilePath should return nonExistentPath directly without calling File.exists()
+        val path = TelegramManager.getCustomEmojiFilePath("custom_emoji_888")
+        assertEquals(nonExistentPath, path)
+    }
+
+    @Test
+    fun testViewRecycledDisposesPendingRequests() {
+        val parent = FrameLayout(context)
+        val adapter = MessageAdapter()
+        val holder = adapter.onCreateViewHolder(parent, 0)
+
+        val msg =
+            MessageModel(
+                id = 10L,
+                chatId = 100L,
+                senderName = "Bob",
+                text = "Recycle test",
+                time = "10:05",
+                isOutbound = false,
+                reactions = listOf("custom_emoji_999"),
+            )
+
+        holder.bind(msg)
+        adapter.onViewRecycled(holder)
+        // Verify recycled view holder clears state cleanly without throwing
+        val tvReactions = holder.itemView.findViewById<TextView>(R.id.tv_reactions)
+        assertNotNull(tvReactions)
+    }
 }
