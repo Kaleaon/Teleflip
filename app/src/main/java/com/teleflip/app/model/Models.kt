@@ -80,6 +80,7 @@ enum class MediaType {
     VIDEO,
     ANIMATION,
     POLL,
+    PAID_MEDIA,
 }
 
 data class MessageModel(
@@ -113,6 +114,8 @@ data class MessageModel(
     val messageThreadId: Long = 0L,
     val selfDestructSeconds: Int = 0,
     val transcript: String = "",
+    val starCount: Long = 0L,
+    val isPaidMediaLocked: Boolean = false,
 )
 
 data class MessageSearchResult(
