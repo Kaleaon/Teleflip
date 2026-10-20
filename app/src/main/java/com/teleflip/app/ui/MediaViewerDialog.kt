@@ -100,6 +100,16 @@ class MediaViewerDialog(
                 tvHint?.text = "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
                 setupPhoto(filePath, fileExists)
             }
+            MediaType.PAID_MEDIA -> {
+                if (message.isPaidMediaLocked) {
+                    tvTitle?.text = "🔒 Locked Media (⭐ ${message.starCount} Stars)"
+                    tvHint?.text = "[OK] Unlock Content • [RSK] Back"
+                } else {
+                    tvTitle?.text = "🔓 Unlocked Paid Media"
+                    tvHint?.text = "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
+                }
+                setupPhoto(filePath, fileExists)
+            }
             else -> {
                 tvTitle?.text = "📷 Photo Viewer"
                 tvHint?.text = "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"

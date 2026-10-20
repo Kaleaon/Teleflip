@@ -2,40 +2,141 @@ package com.teleflip.app.ui
 
 import android.content.Context
 import android.os.Bundle
+import android.view.KeyEvent
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import com.teleflip.app.R
+import com.teleflip.app.export.ChatExportEngine
+import com.teleflip.app.export.ExportFormat
 import com.teleflip.app.storage.ChatExportProgress
 import com.teleflip.app.storage.ExportStage
+import com.teleflip.app.telegram.TelegramManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import java.io.File
 
-class ChatExportProgressDialog(
-    context: Context,
-    private val onCancelRequested: () -> Unit,
-) : BaseDialog(context) {
+class ChatExportProgressDialog : BaseDialog {
+    private var onCancelRequested: (() -> Unit)? = null
+
+    // Engine export parameters
+    private var scope: CoroutineScope? = null
+    private var telegramManager: TelegramManager? = null
+    private var chatId: Long = 0L
+    private var chatTitle: String = ""
+    private var format: ExportFormat? = null
+    private var onCompleteCallback: ((Result<List<File>>) -> Unit)? = null
+
+    private var exportJob: Job? = null
+
+    // Views for R.layout.dialog_chat_export_progress
     private var tvTitle: TextView? = null
     private var tvStatus: TextView? = null
     private var tvDetail: TextView? = null
     private var progressBar: ProgressBar? = null
 
+    constructor(
+        context: Context,
+        onCancelRequested: () -> Unit = {},
+    ) : super(context) {
+        this.onCancelRequested = onCancelRequested
+    }
+
+    constructor(
+        context: Context,
+        scope: CoroutineScope,
+        telegramManager: TelegramManager,
+        chatId: Long,
+        chatTitle: String,
+        format: ExportFormat,
+        onCompleteCallback: (Result<List<File>>) -> Unit,
+    ) : super(context) {
+        this.scope = scope
+        this.telegramManager = telegramManager
+        this.chatId = chatId
+        this.chatTitle = chatTitle
+        this.format = format
+        this.onCompleteCallback = onCompleteCallback
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.dialog_chat_export_progress)
-        setCancelable(false)
-        setupDismissKeys {
-            onCancelRequested()
+        val currentFormat = format
+        val currentScope = scope
+        val currentTelegramManager = telegramManager
+        val currentOnComplete = onCompleteCallback
+
+        if (currentFormat != null && currentScope != null && currentTelegramManager != null && currentOnComplete != null) {
+            setContentView(R.layout.dialog_export_progress)
+            setupDismissKeys { cancelExportAndDismiss() }
+
+            val tvChatName = findViewById<TextView>(R.id.tv_export_chat_name)
+            val tvEngineStatus = findViewById<TextView>(R.id.tv_export_status)
+            val btnCancel = findViewById<Button>(R.id.btn_cancel_export)
+
+            tvChatName?.text = "Chat: $chatTitle (${currentFormat.label})"
+            tvEngineStatus?.text = "Exported 0 messages..."
+
+            btnCancel?.setOnClickListener {
+                cancelExportAndDismiss()
+            }
+            btnCancel?.requestFocus()
+
+            exportJob =
+                ChatExportEngine.exportChatHistory(
+                    context = context,
+                    scope = currentScope,
+                    telegramManager = currentTelegramManager,
+                    chatId = chatId,
+                    chatTitle = chatTitle,
+                    format = currentFormat,
+                    onProgress = { count ->
+                        tvEngineStatus?.text = "Exported $count messages..."
+                    },
+                    onComplete = { result ->
+                        if (isShowing) {
+                            dismiss()
+                        }
+                        currentOnComplete(result)
+                    },
+                )
+        } else {
+            setContentView(R.layout.dialog_chat_export_progress)
+            setCancelable(false)
+            setupDismissKeys { cancelExportAndDismiss() }
+
+            tvTitle = findViewById(R.id.tv_progress_title)
+            tvStatus = findViewById(R.id.tv_progress_status)
+            tvDetail = findViewById(R.id.tv_progress_detail)
+            progressBar = findViewById(R.id.pb_export_progress)
+
+            findViewById<Button>(R.id.btn_cancel_progress)?.setOnClickListener {
+                cancelExportAndDismiss()
+            }
+        }
+    }
+
+    private fun cancelExportAndDismiss() {
+        exportJob?.cancel()
+        onCancelRequested?.invoke()
+        if (isShowing) {
             dismiss()
         }
+    }
 
-        tvTitle = findViewById(R.id.tv_progress_title)
-        tvStatus = findViewById(R.id.tv_progress_status)
-        tvDetail = findViewById(R.id.tv_progress_detail)
-        progressBar = findViewById(R.id.pb_export_progress)
+    override fun onBackPressed() {
+        cancelExportAndDismiss()
+    }
 
-        findViewById<Button>(R.id.btn_cancel_progress)?.setOnClickListener {
-            onCancelRequested()
-            dismiss()
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (isBackOrRightSoftKey(keyCode)) {
+            cancelExportAndDismiss()
+            return true
         }
+        return super.onKeyDown(keyCode, event)
     }
 
     fun updateProgress(progress: ChatExportProgress) {
