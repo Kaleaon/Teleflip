@@ -15,6 +15,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.atLeastOnce
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
@@ -47,9 +48,9 @@ class TelegramManagerSendOptionsTest {
         manager.sendMessage(chatId = 123L, text = "Hello World")
 
         val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
-        verify(mockClient).send(captor.capture(), any())
+        verify(mockClient, atLeastOnce()).send(captor.capture(), any())
 
-        val sendReq = captor.value as TdApi.SendMessage
+        val sendReq = captor.allValues.filterIsInstance<TdApi.SendMessage>().first()
         assertNotNull("options should not be null", sendReq.options)
         assertEquals(false, sendReq.options.disableNotification)
         assertNull("schedulingState should be null for immediate delivery", sendReq.options.schedulingState)
@@ -67,9 +68,9 @@ class TelegramManagerSendOptionsTest {
         )
 
         val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
-        verify(mockClient).send(captor.capture(), any())
+        verify(mockClient, atLeastOnce()).send(captor.capture(), any())
 
-        val sendReq = captor.value as TdApi.SendMessage
+        val sendReq = captor.allValues.filterIsInstance<TdApi.SendMessage>().first()
         assertNotNull("options should not be null", sendReq.options)
         assertEquals(true, sendReq.options.disableNotification)
         assertNull(sendReq.options.schedulingState)
@@ -90,9 +91,9 @@ class TelegramManagerSendOptionsTest {
         )
 
         val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
-        verify(mockClient).send(captor.capture(), any())
+        verify(mockClient, atLeastOnce()).send(captor.capture(), any())
 
-        val sendReq = captor.value as TdApi.SendMessage
+        val sendReq = captor.allValues.filterIsInstance<TdApi.SendMessage>().first()
         assertNotNull("options should not be null", sendReq.options)
         val optionsSched = sendReq.options.schedulingState
         assertNotNull("schedulingState should be present for future schedule", optionsSched)
@@ -116,9 +117,9 @@ class TelegramManagerSendOptionsTest {
         )
 
         val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
-        verify(mockClient).send(captor.capture(), any())
+        verify(mockClient, atLeastOnce()).send(captor.capture(), any())
 
-        val sendReq = captor.value as TdApi.SendMessage
+        val sendReq = captor.allValues.filterIsInstance<TdApi.SendMessage>().first()
         assertNotNull("options should not be null", sendReq.options)
         assertNull(
             "Past scheduled date must fall back to immediate delivery (null schedulingState)",
@@ -143,9 +144,9 @@ class TelegramManagerSendOptionsTest {
         )
 
         val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
-        verify(mockClient).send(captor.capture(), any())
+        verify(mockClient, atLeastOnce()).send(captor.capture(), any())
 
-        val sendReq = captor.value as TdApi.SendMessage
+        val sendReq = captor.allValues.filterIsInstance<TdApi.SendMessage>().first()
         assertNotNull(sendReq.options)
         assertEquals(true, sendReq.options.disableNotification)
         assertNotNull(sendReq.options.schedulingState)
