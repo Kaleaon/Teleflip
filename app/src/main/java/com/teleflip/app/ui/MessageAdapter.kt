@@ -127,6 +127,7 @@ class MessageAdapter(
         private val tvReplyQuote: TextView? = itemView.findViewById(R.id.tv_reply_quote)
         private val tvMedia: TextView = itemView.findViewById(R.id.tv_media_indicator)
         private val ivPhoto: ImageView = itemView.findViewById(R.id.iv_message_photo)
+        private val tvStarBadge: TextView? = itemView.findViewById(R.id.tv_star_badge)
         private val tvText: TextView = itemView.findViewById(R.id.tv_message_text)
         private val btnTranscribe: TextView? = itemView.findViewById(R.id.btn_transcribe)
         private val tvTranscript: TextView? = itemView.findViewById(R.id.tv_transcript)
@@ -269,6 +270,15 @@ class MessageAdapter(
                         }
                     tvMedia.text = "📊 [$statusTag • Press OK to Vote]"
                 }
+                MediaType.PAID_MEDIA -> {
+                    tvMedia.visibility = View.VISIBLE
+                    if (message.isPaidMediaLocked) {
+                        val cap = if (message.mediaCaption.isNotBlank()) " • ${message.mediaCaption}" else ""
+                        tvMedia.text = "🔒 [Paid Media • ⭐ ${message.starCount} Stars$cap • Press OK to Unlock]"
+                    } else {
+                        tvMedia.text = if (message.mediaCaption.isNotBlank()) "🔓 ${message.mediaCaption}" else "🔓 [Unlocked Media • Press OK to View]"
+                    }
+                }
                 MediaType.NONE -> {
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
@@ -276,11 +286,12 @@ class MessageAdapter(
                 }
             }
 
-            // Photo, Sticker, and GIF display with accessibility contentDescription
+            // Photo, Sticker, GIF, and Paid Media display with accessibility contentDescription
             val isVisualMedia =
                 message.mediaType == MediaType.PHOTO ||
                     message.mediaType == MediaType.STICKER ||
-                    message.mediaType == MediaType.ANIMATION
+                    message.mediaType == MediaType.ANIMATION ||
+                    message.mediaType == MediaType.PAID_MEDIA
             if (isVisualMedia) {
                 ivPhoto.contentDescription =
                     when (message.mediaType) {
@@ -289,6 +300,13 @@ class MessageAdapter(
                             "Sticker $emo"
                         }
                         MediaType.ANIMATION -> "GIF Animation"
+                        MediaType.PAID_MEDIA -> {
+                            if (message.isPaidMediaLocked) {
+                                "Paid Media post, ${message.starCount} Stars"
+                            } else {
+                                "Unlocked Paid Media"
+                            }
+                        }
                         else -> ContentDescriptionFormatter.getPhotoDescription(context, message.mediaCaption)
                     }
                 val density = context.resources.displayMetrics.density
@@ -303,10 +321,27 @@ class MessageAdapter(
                     lp.height = (120 * density).toInt()
                 }
                 ivPhoto.layoutParams = lp
-                ivPhoto.loadMediaFromFile(message.mediaFilePath)
+
+                if (!message.mediaFilePath.isNullOrEmpty()) {
+                    ivPhoto.loadMediaFromFile(message.mediaFilePath)
+                } else if (message.mediaType == MediaType.PAID_MEDIA && message.isPaidMediaLocked) {
+                    ivPhoto.setImageResource(R.drawable.bg_inbound_bubble)
+                    ivPhoto.visibility = View.VISIBLE
+                } else {
+                    ivPhoto.setImageDrawable(null)
+                    ivPhoto.visibility = View.GONE
+                }
+
+                if (message.mediaType == MediaType.PAID_MEDIA && message.isPaidMediaLocked) {
+                    tvStarBadge?.visibility = View.VISIBLE
+                    tvStarBadge?.text = "⭐ ${message.starCount} Stars"
+                } else {
+                    tvStarBadge?.visibility = View.GONE
+                }
             } else {
                 ivPhoto.setImageDrawable(null)
                 ivPhoto.visibility = View.GONE
+                tvStarBadge?.visibility = View.GONE
             }
 
             if (message.mediaType == MediaType.POLL && message.pollOptions.isNotEmpty()) {
