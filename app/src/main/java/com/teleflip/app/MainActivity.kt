@@ -4904,16 +4904,23 @@ class MainActivity : AppCompatActivity() {
                     val itemCount = chatListAdapter?.itemCount ?: 0
                     if (itemCount > 0) {
                         rvChats?.scrollToPosition(0)
-                        rvChats?.post {
-                            val vh = rvChats?.findViewHolderForAdapterPosition(0)
-                            if (vh != null) {
-                                vh.itemView.requestFocus()
-                            } else {
-                                rvChats?.requestFocus()
-                            }
+                        val vh = rvChats?.findViewHolderForAdapterPosition(0)
+                        if (vh != null) {
+                            vh.itemView.requestFocus()
+                        } else {
+                            val listener =
+                                object : RecyclerView.OnChildAttachStateChangeListener {
+                                    override fun onChildViewAttachedToWindow(view: View) {
+                                        if (rvChats?.getChildAdapterPosition(view) == 0) {
+                                            view.requestFocus()
+                                            rvChats?.removeOnChildAttachStateChangeListener(this)
+                                        }
+                                    }
+
+                                    override fun onChildViewDetachedFromWindow(view: View) {}
+                                }
+                            rvChats?.addOnChildAttachStateChangeListener(listener)
                         }
-                    } else {
-                        findViewById<View>(R.id.tv_softkey_left)?.requestFocus()
                     }
                     return true
                 }

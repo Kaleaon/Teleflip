@@ -123,6 +123,7 @@ class SearchDialog(
     }
 
     fun selectTab(tab: SearchTab) {
+        val prevFocused = currentFocus
         currentTab = tab
         tabChats.isSelected = (tab == SearchTab.CHATS)
         tabContacts.isSelected = (tab == SearchTab.CONTACTS)
@@ -134,6 +135,16 @@ class SearchDialog(
             }
             SearchTab.MESSAGES -> {
                 rvResults.adapter = messageSearchAdapter
+            }
+        }
+
+        if (prevFocused == etSearchInput) {
+            etSearchInput.requestFocus()
+        } else if (prevFocused == tabChats || prevFocused == tabContacts || prevFocused == tabMessages) {
+            when (tab) {
+                SearchTab.CHATS -> tabChats.requestFocus()
+                SearchTab.CONTACTS -> tabContacts.requestFocus()
+                SearchTab.MESSAGES -> tabMessages.requestFocus()
             }
         }
 
@@ -222,6 +233,14 @@ class SearchDialog(
         performSearch(query.trim(), requestId)
     }
 
+    private fun restoreFocusIfNeeded(focusedBefore: View?) {
+        if (focusedBefore == etSearchInput) {
+            etSearchInput.requestFocus()
+        } else if (focusedBefore == tabChats || focusedBefore == tabContacts || focusedBefore == tabMessages) {
+            focusedBefore.requestFocus()
+        }
+    }
+
     private fun performSearch(
         trimmed: String,
         requestId: Long,
@@ -242,6 +261,7 @@ class SearchDialog(
             SearchTab.CHATS -> {
                 telegramManager.searchChats(trimmed) { results ->
                     if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchChats
+                    val focusedBefore = currentFocus
                     progressBar.visibility = View.GONE
                     chatAdapter?.submitList(results)
                     if (results.isEmpty()) {
@@ -250,11 +270,13 @@ class SearchDialog(
                     } else {
                         layoutEmpty.visibility = View.GONE
                     }
+                    restoreFocusIfNeeded(focusedBefore)
                 }
             }
             SearchTab.CONTACTS -> {
                 telegramManager.searchContacts(trimmed) { results ->
                     if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchContacts
+                    val focusedBefore = currentFocus
                     progressBar.visibility = View.GONE
                     chatAdapter?.submitList(results)
                     if (results.isEmpty()) {
@@ -263,6 +285,7 @@ class SearchDialog(
                     } else {
                         layoutEmpty.visibility = View.GONE
                     }
+                    restoreFocusIfNeeded(focusedBefore)
                 }
             }
             SearchTab.MESSAGES -> {
@@ -270,6 +293,7 @@ class SearchDialog(
                 messageNextOffset = ""
                 telegramManager.searchMessages(trimmed, offset = "", limit = 20) { _, results, nextOffset ->
                     if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchMessages
+                    val focusedBefore = currentFocus
                     isMessageLoading = false
                     messageNextOffset = nextOffset
                     progressBar.visibility = View.GONE
@@ -281,6 +305,7 @@ class SearchDialog(
                     } else {
                         layoutEmpty.visibility = View.GONE
                     }
+                    restoreFocusIfNeeded(focusedBefore)
                 }
             }
         }
@@ -347,6 +372,31 @@ class SearchDialog(
 
             keypadEngine?.commitCurrentChar()
 
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                val itemCount = rvResults.adapter?.itemCount ?: 0
+                if (itemCount > 0) {
+                    rvResults.scrollToPosition(0)
+                    val vh = rvResults.findViewHolderForAdapterPosition(0)
+                    if (vh != null) {
+                        vh.itemView.requestFocus()
+                    } else {
+                        val listener =
+                            object : RecyclerView.OnChildAttachStateChangeListener {
+                                override fun onChildViewAttachedToWindow(view: View) {
+                                    if (rvResults.getChildAdapterPosition(view) == 0) {
+                                        view.requestFocus()
+                                        rvResults.removeOnChildAttachStateChangeListener(this)
+                                    }
+                                }
+
+                                override fun onChildViewDetachedFromWindow(view: View) {}
+                            }
+                        rvResults.addOnChildAttachStateChangeListener(listener)
+                    }
+                }
+                return true
+            }
+
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                 if ((rvResults.adapter?.itemCount ?: 0) > 0) {
                     rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
@@ -356,6 +406,32 @@ class SearchDialog(
 
             return super.onKeyDown(keyCode, event)
         } else {
+            val isTabFocused = currentFocus === tabChats || currentFocus === tabContacts || currentFocus === tabMessages
+            if (isTabFocused && keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                val itemCount = rvResults.adapter?.itemCount ?: 0
+                if (itemCount > 0) {
+                    rvResults.scrollToPosition(0)
+                    val vh = rvResults.findViewHolderForAdapterPosition(0)
+                    if (vh != null) {
+                        vh.itemView.requestFocus()
+                    } else {
+                        val listener =
+                            object : RecyclerView.OnChildAttachStateChangeListener {
+                                override fun onChildViewAttachedToWindow(view: View) {
+                                    if (rvResults.getChildAdapterPosition(view) == 0) {
+                                        view.requestFocus()
+                                        rvResults.removeOnChildAttachStateChangeListener(this)
+                                    }
+                                }
+
+                                override fun onChildViewDetachedFromWindow(view: View) {}
+                            }
+                        rvResults.addOnChildAttachStateChangeListener(listener)
+                    }
+                }
+                return true
+            }
+
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                 val tabs = SearchTab.values()
                 val prevIndex = (currentTab.ordinal - 1 + tabs.size) % tabs.size
