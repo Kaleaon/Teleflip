@@ -34,13 +34,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.Client
@@ -231,31 +232,30 @@ class TelegramManager(private val context: Context) : Client.ResultHandler {
         batchSize: Int = chatBatchSize,
     ) {
         if (chatIds.isEmpty()) return
+        val effectiveBatchSize = batchSize.coerceAtLeast(1)
+        val semaphore = Semaphore(effectiveBatchSize)
         scope.launch {
-            val chunks = chatIds.toList().chunked(batchSize)
-            for (chunk in chunks) {
-                coroutineScope {
-                    for (id in chunk) {
-                        launch {
-                            try {
-                                val result =
-                                    withTimeoutOrNull(10000L) {
-                                        sendQuery(TdApi.GetChat(id))
-                                    }
-                                if (result is TdApi.Chat) {
-                                    addOrUpdateChat(result)
-                                } else if (result == null) {
-                                    com.teleflip.app.report.AdbReporter.reportError(
-                                        tag,
-                                        "Timeout fetching chat $id in batch chunk",
-                                    )
+            for (id in chatIds) {
+                launch {
+                    semaphore.withPermit {
+                        try {
+                            val result =
+                                withTimeoutOrNull(10000L) {
+                                    sendQuery(TdApi.GetChat(id))
                                 }
-                            } catch (e: Exception) {
+                            if (result is TdApi.Chat) {
+                                addOrUpdateChat(result)
+                            } else if (result == null) {
                                 com.teleflip.app.report.AdbReporter.reportError(
                                     tag,
-                                    "Failed to fetch chat $id in batch chunk: ${e.message}",
+                                    "Timeout fetching chat $id in batch chunk",
                                 )
                             }
+                        } catch (e: Exception) {
+                            com.teleflip.app.report.AdbReporter.reportError(
+                                tag,
+                                "Failed to fetch chat $id in batch chunk: ${e.message}",
+                            )
                         }
                     }
                 }
