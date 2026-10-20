@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.teleflip.app.MainActivity
 import com.teleflip.app.R
+import com.teleflip.app.telegram.TelegramManager
 
 class TeleFlipNotificationService : Service() {
     companion object {
@@ -79,7 +80,21 @@ class TeleFlipNotificationService : Service() {
         flags: Int,
         startId: Int,
     ): Int {
+        try {
+            val telegramManager = TelegramManager.getInstance(applicationContext)
+            telegramManager.start()
+        } catch (_: Throwable) {
+        }
         return START_STICKY
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            val telegramManager = TelegramManager.getInstance(applicationContext)
+            telegramManager.stop()
+        } catch (_: Throwable) {
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
