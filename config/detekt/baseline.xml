@@ -7,48 +7,64 @@
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (SoftkeyUtils.isSoftLeftKey(keyCode)) { if (softkeyManager.handleKeyEvent(keyCode, event)) return true }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (SoftkeyUtils.isSoftRightKey(keyCode)) { if (softkeyManager.handleKeyEvent(keyCode, event)) return true }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (currentScreen == Screen.CONVERSATION &amp;&amp; etComposeInput?.hasFocus() == true) { if (composeInputEngine?.handleKeyEvent(keyCode, event) == true) { return true } }</ID>
-    <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_ENDCALL &amp;&amp; event.action == KeyEvent.ACTION_DOWN) { if (currentScreen == Screen.IN_CALL) { telegramManager.activeCall.value?.let { call -&gt; telegramManager.discardCall(call.callId, callDurationSec) return true } } }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (requestCode == REQ_PHONE_PERM &amp;&amp; grantResults.isNotEmpty() &amp;&amp; grantResults[0] == PackageManager.PERMISSION_GRANTED) { if (currentScreen == Screen.LOGIN) { showLoginScreen(telegramManager.authState.value) } }</ID>
-    <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (isInputKey &amp;&amp; etSearchInput.hasFocus()) { if (keypadEngine?.handleKeyEvent(keyCode, event) == true) { return true } }</ID>
+    <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) { if ((rvResults.adapter?.itemCount ?: 0) &gt; 0) { rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus() return true } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog.&lt;no name provided&gt;$if (!isMessageLoading &amp;&amp; messageNextOffset.isNotEmpty() &amp;&amp; totalItemCount &lt; maxResultsLimit) { if (visibleItemCount + firstVisibleItem &gt;= totalItemCount - 2) { loadMoreMessageResults() } }</ID>
+    <ID>CollapsibleIfStatements:TelegramManager.kt$TelegramManager$if (!msg.isOutgoing &amp;&amp; backgroundPushEnabled) { if (!isChatMuted(msg.chatId)) { val targetChat = _chats.value.find { it.id == msg.chatId } val chatTitle = targetChat?.title ?: "Telegram" NotificationHelper.showIncomingMessageNotification( context = context, chatId = msg.chatId, chatTitle = chatTitle, senderName = model.senderName, messageText = model.text, ) } }</ID>
     <ID>CollapsibleIfStatements:TelegramManager.kt$TelegramManager$if (chat.chatType == ChatType.DIRECT &amp;&amp; chat.id == user.id) { if (chat.isPremium != user.isPremium) { currentList[i] = chat.copy(isPremium = user.isPremium) updated = true } }</ID>
     <ID>CollapsibleIfStatements:TelegramManager.kt$TelegramManager$if (f.local.canBeDownloaded &amp;&amp; !f.local.isDownloadingActive) { if (com.teleflip.app.storage.StorageManager.shouldAutoDownloadMedia(context)) { tdClient?.send(TdApi.DownloadFile(f.id, 1, 0, 0, false), this) } }</ID>
+    <ID>ComplexCondition:ChatExportManager.kt$ChatExportManager$(localPath.isNullOrBlank() || !File(localPath).exists()) &amp;&amp; msg.mediaFileId != 0 &amp;&amp; fileDownloader != null</ID>
+    <ID>ComplexCondition:ChatExportProgressDialog.kt$ChatExportProgressDialog$currentFormat != null &amp;&amp; currentScope != null &amp;&amp; currentTelegramManager != null &amp;&amp; currentOnComplete != null</ID>
+    <ID>ComplexCondition:ImageExtensions.kt$reqWidth &lt;= 0 || reqHeight &lt;= 0 || height &lt;= 0 || width &lt;= 0</ID>
     <ID>ComplexCondition:KeypadInputEngine.kt$KeypadInputEngine$keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN</ID>
+    <ID>ComplexCondition:MainActivity.kt$MainActivity$call != null &amp;&amp; call.state != CallState.DISCARDED &amp;&amp; call.state != CallState.ERROR &amp;&amp; currentScreen != Screen.IN_CALL &amp;&amp; activeDialogCount &lt;= 0 &amp;&amp; currentScreen != Screen.PASSCODE_LOCK &amp;&amp; currentScreen != Screen.LOGIN</ID>
+    <ID>ComplexCondition:MainActivity.kt$MainActivity$focusId == R.id.tab_all || focusId == R.id.tab_direct || focusId == R.id.tab_groups || focusId == R.id.tab_channels || focusId == R.id.tab_bots || focusId == R.id.tab_folders || focusId == R.id.tab_archived</ID>
     <ID>ComplexCondition:MainActivity.kt$MainActivity$msg.mediaType == MediaType.PHOTO || msg.mediaType == MediaType.VIDEO || msg.mediaType == MediaType.ANIMATION || msg.mediaType == MediaType.STICKER</ID>
     <ID>ComplexCondition:SearchDialog.kt$SearchDialog$focused != null &amp;&amp; focused !== etSearchInput &amp;&amp; focused !== tabChats &amp;&amp; focused !== tabContacts &amp;&amp; focused !== tabMessages</ID>
+    <ID>CyclomaticComplexMethod:ChatExportEngine.kt$ChatExportEngine$fun exportChatHistory( context: Context, scope: CoroutineScope, telegramManager: TelegramManager, chatId: Long, chatTitle: String, format: ExportFormat, mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate, onProgress: (completedCount: Int) -&gt; Unit, onComplete: (Result&lt;List&lt;File&gt;&gt;) -&gt; Unit, ): Job</ID>
+    <ID>CyclomaticComplexMethod:ChatExportEngine.kt$ChatExportEngine$fun parseMessage( msg: TdApi.Message, senderName: String, dateFormat: SimpleDateFormat, ): ExportMessage</ID>
+    <ID>CyclomaticComplexMethod:ChatExportManager.kt$ChatExportManager$suspend fun exportChat( context: Context, chatId: Long, chatTitle: String, messages: List&lt;MessageModel&gt;, options: ChatExportOptions, fileDownloader: (suspend (fileId: Int) -&gt; String?)? = null, onProgress: ((ChatExportProgress) -&gt; Unit)? = null, ): Result&lt;File&gt;</ID>
     <ID>CyclomaticComplexMethod:ChatListAdapter.kt$ChatListAdapter.ChatViewHolder$fun bind( chat: ChatModel, position: Int, )</ID>
     <ID>CyclomaticComplexMethod:KeypadInputEngine.kt$KeypadInputEngine$fun handleKeyEvent( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>CyclomaticComplexMethod:LocationHelper.kt$LocationHelper$@SuppressLint("MissingPermission") fun fetchCurrentLocation( onSuccess: (LocationInfo) -&gt; Unit, onError: (String) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$@Deprecated("Deprecated in Java") override fun onActivityResult( requestCode: Int, resultCode: Int, data: Intent?, )</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$@android.annotation.SuppressLint("NewApi", "InlinedApi") private fun getDevicePhoneNumber(): String?</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$override fun dispatchKeyEvent(event: KeyEvent): Boolean</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun applyChatFilterAndDebounce( filter: ChatType?, archivedMode: Boolean = false, foldersMode: Boolean = false, )</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun cycleTabs(direction: Int)</ID>
-    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun getDevicePhoneNumber(): String?</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun observeTelegramState()</ID>
-    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun openConversation( chat: ChatModel, targetMessageId: Long? = null, )</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun renderChatListScreen()</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun renderConversation( chat: ChatModel, targetMessageId: Long? = null, )</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun renderLoginScreen(state: AuthState)</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun renderProfileScreen(chat: ChatModel)</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun renderSettingsScreen()</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun saveMessageToDevice(msg: MessageModel)</ID>
-    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun showChatListScreen()</ID>
-    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun showLoginScreen(state: AuthState)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun showMessageOptionsMenu(msg: MessageModel)</ID>
-    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun showProfileScreen(chat: ChatModel)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun showSendMediaPicker( chat: ChatModel, isPhoto: Boolean, )</ID>
-    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun showSettingsScreen()</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun updateActiveCallOverlay()</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun updateInCallUI(call: ActiveCall)</ID>
     <ID>CyclomaticComplexMethod:MediaViewerDialog.kt$MediaViewerDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:MessageAdapter.kt$MessageAdapter.MessageViewHolder$fun bind(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:NewChatDialog.kt$NewChatDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
-    <ID>CyclomaticComplexMethod:StorageManager.kt$StorageManager$fun detectSdCardDirectory(context: Context): File?</ID>
+    <ID>CyclomaticComplexMethod:StorageManager.kt$StorageManager$private fun performSdCardDetection(context: Context): File?</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun createGroupOrChannel( title: String, isChannel: Boolean, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun fetchCustomEmojiStickers(onResult: (List&lt;StickerItem&gt;) -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$override fun onResult(obj: TdApi.Object?)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$private fun addOrUpdateChat(chat: TdApi.Chat)</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$private fun extractMediaFileInfo(content: TdApi.MessageContent?): Pair&lt;Int, String?&gt;</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$private fun extractMessageText(content: TdApi.MessageContent?): String</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$private fun handleAuthState(state: TdApi.AuthorizationState)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$private fun handleFileUpdate(file: TdApi.File)</ID>
     <ID>EmptyCatchBlock:AdbReporter.kt$AdbReporter${ }</ID>
-    <ID>EmptyCatchBlock:ImageExtensions.kt${ }</ID>
+    <ID>EmptyCatchBlock:ChatExportManager.kt$ChatExportManager${ }</ID>
     <ID>EmptyCatchBlock:MediaViewerDialog.kt$MediaViewerDialog${ }</ID>
+    <ID>EmptyCatchBlock:MessageAdapter.kt$MessageAdapter.MessageViewHolder${ }</ID>
     <ID>EmptyCatchBlock:NotificationHelper.kt$NotificationHelper${ }</ID>
+    <ID>EmptyCatchBlock:ProxyStorage.kt$ProxyStorage${ }</ID>
     <ID>EmptyCatchBlock:StorageManager.kt$StorageManager${ }</ID>
     <ID>EmptyCatchBlock:TeleFlipNotificationService.kt$TeleFlipNotificationService${ }</ID>
     <ID>EmptyCatchBlock:TeleFlipNotificationService.kt$TeleFlipNotificationService.Companion${ }</ID>
@@ -62,20 +78,29 @@
     <ID>FunctionOnlyReturningConstant:SoftkeyManager.kt$SoftkeyManager$@Deprecated("Back press is handled via OnBackPressedDispatcher, bypassing softkeys.") fun handleBack(): Boolean</ID>
     <ID>ImplicitDefaultLocale:MainActivity.kt$MainActivity$String.format("%02d:%02d", min, sec)</ID>
     <ID>ImplicitDefaultLocale:MessageAdapter.kt$MessageAdapter.MessageViewHolder$String.format("%.4f, %.4f", message.latitude, message.longitude)</ID>
+    <ID>InstanceOfCheckForException:ChatExportEngine.kt$ChatExportEngine$e is CancellationException</ID>
     <ID>LargeClass:MainActivity.kt$MainActivity : AppCompatActivity</ID>
     <ID>LargeClass:TelegramManager.kt$TelegramManager : ResultHandler</ID>
+    <ID>LongMethod:ChatExportManager.kt$ChatExportManager$private fun generateHtmlFile( exportDir: File, chatTitle: String, messages: List&lt;MessageModel&gt;, mediaPaths: Map&lt;Long, String&gt;, )</ID>
+    <ID>LongMethod:ChatExportManager.kt$ChatExportManager$suspend fun exportChat( context: Context, chatId: Long, chatTitle: String, messages: List&lt;MessageModel&gt;, options: ChatExportOptions, fileDownloader: (suspend (fileId: Int) -&gt; String?)? = null, onProgress: ((ChatExportProgress) -&gt; Unit)? = null, ): Result&lt;File&gt;</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$override fun dispatchKeyEvent(event: KeyEvent): Boolean</ID>
-    <ID>LongMethod:MainActivity.kt$MainActivity$private fun getDevicePhoneNumber(): String?</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$private fun observeTelegramState()</ID>
-    <ID>LongMethod:MainActivity.kt$MainActivity$private fun openConversation( chat: ChatModel, targetMessageId: Long? = null, )</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$private fun renderConversation( chat: ChatModel, targetMessageId: Long? = null, )</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$private fun renderLoginScreen(state: AuthState)</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$private fun renderProfileScreen(chat: ChatModel)</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$private fun renderSettingsScreen()</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$private fun showAttachMenu(chat: ChatModel)</ID>
-    <ID>LongMethod:MainActivity.kt$MainActivity$private fun showLoginScreen(state: AuthState)</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$private fun showMessageOptionsMenu(msg: MessageModel)</ID>
-    <ID>LongMethod:MainActivity.kt$MainActivity$private fun showProfileScreen(chat: ChatModel)</ID>
-    <ID>LongMethod:MainActivity.kt$MainActivity$private fun showSettingsScreen()</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$private fun updateSoftkeysForFocusedMessage( chat: ChatModel, msg: MessageModel, )</ID>
     <ID>LongMethod:MessageAdapter.kt$MessageAdapter.MessageViewHolder$fun bind(message: MessageModel)</ID>
+    <ID>LongMethod:TelegramManager.kt$TelegramManager$fun fetchCustomEmojiStickers(onResult: (List&lt;StickerItem&gt;) -&gt; Unit)</ID>
     <ID>LongMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
     <ID>LongMethod:TelegramManager.kt$TelegramManager$override fun onResult(obj: TdApi.Object?)</ID>
+    <ID>LongMethod:TelegramManager.kt$TelegramManager$private fun addOrUpdateChat(chat: TdApi.Chat)</ID>
+    <ID>LongMethod:TelegramManager.kt$TelegramManager$private fun handleAuthState(state: TdApi.AuthorizationState)</ID>
+    <ID>LongParameterList:ChatExportEngine.kt$ChatExportEngine$( context: Context, scope: CoroutineScope, telegramManager: TelegramManager, chatId: Long, chatTitle: String, format: ExportFormat, mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate, onProgress: (completedCount: Int) -&gt; Unit, onComplete: (Result&lt;List&lt;File&gt;&gt;) -&gt; Unit, )</ID>
+    <ID>LongParameterList:TelegramManager.kt$TelegramManager$( server: String, port: Int, type: ProxyType, username: String = "", password: String = "", secret: String = "", enableNow: Boolean = true, callback: ((Boolean, String?) -&gt; Unit)? = null, )</ID>
+    <ID>LoopWithTooManyJumpStatements:TelegramManager.kt$TelegramManager$while</ID>
     <ID>MagicNumber:AdbReportReceiver.kt$AdbReportReceiver$100</ID>
     <ID>MagicNumber:AdbReportReceiver.kt$AdbReportReceiver$30</ID>
     <ID>MagicNumber:AdbReporter.kt$AdbReporter$50</ID>
@@ -83,6 +108,11 @@
     <ID>MagicNumber:BaseDialog.kt$BaseDialog$229</ID>
     <ID>MagicNumber:BaseDialog.kt$BaseDialog$230</ID>
     <ID>MagicNumber:BaseDialog.kt$BaseDialog$61</ID>
+    <ID>MagicNumber:ChatExportEngine.kt$ChatExportEngine$100</ID>
+    <ID>MagicNumber:ChatExportEngine.kt$ChatExportEngine$1000L</ID>
+    <ID>MagicNumber:ChatExportEngine.kt$ChatExportEngine$30</ID>
+    <ID>MagicNumber:ChatExportManager.kt$ChatExportManager$50</ID>
+    <ID>MagicNumber:ChatExportProgressDialog.kt$ChatExportProgressDialog$100</ID>
     <ID>MagicNumber:ChatListAdapter.kt$ChatListAdapter.ChatViewHolder$9</ID>
     <ID>MagicNumber:DiagnosticsDialog.kt$DiagnosticsDialog$30</ID>
     <ID>MagicNumber:LocationHelper.kt$LocationHelper$1000</ID>
@@ -91,8 +121,11 @@
     <ID>MagicNumber:LocationHelper.kt$LocationHelper$60</ID>
     <ID>MagicNumber:LocationHelper.kt$LocationHelper$6000</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$1.5f</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$10</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$1000</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$1000L</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$12</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$13f</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$15</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$16</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$20</ID>
@@ -106,22 +139,29 @@
     <ID>MagicNumber:MainActivity.kt$MainActivity$3600</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$4</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$40</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$48</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$5</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$50</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$500L</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$6</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$60</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$7</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$9</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$900L</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity.&lt;no name provided&gt;$10</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity.&lt;no name provided&gt;$500L</ID>
+    <ID>MagicNumber:MediaViewerDialog.kt$MediaViewerDialog$1.25f</ID>
     <ID>MagicNumber:MediaViewerDialog.kt$MediaViewerDialog$1.5f</ID>
     <ID>MagicNumber:MediaViewerDialog.kt$MediaViewerDialog$240f</ID>
     <ID>MagicNumber:MediaViewerDialog.kt$MediaViewerDialog$3.0f</ID>
     <ID>MagicNumber:MediaViewerDialog.kt$MediaViewerDialog$48f</ID>
     <ID>MagicNumber:MediaViewerDialog.kt$MediaViewerDialog$5000</ID>
     <ID>MagicNumber:MessageAdapter.kt$MessageAdapter.MessageViewHolder$120</ID>
+    <ID>MagicNumber:MessageAdapter.kt$MessageAdapter.MessageViewHolder$16</ID>
     <ID>MagicNumber:MessageAdapter.kt$MessageAdapter.MessageViewHolder$160</ID>
     <ID>MagicNumber:NotificationHelper.kt$NotificationHelper$900000</ID>
+    <ID>MagicNumber:ProxyStorage.kt$ProxyStorage$1080</ID>
+    <ID>MagicNumber:ProxyStorage.kt$ProxyStorage$16</ID>
     <ID>MagicNumber:SearchDialog.kt$SearchDialog$20</ID>
     <ID>MagicNumber:SearchDialog.kt$SearchDialog$50</ID>
     <ID>MagicNumber:SoftkeyUtils.kt$SoftkeyUtils$132</ID>
@@ -161,37 +201,50 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$900L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$92</ID>
     <ID>MagicNumber:VoicePlayer.kt$VoicePlayer$1.5f</ID>
+    <ID>MagicNumber:VoicePlayer.kt$VoicePlayer.&lt;no name provided&gt;$500L</ID>
     <ID>MagicNumber:VoiceRecorder.kt$VoiceRecorder$1000</ID>
     <ID>MagicNumber:VoiceRecorder.kt$VoiceRecorder$32000</ID>
     <ID>MagicNumber:VoiceRecorder.kt$VoiceRecorder$44100</ID>
     <ID>MagicNumber:VoiceRecorder.kt$VoiceRecorder.&lt;no name provided&gt;$1000</ID>
     <ID>MagicNumber:VoiceRecorder.kt$VoiceRecorder.&lt;no name provided&gt;$500</ID>
+    <ID>MaxLineLength:ChatExportManager.kt$ChatExportManager$writer.write(""" &lt;a href="$relativeMedia" target="_blank"&gt;&lt;img class="media-img" src="$relativeMedia" alt="Photo" /&gt;&lt;/a&gt;""" + "\n")</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$"Warning: Resetting your account will permanently delete your session and cloud messages for this account. This action cannot be undone. Are you sure you want to reset your account?"</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$.</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if</ID>
-    <ID>NestedBlockDepth:ImageExtensions.kt$fun ImageView.loadCircularAvatarOrFallback( path: String?, fallbackLetters: String?, fallbackTextView: TextView?, )</ID>
+    <ID>NestedBlockDepth:MainActivity.kt$MainActivity$@RequiresApi(Build.VERSION_CODES.TIRAMISU) private fun getDevicePhoneNumberApi33(): String?</ID>
+    <ID>NestedBlockDepth:MainActivity.kt$MainActivity$@android.annotation.SuppressLint("NewApi", "InlinedApi") private fun getDevicePhoneNumber(): String?</ID>
     <ID>NestedBlockDepth:MainActivity.kt$MainActivity$override fun dispatchKeyEvent(event: KeyEvent): Boolean</ID>
-    <ID>NestedBlockDepth:MainActivity.kt$MainActivity$private fun getDevicePhoneNumber(): String?</ID>
     <ID>NestedBlockDepth:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
-    <ID>NestedBlockDepth:StorageManager.kt$StorageManager$fun detectSdCardDirectory(context: Context): File?</ID>
+    <ID>NestedBlockDepth:StorageManager.kt$StorageManager$private fun performSdCardDetection(context: Context): File?</ID>
+    <ID>ReturnCount:ChatExportDialog.kt$ChatExportDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:KeypadInputEngine.kt$KeypadInputEngine$fun handleKeyEvent( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:KeypadInputEngine.kt$KeypadInputEngine$private fun isSentenceBoundary( text: CharSequence, targetIndex: Int, ): Boolean</ID>
-    <ID>ReturnCount:LayoutAccessibilityXmlTest.kt$LayoutAccessibilityXmlTest$private fun findNodeById( node: org.w3c.dom.Node, targetId: String, ): org.w3c.dom.Node?</ID>
     <ID>ReturnCount:MainActivity.kt$MainActivity$@Deprecated("Deprecated in Java") override fun onActivityResult( requestCode: Int, resultCode: Int, data: Intent?, )</ID>
+    <ID>ReturnCount:MainActivity.kt$MainActivity$@RequiresApi(Build.VERSION_CODES.TIRAMISU) private fun getDevicePhoneNumberApi33(): String?</ID>
+    <ID>ReturnCount:MainActivity.kt$MainActivity$@android.annotation.SuppressLint("NewApi", "InlinedApi") private fun getDevicePhoneNumber(): String?</ID>
     <ID>ReturnCount:MainActivity.kt$MainActivity$override fun dispatchKeyEvent(event: KeyEvent): Boolean</ID>
-    <ID>ReturnCount:MainActivity.kt$MainActivity$private fun getDevicePhoneNumber(): String?</ID>
+    <ID>ReturnCount:MainActivity.kt$MainActivity$private fun isTabViewFocused(): Boolean</ID>
     <ID>ReturnCount:MainActivity.kt$MainActivity$private fun updateLoginFocusChain()</ID>
     <ID>ReturnCount:MainActivity.kt$MainActivity.Companion$internal fun cleanAndFormatPhoneNumber(raw: String?): String?</ID>
     <ID>ReturnCount:MediaViewerDialog.kt$MediaViewerDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:NewChatDialog.kt$NewChatDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:OptionsMenuDialog.kt$OptionsMenuDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:PollDialog.kt$PollDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>ReturnCount:ProxyStorage.kt$ProxyStorage$@Synchronized fun getProxies(context: Context): List&lt;ProxyItem&gt;</ID>
     <ID>ReturnCount:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:SoftkeyManager.kt$SoftkeyManager$fun handleKeyEvent( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$@androidx.annotation.VisibleForTesting internal fun extractStickerInfo(content: TdApi.MessageContent?): Pair&lt;String, Boolean&gt;</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun getSenderDisplayName(message: TdApi.Message): String</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun isChatMuted(chatId: Long): Boolean</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
-    <ID>ReturnCount:TelegramManager.kt$TelegramManager$private fun extractStickerInfo(content: TdApi.MessageContent?): Pair&lt;String, Boolean&gt;</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$private fun extractIsPaidMediaLocked(content: TdApi.MessageContent?): Boolean</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$private fun extractMediaFileInfo(content: TdApi.MessageContent?): Pair&lt;Int, String?&gt;</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$private fun extractVoiceTranscript(content: TdApi.MessageContent?): String</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$suspend fun downloadFileSuspending( fileId: Int, timeoutMs: Long = 30_000L, ): String?</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$suspend fun resolveSenderName(sender: TdApi.MessageSender?): String</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager.Companion$fun getCustomEmojiFilePath(key: String): String?</ID>
     <ID>ReturnCount:VoiceRecorder.kt$VoiceRecorder$fun startRecording(onTick: (Int) -&gt; Unit): Boolean</ID>
     <ID>SwallowedException:ContentDescriptionFormatter.kt$ContentDescriptionFormatter$e: Exception</ID>
-    <ID>SwallowedException:ImageExtensions.kt$e: Throwable</ID>
     <ID>SwallowedException:LocationHelper.kt$LocationHelper.Companion$e2: Exception</ID>
     <ID>SwallowedException:LocationHelper.kt$LocationHelper.Companion$e: Exception</ID>
     <ID>SwallowedException:MainActivity.kt$MainActivity$e: Exception</ID>
@@ -201,24 +254,29 @@
     <ID>SwallowedException:TelegramManager.kt$TelegramManager$ex: Throwable</ID>
     <ID>SwallowedException:VoiceRecorder.kt$VoiceRecorder$e: Exception</ID>
     <ID>TooGenericExceptionCaught:AdbReporter.kt$AdbReporter$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ChatExportEngine.kt$ChatExportEngine$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ChatExportManager.kt$ChatExportManager$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:ContentDescriptionFormatter.kt$ContentDescriptionFormatter$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:ImageExtensions.kt$e: Throwable</ID>
     <ID>TooGenericExceptionCaught:LocationHelper.kt$LocationHelper$e: Exception</ID>
     <ID>TooGenericExceptionCaught:LocationHelper.kt$LocationHelper.Companion$e2: Exception</ID>
     <ID>TooGenericExceptionCaught:LocationHelper.kt$LocationHelper.Companion$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:QrCodeGenerator.kt$QrCodeGenerator$e: Exception</ID>
     <ID>TooGenericExceptionCaught:TelegramManager.kt$TelegramManager$e2: Exception</ID>
     <ID>TooGenericExceptionCaught:TelegramManager.kt$TelegramManager$e: Exception</ID>
     <ID>TooGenericExceptionCaught:TelegramManager.kt$TelegramManager$e: Throwable</ID>
     <ID>TooGenericExceptionCaught:TelegramManager.kt$TelegramManager$ex: Throwable</ID>
     <ID>TooGenericExceptionCaught:VoicePlayer.kt$VoicePlayer$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:VoicePlayer.kt$VoicePlayer.&lt;no name provided&gt;$e: Exception</ID>
     <ID>TooGenericExceptionCaught:VoiceRecorder.kt$VoiceRecorder$e: Exception</ID>
     <ID>TooManyFunctions:AdbReporter.kt$AdbReporter</ID>
     <ID>TooManyFunctions:MainActivity.kt$MainActivity : AppCompatActivity</ID>
     <ID>TooManyFunctions:PasscodeManager.kt$PasscodeManager</ID>
+    <ID>TooManyFunctions:ProxyStorage.kt$ProxyStorage</ID>
     <ID>TooManyFunctions:StorageManager.kt$StorageManager</ID>
     <ID>TooManyFunctions:TelegramManager.kt$TelegramManager : ResultHandler</ID>
     <ID>UnusedPrivateProperty:AdbReporter.kt$AdbReporter$signal</ID>
+    <ID>UnusedPrivateProperty:ChatExportDialog.kt$ChatExportDialog$private val chatId: Long</ID>
   </CurrentIssues>
 </SmellBaseline>
