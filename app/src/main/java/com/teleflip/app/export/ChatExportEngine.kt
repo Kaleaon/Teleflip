@@ -19,7 +19,6 @@ import java.util.Locale
 import java.util.concurrent.CancellationException
 
 object ChatExportEngine {
-
     fun exportChatHistory(
         context: Context,
         scope: CoroutineScope,
@@ -82,14 +81,14 @@ object ChatExportEngine {
 
                 if (format == ExportFormat.JSON || format == ExportFormat.BOTH) {
                     val jsonContent = ChatExportFormatter.formatToJson(chatId, chatTitle, sortedMessages, exportedAt)
-                    val jsonFile = File(targetDir, "chat_export_${cleanTitle}_${timeStampStr}.json")
+                    val jsonFile = File(targetDir, "chat_export_${cleanTitle}_$timeStampStr.json")
                     jsonFile.writeText(jsonContent, Charsets.UTF_8)
                     savedFiles.add(jsonFile)
                 }
 
                 if (format == ExportFormat.HTML || format == ExportFormat.BOTH) {
                     val htmlContent = ChatExportFormatter.formatToHtml(chatId, chatTitle, sortedMessages, exportedAt)
-                    val htmlFile = File(targetDir, "chat_export_${cleanTitle}_${timeStampStr}.html")
+                    val htmlFile = File(targetDir, "chat_export_${cleanTitle}_$timeStampStr.html")
                     htmlFile.writeText(htmlContent, Charsets.UTF_8)
                     savedFiles.add(htmlFile)
                 }
@@ -120,11 +119,12 @@ object ChatExportEngine {
     ): ExportMessage {
         val timestamp = msg.date.toLong()
         val dateFormatted = dateFormat.format(Date(timestamp * 1000L))
-        val senderId = when (val sender = msg.senderId) {
-            is TdApi.MessageSenderUser -> sender.userId
-            is TdApi.MessageSenderChat -> sender.chatId
-            else -> 0L
-        }
+        val senderId =
+            when (val sender = msg.senderId) {
+                is TdApi.MessageSenderUser -> sender.userId
+                is TdApi.MessageSenderChat -> sender.chatId
+                else -> 0L
+            }
 
         var text = ""
         var attachmentType: String? = null

@@ -7,8 +7,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.drinkless.tdlib.TdApi
 import org.json.JSONObject
@@ -20,21 +18,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.anyInt
-import org.mockito.ArgumentMatchers.anyLong
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class ChatExportTest {
-
     private lateinit var context: Context
 
     @Before
@@ -51,30 +45,31 @@ class ChatExportTest {
 
     @Test
     fun testFormatToJson_validStructureAndContents() {
-        val messages = listOf(
-            ExportMessage(
-                messageId = 101L,
-                timestamp = 1700000000L,
-                dateFormatted = "2026-10-19 08:00:00",
-                senderId = 1L,
-                senderName = "Alice",
-                text = "Hello world!",
-                attachmentType = null,
-                attachmentDetails = null,
-                isOutbound = false,
-            ),
-            ExportMessage(
-                messageId = 102L,
-                timestamp = 1700000060L,
-                dateFormatted = "2026-10-19 08:01:00",
-                senderId = 2L,
-                senderName = "Me",
-                text = "Hi Alice, look at this photo",
-                attachmentType = "Photo",
-                attachmentDetails = "1080x1920",
-                isOutbound = true,
-            ),
-        )
+        val messages =
+            listOf(
+                ExportMessage(
+                    messageId = 101L,
+                    timestamp = 1700000000L,
+                    dateFormatted = "2026-10-19 08:00:00",
+                    senderId = 1L,
+                    senderName = "Alice",
+                    text = "Hello world!",
+                    attachmentType = null,
+                    attachmentDetails = null,
+                    isOutbound = false,
+                ),
+                ExportMessage(
+                    messageId = 102L,
+                    timestamp = 1700000060L,
+                    dateFormatted = "2026-10-19 08:01:00",
+                    senderId = 2L,
+                    senderName = "Me",
+                    text = "Hi Alice, look at this photo",
+                    attachmentType = "Photo",
+                    attachmentDetails = "1080x1920",
+                    isOutbound = true,
+                ),
+            )
 
         val jsonStr = ChatExportFormatter.formatToJson(12345L, "Test Chat", messages, "2026-10-19 08:30:00")
         assertNotNull(jsonStr)
@@ -105,19 +100,20 @@ class ChatExportTest {
 
     @Test
     fun testFormatToHtml_validStructureAndEscaping() {
-        val messages = listOf(
-            ExportMessage(
-                messageId = 201L,
-                timestamp = 1700000000L,
-                dateFormatted = "2026-10-19 08:00:00",
-                senderId = 1L,
-                senderName = "Bob & Alice <Tag>",
-                text = "Line 1\nLine 2 & <More>",
-                attachmentType = "Document",
-                attachmentDetails = "report.pdf",
-                isOutbound = false,
-            ),
-        )
+        val messages =
+            listOf(
+                ExportMessage(
+                    messageId = 201L,
+                    timestamp = 1700000000L,
+                    dateFormatted = "2026-10-19 08:00:00",
+                    senderId = 1L,
+                    senderName = "Bob & Alice <Tag>",
+                    text = "Line 1\nLine 2 & <More>",
+                    attachmentType = "Document",
+                    attachmentDetails = "report.pdf",
+                    isOutbound = false,
+                ),
+            )
 
         val htmlStr = ChatExportFormatter.formatToHtml(999L, "Group <Test>", messages, "2026-10-19 08:30:00")
         assertNotNull(htmlStr)
@@ -191,185 +187,191 @@ class ChatExportTest {
     }
 
     @Test
-    fun testExportChatHistory_incrementalAndBothFormats(): Unit = runBlocking {
-        val mockManager = mock(TelegramManager::class.java)
+    fun testExportChatHistory_incrementalAndBothFormats(): Unit =
+        runBlocking {
+            val mockManager = mock(TelegramManager::class.java)
 
-        val msg1 = TdApi.Message()
-        msg1.id = 1000L
-        msg1.date = 1700000000
-        msg1.senderId = TdApi.MessageSenderUser(10L)
-        msg1.content = TdApi.MessageText(TdApi.FormattedText("First Message", emptyArray()), null, null)
+            val msg1 = TdApi.Message()
+            msg1.id = 1000L
+            msg1.date = 1700000000
+            msg1.senderId = TdApi.MessageSenderUser(10L)
+            msg1.content = TdApi.MessageText(TdApi.FormattedText("First Message", emptyArray()), null, null)
 
-        val msg2 = TdApi.Message()
-        msg2.id = 900L
-        msg2.date = 1700000060
-        msg2.senderId = TdApi.MessageSenderUser(20L)
-        msg2.content = TdApi.MessageText(TdApi.FormattedText("Second Message", emptyArray()), null, null)
+            val msg2 = TdApi.Message()
+            msg2.id = 900L
+            msg2.date = 1700000060
+            msg2.senderId = TdApi.MessageSenderUser(20L)
+            msg2.content = TdApi.MessageText(TdApi.FormattedText("Second Message", emptyArray()), null, null)
 
-        `when`(mockManager.getChatHistoryBatch(999L, 0L, 100)).thenReturn(listOf(msg1, msg2))
-        `when`(mockManager.getChatHistoryBatch(999L, 900L, 100)).thenReturn(emptyList())
-        `when`(mockManager.resolveSenderName(org.mockito.ArgumentMatchers.any())).thenReturn("Alice")
+            `when`(mockManager.getChatHistoryBatch(999L, 0L, 100)).thenReturn(listOf(msg1, msg2))
+            `when`(mockManager.getChatHistoryBatch(999L, 900L, 100)).thenReturn(emptyList())
+            `when`(mockManager.resolveSenderName(org.mockito.ArgumentMatchers.any())).thenReturn("Alice")
 
-        val completionDeferred = CompletableDeferred<Result<List<File>>>()
-        var progressCount = 0
+            val completionDeferred = CompletableDeferred<Result<List<File>>>()
+            var progressCount = 0
 
-        val job = ChatExportEngine.exportChatHistory(
-            context = context,
-            scope = this,
-            telegramManager = mockManager,
-            chatId = 999L,
-            chatTitle = "Unit Test Chat",
-            format = ExportFormat.BOTH,
-            mainDispatcher = Dispatchers.Unconfined,
-            onProgress = { count ->
-                progressCount = count
-            },
-            onComplete = { res ->
-                completionDeferred.complete(res)
-            },
-        )
+            val job =
+                ChatExportEngine.exportChatHistory(
+                    context = context,
+                    scope = this,
+                    telegramManager = mockManager,
+                    chatId = 999L,
+                    chatTitle = "Unit Test Chat",
+                    format = ExportFormat.BOTH,
+                    mainDispatcher = Dispatchers.Unconfined,
+                    onProgress = { count ->
+                        progressCount = count
+                    },
+                    onComplete = { res ->
+                        completionDeferred.complete(res)
+                    },
+                )
 
-        job.join()
-        val result = completionDeferred.await()
-        assertTrue(result.isSuccess)
+            job.join()
+            val result = completionDeferred.await()
+            assertTrue(result.isSuccess)
 
-        val files = result.getOrNull()!!
-        assertEquals(2, files.size)
+            val files = result.getOrNull()!!
+            assertEquals(2, files.size)
 
-        val jsonFile = files.find { it.name.endsWith(".json") }
-        val htmlFile = files.find { it.name.endsWith(".html") }
+            val jsonFile = files.find { it.name.endsWith(".json") }
+            val htmlFile = files.find { it.name.endsWith(".html") }
 
-        assertNotNull(jsonFile)
-        assertNotNull(htmlFile)
+            assertNotNull(jsonFile)
+            assertNotNull(htmlFile)
 
-        assertTrue(jsonFile!!.exists())
-        assertTrue(htmlFile!!.exists())
+            assertTrue(jsonFile!!.exists())
+            assertTrue(htmlFile!!.exists())
 
-        val jsonText = jsonFile.readText()
-        assertTrue(jsonText.contains("First Message"))
-        assertTrue(jsonText.contains("Second Message"))
+            val jsonText = jsonFile.readText()
+            assertTrue(jsonText.contains("First Message"))
+            assertTrue(jsonText.contains("Second Message"))
 
-        val htmlText = htmlFile.readText()
-        assertTrue(htmlText.contains("First Message"))
-        assertTrue(htmlText.contains("Second Message"))
+            val htmlText = htmlFile.readText()
+            assertTrue(htmlText.contains("First Message"))
+            assertTrue(htmlText.contains("Second Message"))
 
-        // Cleanup test files
-        jsonFile.delete()
-        htmlFile.delete()
-    }
+            // Cleanup test files
+            jsonFile.delete()
+            htmlFile.delete()
+        }
 
     @Test
-    fun testExportChatHistory_highVolumeMessages(): Unit = runBlocking {
-        val mockManager = mock(TelegramManager::class.java)
+    fun testExportChatHistory_highVolumeMessages(): Unit =
+        runBlocking {
+            val mockManager = mock(TelegramManager::class.java)
 
-        val batchCount = 10 // 10 batches of 100 = 1,000 messages
-        val fakeBatches = mutableMapOf<Long, List<TdApi.Message>>()
+            val batchCount = 10 // 10 batches of 100 = 1,000 messages
+            val fakeBatches = mutableMapOf<Long, List<TdApi.Message>>()
 
-        var currentMsgId = 10000L
-        var fromId = 0L
+            var currentMsgId = 10000L
+            var fromId = 0L
 
-        for (b in 0 until batchCount) {
-            val batch = mutableListOf<TdApi.Message>()
-            for (i in 0 until 100) {
-                currentMsgId--
-                val msg = TdApi.Message()
-                msg.id = currentMsgId
-                msg.date = (1700000000 + (b * 100) + i)
-                msg.senderId = TdApi.MessageSenderUser(1L)
-                msg.content = TdApi.MessageText(TdApi.FormattedText("Msg #$currentMsgId in batch $b", emptyArray()), null, null)
-                batch.add(msg)
+            for (b in 0 until batchCount) {
+                val batch = mutableListOf<TdApi.Message>()
+                for (i in 0 until 100) {
+                    currentMsgId--
+                    val msg = TdApi.Message()
+                    msg.id = currentMsgId
+                    msg.date = (1700000000 + (b * 100) + i)
+                    msg.senderId = TdApi.MessageSenderUser(1L)
+                    msg.content = TdApi.MessageText(TdApi.FormattedText("Msg #$currentMsgId in batch $b", emptyArray()), null, null)
+                    batch.add(msg)
+                }
+                fakeBatches[fromId] = batch
+                fromId = batch.last().id
             }
-            fakeBatches[fromId] = batch
-            fromId = batch.last().id
+            fakeBatches[fromId] = emptyList()
+
+            for ((fId, list) in fakeBatches) {
+                `when`(mockManager.getChatHistoryBatch(888L, fId, 100)).thenReturn(list)
+            }
+            `when`(mockManager.resolveSenderName(org.mockito.ArgumentMatchers.any())).thenReturn("User1")
+
+            val completionDeferred = CompletableDeferred<Result<List<File>>>()
+            var maxProgress = 0
+
+            val testScope = CoroutineScope(Dispatchers.IO)
+            val job =
+                ChatExportEngine.exportChatHistory(
+                    context = context,
+                    scope = testScope,
+                    telegramManager = mockManager,
+                    chatId = 888L,
+                    chatTitle = "High Volume Chat",
+                    format = ExportFormat.JSON,
+                    mainDispatcher = Dispatchers.Unconfined,
+                    onProgress = { count ->
+                        maxProgress = count
+                    },
+                    onComplete = { res ->
+                        completionDeferred.complete(res)
+                    },
+                )
+
+            job.join()
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            val result = completionDeferred.await()
+            if (result.isFailure) {
+                println("HighVolume test failure: " + result.exceptionOrNull()?.message)
+                result.exceptionOrNull()?.printStackTrace()
+            }
+            assertTrue(result.isSuccess)
+
+            val files = result.getOrNull()!!
+            assertEquals(1, files.size)
+            assertEquals(1000, maxProgress)
+
+            val exportedJson = files[0].readText()
+            val jsonObj = JSONObject(exportedJson)
+            assertEquals(1000, jsonObj.getInt("message_count"))
+
+            // Cleanup
+            files[0].delete()
         }
-        fakeBatches[fromId] = emptyList()
-
-        for ((fId, list) in fakeBatches) {
-            `when`(mockManager.getChatHistoryBatch(888L, fId, 100)).thenReturn(list)
-        }
-        `when`(mockManager.resolveSenderName(org.mockito.ArgumentMatchers.any())).thenReturn("User1")
-
-        val completionDeferred = CompletableDeferred<Result<List<File>>>()
-        var maxProgress = 0
-
-        val testScope = CoroutineScope(Dispatchers.IO)
-        val job = ChatExportEngine.exportChatHistory(
-            context = context,
-            scope = testScope,
-            telegramManager = mockManager,
-            chatId = 888L,
-            chatTitle = "High Volume Chat",
-            format = ExportFormat.JSON,
-            mainDispatcher = Dispatchers.Unconfined,
-            onProgress = { count ->
-                maxProgress = count
-            },
-            onComplete = { res ->
-                completionDeferred.complete(res)
-            },
-        )
-
-        job.join()
-        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-        val result = completionDeferred.await()
-        if (result.isFailure) {
-            println("HighVolume test failure: " + result.exceptionOrNull()?.message)
-            result.exceptionOrNull()?.printStackTrace()
-        }
-        assertTrue(result.isSuccess)
-
-        val files = result.getOrNull()!!
-        assertEquals(1, files.size)
-        assertEquals(1000, maxProgress)
-
-        val exportedJson = files[0].readText()
-        val jsonObj = JSONObject(exportedJson)
-        assertEquals(1000, jsonObj.getInt("message_count"))
-
-        // Cleanup
-        files[0].delete()
-    }
 
     @Test
-    fun testExportChatHistory_cancellationPreventsCorruptFiles(): Unit = runBlocking {
-        val mockManager = mock(TelegramManager::class.java)
+    fun testExportChatHistory_cancellationPreventsCorruptFiles(): Unit =
+        runBlocking {
+            val mockManager = mock(TelegramManager::class.java)
 
-        val msg1 = TdApi.Message()
-        msg1.id = 500L
-        msg1.date = 1700000000
-        msg1.senderId = TdApi.MessageSenderUser(1L)
-        msg1.content = TdApi.MessageText(TdApi.FormattedText("Msg 1", emptyArray()), null, null)
+            val msg1 = TdApi.Message()
+            msg1.id = 500L
+            msg1.date = 1700000000
+            msg1.senderId = TdApi.MessageSenderUser(1L)
+            msg1.content = TdApi.MessageText(TdApi.FormattedText("Msg 1", emptyArray()), null, null)
 
-        `when`(mockManager.getChatHistoryBatch(777L, 0L, 100)).thenAnswer {
-            Thread.sleep(10)
-            listOf(msg1)
+            `when`(mockManager.getChatHistoryBatch(777L, 0L, 100)).thenAnswer {
+                Thread.sleep(10)
+                listOf(msg1)
+            }
+            `when`(mockManager.resolveSenderName(msg1.senderId)).thenReturn("User1")
+
+            val completionDeferred = CompletableDeferred<Result<List<File>>>()
+
+            val testScope = CoroutineScope(Dispatchers.IO)
+            val exportJob =
+                ChatExportEngine.exportChatHistory(
+                    context = context,
+                    scope = testScope,
+                    telegramManager = mockManager,
+                    chatId = 777L,
+                    chatTitle = "Cancelled Export",
+                    format = ExportFormat.BOTH,
+                    mainDispatcher = Dispatchers.Unconfined,
+                    onProgress = {},
+                    onComplete = { res ->
+                        completionDeferred.complete(res)
+                    },
+                )
+
+            // Cancel job
+            exportJob.cancel()
+            exportJob.join()
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+
+            val result = completionDeferred.await()
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is CancellationException)
         }
-        `when`(mockManager.resolveSenderName(msg1.senderId)).thenReturn("User1")
-
-        val completionDeferred = CompletableDeferred<Result<List<File>>>()
-
-        val testScope = CoroutineScope(Dispatchers.IO)
-        val exportJob = ChatExportEngine.exportChatHistory(
-            context = context,
-            scope = testScope,
-            telegramManager = mockManager,
-            chatId = 777L,
-            chatTitle = "Cancelled Export",
-            format = ExportFormat.BOTH,
-            mainDispatcher = Dispatchers.Unconfined,
-            onProgress = {},
-            onComplete = { res ->
-                completionDeferred.complete(res)
-            },
-        )
-
-        // Cancel job
-        exportJob.cancel()
-        exportJob.join()
-        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val result = completionDeferred.await()
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is CancellationException)
-    }
 }

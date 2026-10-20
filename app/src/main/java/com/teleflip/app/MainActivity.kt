@@ -1163,17 +1163,18 @@ class MainActivity : AppCompatActivity() {
         chatTitle: String,
     ) {
         commitActiveInputEngines()
-        val options = listOf(
-            MenuOption(1, "📄 JSON Format (.json)") {
-                startChatExport(chatId, chatTitle, ExportFormat.JSON)
-            },
-            MenuOption(2, "🌐 HTML Format (.html)") {
-                startChatExport(chatId, chatTitle, ExportFormat.HTML)
-            },
-            MenuOption(3, "📦 Both Formats (JSON & HTML)") {
-                startChatExport(chatId, chatTitle, ExportFormat.BOTH)
-            },
-        )
+        val options =
+            listOf(
+                MenuOption(1, "📄 JSON Format (.json)") {
+                    startChatExport(chatId, chatTitle, ExportFormat.JSON)
+                },
+                MenuOption(2, "🌐 HTML Format (.html)") {
+                    startChatExport(chatId, chatTitle, ExportFormat.HTML)
+                },
+                MenuOption(3, "📦 Both Formats (JSON & HTML)") {
+                    startChatExport(chatId, chatTitle, ExportFormat.BOTH)
+                },
+            )
         OptionsMenuDialog(this, "Select Export Format", options).show()
     }
 

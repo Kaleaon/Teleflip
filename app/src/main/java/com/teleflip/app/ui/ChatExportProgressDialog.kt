@@ -17,7 +17,6 @@ import kotlinx.coroutines.Job
 import java.io.File
 
 class ChatExportProgressDialog : BaseDialog {
-
     private var onCancelRequested: (() -> Unit)? = null
 
     // Engine export parameters
@@ -84,23 +83,24 @@ class ChatExportProgressDialog : BaseDialog {
             }
             btnCancel?.requestFocus()
 
-            exportJob = ChatExportEngine.exportChatHistory(
-                context = context,
-                scope = currentScope,
-                telegramManager = currentTelegramManager,
-                chatId = chatId,
-                chatTitle = chatTitle,
-                format = currentFormat,
-                onProgress = { count ->
-                    tvEngineStatus?.text = "Exported $count messages..."
-                },
-                onComplete = { result ->
-                    if (isShowing) {
-                        dismiss()
-                    }
-                    currentOnComplete(result)
-                },
-            )
+            exportJob =
+                ChatExportEngine.exportChatHistory(
+                    context = context,
+                    scope = currentScope,
+                    telegramManager = currentTelegramManager,
+                    chatId = chatId,
+                    chatTitle = chatTitle,
+                    format = currentFormat,
+                    onProgress = { count ->
+                        tvEngineStatus?.text = "Exported $count messages..."
+                    },
+                    onComplete = { result ->
+                        if (isShowing) {
+                            dismiss()
+                        }
+                        currentOnComplete(result)
+                    },
+                )
         } else {
             setContentView(R.layout.dialog_chat_export_progress)
             setCancelable(false)

@@ -259,4 +259,3 @@ class TelegramManagerTest {
         assertTrue("Email verification message expected", emailMsg?.contains("Email verification") == true)
     }
 }
-
