@@ -22,7 +22,10 @@ class ChatExportProgressDialog(
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_chat_export_progress)
         setCancelable(false)
-        setupDismissKeys()
+        setupDismissKeys {
+            onCancelRequested()
+            dismiss()
+        }
 
         tvTitle = findViewById(R.id.tv_progress_title)
         tvStatus = findViewById(R.id.tv_progress_status)

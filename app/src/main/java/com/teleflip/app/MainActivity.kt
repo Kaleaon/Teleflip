@@ -2246,39 +2246,46 @@ class MainActivity : AppCompatActivity() {
             .setMessage("Fetch all previous messages and media for \"${chat.title}\" directly from Telegram cloud servers?")
             .setPositiveButton("Import All") { dialog, _ ->
                 dialog.dismiss()
-                val progressDialog = ChatExportProgressDialog(this) {}
-                progressDialog.show()
-                lifecycleScope.launch {
-                    try {
-                        val result =
-                            telegramManager.importChatHistoryFromCloud(
-                                chatId = chat.id,
-                                autoDownloadMedia = true,
-                                onProgress = { loadedMsgs, queuedMedia ->
-                                    progressDialog.updateProgress(
-                                        ChatExportProgress(
-                                            stage = ExportStage.FETCHING_CLOUD_HISTORY,
-                                            messagesProcessed = loadedMsgs,
-                                            totalMessages = loadedMsgs,
-                                            mediaDownloaded = queuedMedia,
-                                            totalMedia = queuedMedia,
-                                            statusText = "Imported $loadedMsgs messages ($queuedMedia media queued)...",
-                                        ),
-                                    )
-                                },
-                            )
-                        progressDialog.dismiss()
-                        showToast("✅ Imported ${result.first} messages from cloud (${result.second} media syncing)")
-                        val updated = telegramManager.messages.value[chat.id] ?: emptyList()
-                        messageAdapter?.submitList(updated)
-                        if (updated.isNotEmpty()) {
-                            rvMessages?.scrollToPosition(updated.size - 1)
-                        }
-                    } catch (e: Exception) {
-                        progressDialog.dismiss()
-                        showToast("Failed to import history: ${e.message}")
+                var importJob: Job? = null
+                val progressDialog =
+                    ChatExportProgressDialog(this) {
+                        importJob?.cancel()
                     }
-                }
+                progressDialog.show()
+                importJob =
+                    lifecycleScope.launch {
+                        try {
+                            val result =
+                                telegramManager.importChatHistoryFromCloud(
+                                    chatId = chat.id,
+                                    autoDownloadMedia = true,
+                                    onProgress = { loadedMsgs, queuedMedia ->
+                                        progressDialog.updateProgress(
+                                            ChatExportProgress(
+                                                stage = ExportStage.FETCHING_CLOUD_HISTORY,
+                                                messagesProcessed = loadedMsgs,
+                                                totalMessages = loadedMsgs,
+                                                mediaDownloaded = queuedMedia,
+                                                totalMedia = queuedMedia,
+                                                statusText = "Imported $loadedMsgs messages ($queuedMedia media queued)...",
+                                            ),
+                                        )
+                                    },
+                                )
+                            progressDialog.dismiss()
+                            showToast("✅ Imported ${result.first} messages from cloud (${result.second} media syncing)")
+                            val updated = telegramManager.messages.value[chat.id] ?: emptyList()
+                            messageAdapter?.submitList(updated)
+                            if (updated.isNotEmpty()) {
+                                rvMessages?.scrollToPosition(updated.size - 1)
+                            }
+                        } catch (e: Exception) {
+                            progressDialog.dismiss()
+                            if (e !is kotlinx.coroutines.CancellationException) {
+                                showToast("Failed to import history: ${e.message}")
+                            }
+                        }
+                    }
             }
             .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
             .show()
