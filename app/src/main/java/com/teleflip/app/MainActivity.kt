@@ -174,7 +174,7 @@ class MainActivity : AppCompatActivity() {
         private const val MUTE_1_HOUR_SEC = 3600
         private const val MUTE_8_HOURS_SEC = 28800
         private const val MUTE_2_DAYS_SEC = 172800
-        private const val MUTE_FOREVER_SEC = 31536000
+        private const val MUTE_FOREVER_SEC = Int.MAX_VALUE
         private const val PASSCODE_PIN_LENGTH = 4
 
         internal fun cleanAndFormatPhoneNumber(raw: String?): String? {
@@ -5155,6 +5155,10 @@ class MainActivity : AppCompatActivity() {
                 showSearchDialog()
             }
         }
+
+        btnSendMsg?.post {
+            btnSendMsg.requestFocus()
+        }
     }
 
     // =========================================================================
@@ -5259,10 +5263,51 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // In Conversation: Route *, # to compose box engine
-        if (currentScreen == Screen.CONVERSATION && etComposeInput?.hasFocus() == true) {
-            if (composeInputEngine?.handleKeyEvent(keyCode, event) == true) {
-                return true
+        // In Conversation: D-Pad navigation between message list and compose input
+        if (currentScreen == Screen.CONVERSATION && event.action == KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP && etComposeInput?.hasFocus() == true) {
+                val cursor = etComposeInput?.selectionStart ?: 0
+                val isAtTopLine = (etComposeInput?.layout?.getLineForOffset(cursor) ?: 0) == 0
+                if (isAtTopLine) {
+                    val count = messageAdapter?.itemCount ?: 0
+                    if (count > 0) {
+                        val targetPos = count - 1
+                        rvMessages?.scrollToPosition(targetPos)
+                        rvMessages?.post {
+                            rvMessages?.findViewHolderForAdapterPosition(targetPos)?.itemView?.requestFocus()
+                        }
+                        return true
+                    }
+                }
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                val lastPos = (messageAdapter?.itemCount ?: 0) - 1
+                if (lastPos >= 0) {
+                    val focused = currentFocus
+                    if (focused != null) {
+                        val vh = rvMessages?.findContainingViewHolder(focused)
+                        if (vh != null && vh.adapterPosition == lastPos) {
+                            etComposeInput?.requestFocus()
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+
+        // In Conversation: Route keypad keys (digits, *, #) to compose box engine even if scrolling messages
+        if (currentScreen == Screen.CONVERSATION) {
+            val isComposeInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    (etComposeInput?.hasFocus() == true && (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT))
+            if (isComposeInputKey) {
+                if (etComposeInput?.hasFocus() != true) {
+                    etComposeInput?.requestFocus()
+                }
+                if (composeInputEngine?.handleKeyEvent(keyCode, event) == true) {
+                    return true
+                }
             }
         }
 
