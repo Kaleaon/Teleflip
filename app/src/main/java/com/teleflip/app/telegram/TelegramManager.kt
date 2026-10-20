@@ -4212,6 +4212,24 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
         tdClient?.send(TdApi.LogOut(), this)
     }
 
+    fun close() {
+        val client: Client?
+        synchronized(clientLock) {
+            reconnectPending = false
+            client = tdClient
+            if (client == null || isClosingClient) return
+            isClosingClient = true
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "Closing TDLib client gracefully...")
+                client.send(TdApi.Close(), this@TelegramManager)
+            } catch (e: Throwable) {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "Error during native close: ${e.message}")
+            }
+        }
+    }
+
     override fun onResult(obj: TdApi.Object?) {
         if (obj == null) return
 
@@ -4336,7 +4354,7 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                     is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = err.message)
                     is AuthState.WaitPasswordRecoveryCode -> _authState.value = curr.copy(errorMessage = err.message)
                     else -> {
-                        if (_authState.value !is AuthState.Ready) {
+                        if (_authState.value !is AuthState.Ready && _authState.value !is AuthState.Initial && _authState.value !is AuthState.WaitParameters) {
                             _authState.value = AuthState.WaitPhoneNumber(errorMessage = err.message)
                         }
                     }
@@ -4355,7 +4373,15 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                     _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Please configure your Telegram API ID & Hash in Settings (Config)")
                     return
                 }
-                val dbDir = File(context.filesDir, "tdlib_${this@TelegramManager.apiId}").absolutePath
+                val targetDbDir = File(context.filesDir, "tdlib_${this@TelegramManager.apiId}")
+                val legacyDbDir = File(context.filesDir, "tdlib")
+                if (!targetDbDir.exists() && legacyDbDir.exists() && legacyDbDir.isDirectory) {
+                    legacyDbDir.renameTo(targetDbDir)
+                }
+                if (!targetDbDir.exists()) {
+                    targetDbDir.mkdirs()
+                }
+                val dbDir = targetDbDir.absolutePath
                 val filesDir = com.teleflip.app.storage.StorageManager.getFilesDirectory(context).absolutePath
                 val params =
                     TdApi.SetTdlibParameters().apply {
@@ -4401,6 +4427,29 @@ class TelegramManager(paramContext: Context) : Client.ResultHandler {
                 loadCurrentUser()
                 loadChatFolders()
                 loadScopeNotificationSettings()
+            }
+            TdApi.AuthorizationStateClosing.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib is closing gracefully...")
+            }
+            TdApi.AuthorizationStateLoggingOut.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib is logging out...")
+                _authState.value = AuthState.Initial
+            }
+            TdApi.AuthorizationStateWaitRegistration.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "TDLib requires registration (new user)")
+                _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Registration required - please sign up with official Telegram first.")
+            }
+            TdApi.AuthorizationStateWaitEmailAddress.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "TDLib requires email address")
+                _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Email verification required. Please log in on another device first.")
+            }
+            TdApi.AuthorizationStateWaitEmailCode.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "TDLib requires email code")
+                _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Email verification code required.")
+            }
+            TdApi.AuthorizationStateWaitPremiumPurchase.CONSTRUCTOR -> {
+                com.teleflip.app.report.AdbReporter.reportWarning(tag, "TDLib requires premium purchase")
+                _authState.value = AuthState.WaitPhoneNumber(errorMessage = "Premium subscription required.")
             }
             TdApi.AuthorizationStateClosed.CONSTRUCTOR -> {
                 com.teleflip.app.report.AdbReporter.reportInfo(tag, "AuthorizationStateClosed received. Previous client released.")

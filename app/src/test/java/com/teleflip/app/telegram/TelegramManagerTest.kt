@@ -209,4 +209,54 @@ class TelegramManagerTest {
         assertEquals("", result.first)
         assertFalse("Null fullType should safely evaluate isPremium to false", result.second)
     }
+
+    @Test
+    fun testTdErrorDoesNotForceLoginWhenInitialOrWaitParameters() {
+        val manager = TelegramManager(mockContext)
+        assertEquals(AuthState.Initial, manager.authState.value)
+
+        // Error during initial startup/parameter exchange must not force WaitPhoneNumber
+        manager.onResult(TdApi.Error(400, "Network timeout or transient init error"))
+        assertEquals(
+            "AuthState should remain Initial instead of forcing WaitPhoneNumber",
+            AuthState.Initial,
+            manager.authState.value,
+        )
+
+        manager.setAuthStateForTesting(AuthState.WaitParameters)
+        manager.onResult(TdApi.Error(500, "Database busy"))
+        assertEquals(
+            "AuthState should remain WaitParameters instead of forcing WaitPhoneNumber",
+            AuthState.WaitParameters,
+            manager.authState.value,
+        )
+    }
+
+    @Test
+    fun testAuthStateClosingAndLoggingOutTransitions() {
+        val manager = TelegramManager(mockContext)
+        manager.setAuthStateForTesting(AuthState.Ready)
+
+        manager.onResult(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateClosing()))
+        assertEquals("Ready state should be preserved during closing", AuthState.Ready, manager.authState.value)
+
+        manager.onResult(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateLoggingOut()))
+        assertEquals("Logging out should transition to Initial state", AuthState.Initial, manager.authState.value)
+    }
+
+    @Test
+    fun testAuthStateRegistrationAndEmailTransitions() {
+        val manager = TelegramManager(mockContext)
+
+        manager.onResult(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateWaitRegistration()))
+        assertTrue(manager.authState.value is AuthState.WaitPhoneNumber)
+        val regMsg = (manager.authState.value as AuthState.WaitPhoneNumber).errorMessage
+        assertTrue("Registration error message expected", regMsg?.contains("Registration required") == true)
+
+        manager.onResult(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateWaitEmailAddress()))
+        assertTrue(manager.authState.value is AuthState.WaitPhoneNumber)
+        val emailMsg = (manager.authState.value as AuthState.WaitPhoneNumber).errorMessage
+        assertTrue("Email verification message expected", emailMsg?.contains("Email verification") == true)
+    }
 }
+
