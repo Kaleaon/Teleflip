@@ -3,7 +3,6 @@ package com.teleflip.app.storage
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.Build
 import android.os.Environment
 import androidx.core.content.ContextCompat
 import java.io.File
@@ -53,6 +52,47 @@ object StorageManager {
     private const val BYTES_PER_MB = 1024L * 1024L
     private const val BYTES_PER_GB = 1024L * 1024L * 1024L
     const val SECONDS_PER_DAY = 86400
+    const val DEFAULT_CACHE_TTL_MS = 15_000L
+
+    private data class SdCardCache(
+        val directory: File?,
+        val isAvailable: Boolean,
+        val timestamp: Long,
+    )
+
+    @Volatile
+    private var sdCardCache: SdCardCache? = null
+
+    private var cacheTtlMs: Long = DEFAULT_CACHE_TTL_MS
+
+    internal var timeProvider: () -> Long = System::currentTimeMillis
+
+    private val discoveryCount = java.util.concurrent.atomic.AtomicInteger(0)
+
+    @Synchronized
+    fun invalidateCache() {
+        sdCardCache = null
+    }
+
+    fun isCacheValid(): Boolean {
+        val cache = sdCardCache ?: return false
+        val age = timeProvider() - cache.timestamp
+        return age in 0 until cacheTtlMs
+    }
+
+    @Synchronized
+    fun setCacheTtlMs(ttlMs: Long) {
+        require(ttlMs > 0) { "Cache TTL must be positive" }
+        cacheTtlMs = ttlMs
+    }
+
+    fun getCacheTtlMs(): Long = cacheTtlMs
+
+    fun getDiscoveryCount(): Int = discoveryCount.get()
+
+    fun resetDiscoveryCount() {
+        discoveryCount.set(0)
+    }
 
     fun formatStorageSize(bytes: Long): String {
         return if (bytes >= BYTES_PER_GB) {
@@ -119,15 +159,57 @@ object StorageManager {
         return options
     }
 
-    fun detectSdCardDirectory(context: Context): File? {
-        var resultDir: File? = null
-        val externalDirs = ContextCompat.getExternalFilesDirs(context, null)
-        for (i in 1 until externalDirs.size) {
-            val dir = externalDirs[i]
-            if (dir != null && dir.exists() && dir.canWrite()) {
-                resultDir = dir
-                break
+    fun detectSdCardDirectory(
+        context: Context,
+        forceRefresh: Boolean = false,
+    ): File? {
+        if (!forceRefresh) {
+            val cache = sdCardCache
+            if (cache != null) {
+                val age = timeProvider() - cache.timestamp
+                if (age in 0 until cacheTtlMs) {
+                    return cache.directory
+                }
             }
+        }
+        return refreshSdCardCache(context, forceRefresh).directory
+    }
+
+    private fun refreshSdCardCache(
+        context: Context,
+        forceRefresh: Boolean = false,
+    ): SdCardCache {
+        synchronized(this) {
+            if (!forceRefresh) {
+                val cache = sdCardCache
+                if (cache != null) {
+                    val age = timeProvider() - cache.timestamp
+                    if (age in 0 until cacheTtlMs) {
+                        return cache
+                    }
+                }
+            }
+            val dir = performSdCardDetection(context)
+            val available = dir != null && dir.exists() && dir.canWrite()
+            val newCache = SdCardCache(dir, available, timeProvider())
+            sdCardCache = newCache
+            discoveryCount.incrementAndGet()
+            return newCache
+        }
+    }
+
+    private fun performSdCardDetection(context: Context): File? {
+        var resultDir: File? = null
+        try {
+            val externalDirs = ContextCompat.getExternalFilesDirs(context, null)
+            for (i in 1 until externalDirs.size) {
+                val dir = externalDirs[i]
+                if (dir != null && dir.exists() && dir.canWrite()) {
+                    resultDir = dir
+                    break
+                }
+            }
+        } catch (_: Throwable) {
         }
         if (resultDir == null) {
             try {
@@ -151,9 +233,20 @@ object StorageManager {
         return resultDir
     }
 
-    fun isSdCardAvailable(context: Context): Boolean {
-        val sdDir = detectSdCardDirectory(context)
-        return sdDir != null && sdDir.exists() && sdDir.canWrite()
+    fun isSdCardAvailable(
+        context: Context,
+        forceRefresh: Boolean = false,
+    ): Boolean {
+        if (!forceRefresh) {
+            val cache = sdCardCache
+            if (cache != null) {
+                val age = timeProvider() - cache.timestamp
+                if (age in 0 until cacheTtlMs) {
+                    return cache.isAvailable
+                }
+            }
+        }
+        return refreshSdCardCache(context, forceRefresh).isAvailable
     }
 
     fun getSelectedStorageType(context: Context): StorageLocationType {
@@ -170,12 +263,14 @@ object StorageManager {
         context: Context,
         type: StorageLocationType,
     ): Boolean {
+        invalidateCache()
         if (type == StorageLocationType.SD_CARD && !isSdCardAvailable(context)) {
             return false
         }
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val value = if (type == StorageLocationType.SD_CARD) "sd_card" else "internal"
         prefs.edit().putString(PREF_STORAGE_LOCATION, value).apply()
+        invalidateCache()
         return true
     }
 
@@ -196,17 +291,31 @@ object StorageManager {
 
     fun getDownloadDirectory(context: Context): File {
         val currentType = getSelectedStorageType(context)
-        val target =
+        val baseDir =
             if (currentType == StorageLocationType.SD_CARD) {
-                val sd = detectSdCardDirectory(context)
-                if (sd != null) {
-                    File(sd, "TeleFlip_Downloads")
-                } else {
-                    File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TeleFlip")
-                }
+                detectSdCardDirectory(context) ?: context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
             } else {
-                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TeleFlip")
+                context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
             }
+        val target = File(baseDir, "TeleFlip_Downloads")
+        if (!target.exists()) {
+            target.mkdirs()
+        }
+        return target
+    }
+
+    fun getExportDirectory(
+        context: Context,
+        type: StorageLocationType? = null,
+    ): File {
+        val targetType = type ?: getSelectedStorageType(context)
+        val baseDir =
+            if (targetType == StorageLocationType.SD_CARD) {
+                detectSdCardDirectory(context) ?: context.getExternalFilesDir(null) ?: context.filesDir
+            } else {
+                context.getExternalFilesDir(null) ?: context.filesDir
+            }
+        val target = File(baseDir, "TeleFlip_Exports")
         if (!target.exists()) {
             target.mkdirs()
         }
@@ -241,19 +350,9 @@ object StorageManager {
 
     private fun isConnectedToWifi(context: Context): Boolean {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
-        val isWifi =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val caps = cm.activeNetwork?.let { cm.getNetworkCapabilities(it) }
-                caps != null &&
-                    (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
-            } else {
-                @Suppress("DEPRECATION")
-                val info = cm.activeNetworkInfo
-                @Suppress("DEPRECATION")
-                info != null && info.isConnected &&
-                    (info.type == ConnectivityManager.TYPE_WIFI || info.type == ConnectivityManager.TYPE_ETHERNET)
-            }
-        return isWifi
+        val caps = cm.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        return caps != null &&
+            (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
     }
 
     fun getKeepMediaDuration(context: Context): KeepMediaDuration {
