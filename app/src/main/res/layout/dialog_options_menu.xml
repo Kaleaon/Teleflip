@@ -28,4 +28,6 @@
         android:layout_height="wrap_content"
         android:maxHeight="320dp" />
 
+    <include layout="@layout/layout_softkeys" />
+
 </LinearLayout>

@@ -60,7 +60,6 @@ class MediaViewerDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_media_viewer)
-        setupDismissKeys()
 
         window?.setLayout(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -85,6 +84,8 @@ class MediaViewerDialog(
 
         val filePath = message.mediaFilePath
         val fileExists = !filePath.isNullOrBlank() && File(filePath).exists()
+
+        updateMediaViewerSoftkeys()
 
         when (message.mediaType) {
             MediaType.VIDEO, MediaType.ANIMATION -> {
@@ -284,6 +285,37 @@ class MediaViewerDialog(
         }
     }
 
+    internal fun updateMediaViewerSoftkeys() {
+        val isVideoMode = message.mediaType == MediaType.VIDEO || message.mediaType == MediaType.ANIMATION
+        if (isVideoMode) {
+            setupSoftkeys(
+                left = "Restart",
+                center = if (isVideoPlaying) "Pause" else "Play",
+                right = "Back",
+                onLeft = {
+                    vvVideo?.seekTo(0)
+                    vvVideo?.start()
+                    isVideoPlaying = true
+                    updateSpeedBadge()
+                    updateMediaViewerSoftkeys()
+                },
+                onCenter = {
+                    toggleVideoPlayback()
+                },
+                onRight = { dismiss() },
+            )
+        } else {
+            setupSoftkeys(
+                left = "Zoom",
+                center = "Zoom",
+                right = "Back",
+                onLeft = { cycleZoomIn() },
+                onCenter = { cycleZoomIn() },
+                onRight = { dismiss() },
+            )
+        }
+    }
+
     private fun toggleVideoPlayback() {
         val vv = vvVideo ?: return
         if (vv.isPlaying) {
@@ -299,6 +331,7 @@ class MediaViewerDialog(
             val playingDesc = context.getString(R.string.cd_video_state_playing)
             ViewCompat.setStateDescription(vv, playingDesc)
         }
+        updateMediaViewerSoftkeys()
     }
 
     private fun seekVideoBy(deltaMs: Int) {
@@ -325,11 +358,6 @@ class MediaViewerDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (isBackOrRightSoftKey(keyCode)) {
-            dismiss()
-            return true
-        }
-
         if (keyCode == KeyEvent.KEYCODE_1) {
             onSaveMedia(message)
             return true
@@ -338,19 +366,16 @@ class MediaViewerDialog(
         val isVideoMode = message.mediaType == MediaType.VIDEO || message.mediaType == MediaType.ANIMATION
         if (isVideoMode) {
             when {
-                SoftkeyUtils.isCenterKey(keyCode) -> {
-                    toggleVideoPlayback()
-                    return true
-                }
                 keyCode == KeyEvent.KEYCODE_3 -> {
                     cyclePlaybackSpeed()
                     return true
                 }
-                SoftkeyUtils.isSoftLeftKey(keyCode) || keyCode == KeyEvent.KEYCODE_0 -> {
+                keyCode == KeyEvent.KEYCODE_0 -> {
                     vvVideo?.seekTo(0)
                     vvVideo?.start()
                     isVideoPlaying = true
                     updateSpeedBadge()
+                    updateMediaViewerSoftkeys()
                     return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_4 -> {
@@ -364,7 +389,7 @@ class MediaViewerDialog(
             }
         } else {
             when {
-                SoftkeyUtils.isSoftLeftKey(keyCode) || SoftkeyUtils.isCenterKey(keyCode) || keyCode == KeyEvent.KEYCODE_2 -> {
+                keyCode == KeyEvent.KEYCODE_2 -> {
                     cycleZoomIn()
                     return true
                 }
