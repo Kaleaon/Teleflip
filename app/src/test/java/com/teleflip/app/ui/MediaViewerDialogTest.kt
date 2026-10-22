@@ -79,6 +79,17 @@ class MediaViewerDialogTest {
     }
 
     @Test
+    fun unlockedPaidVideoUsesKeypadVideoControls() {
+        val message = samplePhotoMessage.copy(mediaType = MediaType.PAID_MEDIA, mediaFilePath = null, isPaidMediaLocked = false, mediaMimeType = "video/mp4")
+        val dialog = MediaViewerDialog(context, message, {}, {})
+        dialog.show()
+        assertTrue(dialog.findViewById<TextView>(R.id.tv_viewer_controls_hint)!!.text.contains("Play/Pause"))
+        dialog.onKeyDown(KeyEvent.KEYCODE_3, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_3))
+        assertEquals(1.25f, dialog.playbackSpeed)
+        dialog.dismiss()
+    }
+
+    @Test
     fun panBy_returnsFalseWhenUnzoomed_andTrueWhenZoomedIn() {
         val dialog = MediaViewerDialog(context, samplePhotoMessage, {}, {})
         dialog.show()
@@ -411,5 +422,32 @@ class MediaViewerDialogTest {
 
         shadowOf(android.os.Looper.getMainLooper()).idle()
         // Should close cleanly without crashing or updating dismissed views
+    }
+
+    @Test
+    fun openViewerUsesDownloadedPathWithoutBeingReopened() {
+        val pending = samplePhotoMessage.copy(mediaFileId = 7, mediaFilePath = null)
+        val updates = kotlinx.coroutines.flow.MutableStateFlow(mapOf(100L to listOf(pending)))
+        var saved: MessageModel? = null
+        var downloadRequests = 0
+        val dialog = MediaViewerDialog(context, pending, { saved = it }, { downloadRequests++ }, updates)
+        dialog.show()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        updates.value = mapOf(100L to listOf(pending.copy(mediaFilePath = samplePhotoFile.absolutePath)))
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        dialog.onKeyDown(KeyEvent.KEYCODE_1, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_1))
+        assertEquals(samplePhotoFile.absolutePath, saved?.mediaFilePath)
+        assertEquals(1, downloadRequests)
+        dialog.dismiss()
+    }
+
+    @Test
+    fun webmStickerUsesVideoDownloadPath() {
+        val pending = samplePhotoMessage.copy(mediaType = MediaType.STICKER, mediaFileId = 7, mediaFilePath = null, stickerFormat = "webm")
+        val dialog = MediaViewerDialog(context, pending, {}, {})
+        dialog.show()
+        val status = dialog.findViewById<TextView>(R.id.tv_viewer_status)
+        assertTrue(status.text.toString().contains("video/GIF"))
+        dialog.dismiss()
     }
 }
