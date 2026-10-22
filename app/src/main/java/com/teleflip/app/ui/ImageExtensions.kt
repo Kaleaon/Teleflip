@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
+import coil.dispose
 import coil.load
 import coil.transform.CircleCropTransformation
 import java.io.File
@@ -77,6 +78,8 @@ fun ImageView.loadCircularAvatarOrFallback(
     fallbackTextView: TextView?,
 ) {
     if (path.isNullOrEmpty()) {
+        dispose()
+        setImageDrawable(null)
         visibility = View.GONE
         fallbackTextView?.visibility = View.VISIBLE
         fallbackTextView?.text = fallbackLetters ?: ""
@@ -85,6 +88,7 @@ fun ImageView.loadCircularAvatarOrFallback(
 
     try {
         val file = File(path)
+        visibility = View.VISIBLE
         load(file) {
             transformations(CircleCropTransformation())
             listener(
@@ -111,6 +115,8 @@ fun ImageView.loadCircularAvatarOrFallback(
  */
 fun ImageView.loadMediaFromFile(path: String?) {
     if (path.isNullOrEmpty()) {
+        dispose()
+        setImageDrawable(null)
         setImageDrawable(null)
         visibility = View.GONE
         return
@@ -118,6 +124,7 @@ fun ImageView.loadMediaFromFile(path: String?) {
 
     try {
         val file = File(path)
+        visibility = View.VISIBLE
         load(file) {
             listener(
                 onSuccess = { _, _ ->
