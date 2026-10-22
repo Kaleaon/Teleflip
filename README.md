@@ -4,11 +4,13 @@
 
 # TeleFlip 📱
 
-A native, lightweight, and full-featured Telegram client meticulously engineered for Android flip phones, feature phones, and physical keypad devices (Schok Classic, Cat S22 Flip, Kyocera DuraXV, Sonim XP3/XP5, Xiaomi Qin, and similar Android Go / AOSP devices).
+A native Telegram client designed for Android flip phones, feature phones, and physical keypad devices (Schok Classic, Cat S22 Flip, Kyocera DuraXV, Sonim XP3/XP5, Xiaomi Qin, and similar Android Go / AOSP devices).
 
 Built directly on official Telegram **TDLib** (Telegram Database Library) using Android NDK native binaries for maximum performance, minimal battery drain, and full MTProto protocol compliance.
 
 ---
+
+See [feature coverage and remaining work](docs/TELEGRAM_FEATURE_PARITY.md) and [SC3218 compatibility](docs/SC3218_COMPATIBILITY.md) for validation limits.
 
 ## ✨ Features
 
@@ -19,7 +21,7 @@ Built directly on official Telegram **TDLib** (Telegram Database Library) using 
   - `*` Key: Symbols & Emoji dialog with D-Pad grid selection.
   - `0` Key: Space insertion.
   - `1` Key: Fast punctuation cycling.
-- **Full Telegram Messaging Parity**:
+- **Telegram Messaging**:
   - **Native Reply Threading & In-Place Editing**: Quoted reply previews inside message bubbles, live reply/edit context banner above the compose box, and `TdApi.EditMessageText` support.
   - **Keypad Emoji Reactions**: React to any message using `1`–`8` numeric shortcuts (`👍`, `❤️`, `😂`, `🔥`, `🎉`, `🙏`, `😢`, `👀`).
   - **Pinned Chats & Pinned Messages**: Pin/unpin chats (`📌`) and jump directly to pinned messages inside any conversation.
@@ -34,7 +36,7 @@ Built directly on official Telegram **TDLib** (Telegram Database Library) using 
   - **Interactive Telegram Polls (`PollDialog`)**: Create anonymous or public multiple-choice polls using T9 input and vote or close polls with `1`–`9` keypad shortcuts.
   - **Group Members & Admin Management**: Inspect group member lists (`👑 Owner`, `🛡️ Admin`, `👤 Member`), promote/demote admins, or remove members.
   - **Forum Topic Threads**: Browse, filter, and create topic threads (`🧵`) in forum-enabled supergroups.
-  - **Bot Command Menu**: Trigger `/start`, `/help`, `/settings`, `/status`, and `/cancel` with a single keypress.
+  - **Bot Command Menu**: Browse the commands actually published by each bot, with numbered keypad shortcuts.
 - **Organization, Privacy & Closed-Flip Notifications**:
   - **Custom Chat Folders & Archived Chats**: Filter across `All`, `Direct`, `Groups`, `Channels`, `Bots`, `📁 Folders`, and `📦 Archive` tabs using `D-Pad Left/Right`.
   - **End-to-End Encrypted Secret Chats & Self-Destruct Timers**: Start `🔒 Secret Chats` (`TdApi.CreateNewSecretChat`) and configure message self-destruct timers (`Off`, `5s`, `15s`, `30s`, `1m`, `1h`).
