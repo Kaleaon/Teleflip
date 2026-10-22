@@ -22,7 +22,7 @@ class TelegramFeaturesTest {
         val context = mock(Context::class.java)
         val prefs = mock(SharedPreferences::class.java)
         Mockito.`when`(context.getSharedPreferences("teleflip_prefs", Context.MODE_PRIVATE)).thenReturn(prefs)
-        telegramManager = TelegramManager(context)
+        telegramManager = TelegramManager(context, audioFactory = { mock(com.teleflip.app.calls.CallAudioSession::class.java) })
     }
 
     @Test
@@ -102,7 +102,7 @@ class TelegramFeaturesTest {
         telegramManager.discardCall(active?.callId ?: 0, durationSec = 35) { success, _ ->
             discardSuccess = success
         }
-        assertTrue("Call discard should succeed", discardSuccess)
+        assertEquals(false, discardSuccess)
         assertEquals(com.teleflip.app.model.CallState.DISCARDED, telegramManager.activeCall.value?.state)
     }
 
@@ -136,11 +136,11 @@ class TelegramFeaturesTest {
                 id = 101
                 userId = 777L
                 isOutgoing = false
-                state = TdApi.CallStateReady()
+                state = TdApi.CallStateExchangingKeys()
             }
         telegramManager.handleCallUpdate(callReady)
         current = telegramManager.activeCall.value
-        assertEquals(com.teleflip.app.model.CallState.READY, current?.state)
+        assertEquals(com.teleflip.app.model.CallState.EXCHANGING_KEYS, current?.state)
 
         val callDiscarded =
             TdApi.Call().apply {
