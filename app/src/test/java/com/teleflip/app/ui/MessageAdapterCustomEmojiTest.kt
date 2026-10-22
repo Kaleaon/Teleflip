@@ -52,7 +52,7 @@ class MessageAdapterCustomEmojiTest {
             fetchedList = items
         }
         assertNotNull("Fetched custom emoji stickers should not be null", fetchedList)
-        assertTrue("Fetched list should contain fallback/default custom emoji stickers", fetchedList!!.isNotEmpty())
+        assertTrue("No client must not fabricate custom emoji files", fetchedList!!.isEmpty())
     }
 
     @Test
@@ -74,7 +74,7 @@ class MessageAdapterCustomEmojiTest {
         // Toggle custom emoji reaction
         telegramManager.toggleMessageReaction(1L, 101L, "custom_emoji_1001")
         var currentMsgs = telegramManager.messages.value[1L] ?: emptyList()
-        assertTrue("Message reactions should contain custom_emoji_1001", currentMsgs.first().reactions.contains("custom_emoji_1001"))
+        assertTrue("No client must not claim a reaction was accepted", currentMsgs.first().reactions.isEmpty())
 
         // Untoggle custom emoji reaction
         telegramManager.toggleMessageReaction(1L, 101L, "custom_emoji_1001")
