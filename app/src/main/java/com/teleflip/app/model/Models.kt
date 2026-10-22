@@ -61,6 +61,7 @@ data class ChatModel(
     val isForum: Boolean = false,
     val activeTopicId: Long = 0L,
     val activeTopicName: String = "",
+    val isMarkedUnread: Boolean = false,
 )
 
 enum class MessageStatus {
@@ -74,13 +75,18 @@ enum class MediaType {
     NONE,
     PHOTO,
     VOICE,
+    AUDIO,
     LOCATION,
     DOCUMENT,
     STICKER,
     VIDEO,
     ANIMATION,
     POLL,
+    PAID_MEDIA,
+    CONTACT,
 }
+
+data class MessageFormatting(val offset: Int, val length: Int, val kind: String, val url: String = "")
 
 data class MessageModel(
     val id: Long,
@@ -117,6 +123,12 @@ data class MessageModel(
     val messageThreadId: Long = 0L,
     val selfDestructSeconds: Int = 0,
     val transcript: String = "",
+    val starCount: Long = 0L,
+    val isPaidMediaLocked: Boolean = false,
+    val mediaMimeType: String = "",
+    val stickerFormat: String = "",
+    val hasBotButtons: Boolean = false,
+    val formatting: List<MessageFormatting> = emptyList(),
 )
 
 data class MessageSearchResult(
@@ -132,6 +144,7 @@ data class MessageSearchResult(
 enum class CallState {
     PENDING,
     EXCHANGING_KEYS,
+    CONNECTING,
     READY,
     HANGING_UP,
     DISCARDED,
@@ -147,6 +160,7 @@ data class ActiveCall(
     val durationSec: Int = 0,
     val isMuted: Boolean = false,
     val isSpeakerOn: Boolean = false,
+    val verificationEmojis: List<String> = emptyList(),
 )
 
 data class ChatProfile(
