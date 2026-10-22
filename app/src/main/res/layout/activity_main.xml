@@ -12,6 +12,9 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
+    <!-- Active Call Softkey Bar Overlay -->
+    <include layout="@layout/view_active_call_overlay" />
+
     <!-- Thin Divider -->
     <View
         android:layout_width="match_parent"
