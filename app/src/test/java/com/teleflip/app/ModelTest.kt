@@ -125,7 +125,7 @@ class ModelTest {
     fun testEnumValues() {
         assertEquals(4, ChatType.values().size)
         assertEquals(4, MessageStatus.values().size)
-        assertEquals(9, MediaType.values().size)
+        assertEquals(12, MediaType.values().size)
     }
 
     @Test

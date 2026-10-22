@@ -102,9 +102,9 @@ class ChatListAdapter(
                 tvLastMsg.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             }
 
-            if (chat.unreadCount > 0) {
+            if (chat.unreadCount > 0 || chat.isMarkedUnread) {
                 tvUnread.visibility = View.VISIBLE
-                tvUnread.text = chat.unreadCount.toString()
+                tvUnread.text = if (chat.unreadCount > 0) chat.unreadCount.toString() else "•"
             } else {
                 tvUnread.visibility = View.GONE
             }
