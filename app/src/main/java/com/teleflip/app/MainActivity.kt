@@ -2507,9 +2507,18 @@ class MainActivity : AppCompatActivity() {
         PollDialog(
             context = this,
             timeoutMs = telegramManager.keypadTimeoutMs,
-            onCreatePoll = { question, pollOptions, isAnonymous ->
-                telegramManager.sendPoll(chat.id, question, pollOptions, isAnonymous)
-                showToast("Poll published!")
+            onCreatePoll = { question, pollOptions, isAnonymous, isQuiz, correctIndex, explanation, allowsMultipleAnswers ->
+                telegramManager.sendPoll(
+                    chatId = chat.id,
+                    question = question,
+                    options = pollOptions,
+                    isAnonymous = isAnonymous,
+                    isQuiz = isQuiz,
+                    correctOptionIndex = correctIndex,
+                    explanation = explanation,
+                    allowsMultipleAnswers = allowsMultipleAnswers,
+                )
+                showToast(if (isQuiz) "Quiz published!" else "Poll published!")
             },
         ).show()
     }
