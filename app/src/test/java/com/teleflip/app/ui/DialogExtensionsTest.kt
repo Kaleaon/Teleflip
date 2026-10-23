@@ -5,6 +5,7 @@ import android.app.Dialog
 import android.view.KeyEvent
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ScrollView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -100,6 +101,17 @@ class DialogExtensionsTest {
 
         assertTrue(handled)
         assertFalse(dialog.isShowing)
+    }
+
+    @Test
+    fun diagnosticsDialog_focusesScrollViewOnShow() {
+        val dialog = DiagnosticsDialog(context)
+        dialog.show()
+
+        assertTrue(dialog.isShowing)
+        val scrollView = dialog.findViewById<ScrollView>(R.id.scroll_diag_logs)
+        assertNotNull(scrollView)
+        assertTrue(scrollView.isFocused)
     }
 
     @Test
