@@ -33,6 +33,16 @@ class MessageAdapter(
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     companion object {
         const val PAYLOAD_PLAYBACK_STATE = "PAYLOAD_PLAYBACK_STATE"
+        private val REDUNDANT_MEDIA_TAGS =
+            setOf(
+                "📷 [Photo]",
+                "📹 [Video]",
+                "🎞️ [GIF]",
+                "🎤 [Voice Note]",
+                "🎵 [Audio]",
+                "📍 [Location]",
+                "📊 [Poll]",
+            )
     }
 
     private var playingMessageId: Long? = null
@@ -40,6 +50,13 @@ class MessageAdapter(
 
     override fun submitList(newItems: List<MessageModel>?) {
         super.submitList(if (newItems != null) ArrayList(newItems) else null)
+    }
+
+    override fun submitList(
+        newItems: List<MessageModel>?,
+        commitCallback: Runnable?,
+    ) {
+        super.submitList(if (newItems != null) ArrayList(newItems) else null, commitCallback)
     }
 
     fun setPlayingMessageId(
@@ -209,7 +226,9 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, stateDesc)
                     tvMedia.contentDescription =
                         ContentDescriptionFormatter.getVoiceMessageDescription(
-                            context, isPlaying, message.durationSeconds,
+                            context,
+                            isPlaying,
+                            message.durationSeconds,
                         )
                 }
                 MediaType.LOCATION -> {
@@ -351,8 +370,21 @@ class MessageAdapter(
                 tvText.text = pollBody
                 tvText.visibility = View.VISIBLE
             } else {
-                tvText.text = MessageTextFormatter.format(message)
-                tvText.visibility = if (message.text.isNotBlank()) View.VISIBLE else View.GONE
+                val trimmedText = message.text.trim()
+                val isRedundantMediaText =
+                    message.mediaType != MediaType.NONE &&
+                        (
+                            trimmedText in REDUNDANT_MEDIA_TAGS ||
+                                (message.mediaType == MediaType.STICKER && trimmedText.startsWith("🎨 [Sticker")) ||
+                                (message.mediaType == MediaType.DOCUMENT && trimmedText == "📄 ${message.mediaCaption}".trim())
+                        )
+                if (isRedundantMediaText) {
+                    tvText.text = ""
+                    tvText.visibility = View.GONE
+                } else {
+                    tvText.text = MessageTextFormatter.format(message)
+                    tvText.visibility = if (message.text.isNotBlank()) View.VISIBLE else View.GONE
+                }
             }
 
             if (message.mediaType == MediaType.VOICE) {
@@ -360,6 +392,8 @@ class MessageAdapter(
                 btnTranscribe?.setOnClickListener {
                     onTranscribeClick?.invoke(message)
                 }
+                btnTranscribe?.isFocusable = false
+                btnTranscribe?.isFocusableInTouchMode = false
                 if (message.transcript.isNotBlank()) {
                     tvTranscript?.visibility = View.VISIBLE
                     tvTranscript?.text = "💬 ${message.transcript}"

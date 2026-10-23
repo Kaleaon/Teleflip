@@ -2418,17 +2418,75 @@ class TelegramManager(
         }
     }
 
+    private val requestedReplyPreviews = java.util.concurrent.ConcurrentHashMap.newKeySet<Pair<Long, Long>>()
+
+    private fun resolveReplyPreviewAsync(
+        chatId: Long,
+        replyToId: Long,
+    ) {
+        if (replyToId == 0L || !requestedReplyPreviews.add(chatId to replyToId)) return
+        tdClient?.send(TdApi.GetMessage(chatId, replyToId)) { result ->
+            val msg = result as? TdApi.Message ?: return@send
+            val sender = getSenderDisplayName(msg)
+            val snippet = extractMessageText(msg.content).replace('\n', ' ').trim().take(40)
+            val preview = if (snippet.isNotBlank()) "$sender: $snippet" else sender
+            if (preview.isNotBlank()) {
+                _messages.update { current ->
+                    val existing = current[chatId] ?: return@update current
+                    if (existing.none { it.replyToMessageId == replyToId && it.replyToPreview.isBlank() }) {
+                        current
+                    } else {
+                        current + (
+                            chatId to
+                                existing.map { m ->
+                                    if (m.replyToMessageId == replyToId && m.replyToPreview.isBlank()) {
+                                        m.copy(replyToPreview = preview)
+                                    } else {
+                                        m
+                                    }
+                                }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private fun appendMessage(
         chatId: Long,
         message: MessageModel,
     ) {
+        var needAsyncReplyLookup = false
         _messages.update { current ->
             val messages = current[chatId].orEmpty()
             val index = messages.indexOfFirst { it.id == message.id }
             val updated = messages.toMutableList()
-            val resolved = message.copy(mediaFilePath = downloadedFilePaths[message.mediaFileId] ?: message.mediaFilePath)
+            val replyTarget =
+                if (message.replyToMessageId != 0L && message.replyToPreview.isBlank()) {
+                    messages.find { it.id == message.replyToMessageId }
+                } else {
+                    null
+                }
+            val resolvedPreview =
+                if (replyTarget != null) {
+                    val snippet = replyTarget.text.ifBlank { replyTarget.mediaCaption }.replace('\n', ' ').trim().take(40)
+                    "${replyTarget.senderName}: $snippet"
+                } else {
+                    if (message.replyToMessageId != 0L && message.replyToPreview.isBlank()) {
+                        needAsyncReplyLookup = true
+                    }
+                    message.replyToPreview
+                }
+            val resolved =
+                message.copy(
+                    mediaFilePath = downloadedFilePaths[message.mediaFileId] ?: message.mediaFilePath,
+                    replyToPreview = resolvedPreview,
+                )
             if (index < 0) updated.add(resolved) else updated[index] = resolved
             current + (chatId to updated)
+        }
+        if (needAsyncReplyLookup) {
+            resolveReplyPreviewAsync(chatId, message.replyToMessageId)
         }
 
         synchronized(chatMap) {
@@ -2448,7 +2506,9 @@ class TelegramManager(
     }
 
     fun loadChatFolders() {
-        _chatFolders.value.forEach { folder -> tdClient?.send(TdApi.GetChatFolder(folder.id), this) }
+        _chatFolders.value.forEach { folder ->
+            if (folder.id > 0) tdClient?.send(TdApi.GetChatFolder(folder.id), this)
+        }
     }
 
     private fun handleUpdateChatFolders(chatFolderInfos: Array<TdApi.ChatFolderInfo>?) {
@@ -2462,7 +2522,7 @@ class TelegramManager(
                     currentFolders.add(ChatFolderModel(id = info.id, title = folderName, includedChatIds = emptySet()))
                 }
             }
-            tdClient?.send(TdApi.GetChatFolder(info.id), this)
+            if (info.id > 0) tdClient?.send(TdApi.GetChatFolder(info.id), this)
         }
         _chatFolders.value = currentFolders
     }
@@ -2556,6 +2616,8 @@ class TelegramManager(
         }
     }
 
+    private val pendingSenderUserIds = java.util.concurrent.ConcurrentHashMap<Long, MutableSet<Pair<Long, Long>>>()
+
     fun getSenderDisplayName(message: TdApi.Message): String {
         if (message.isOutgoing) return "You"
         when (val sender = message.senderId) {
@@ -2564,6 +2626,13 @@ class TelegramManager(
                 if (user != null) {
                     val fullName = "${user.firstName} ${user.lastName.orEmpty()}".trim()
                     return if (fullName.isNotBlank()) fullName else "Contact"
+                } else if (sender.userId > 0L) {
+                    if (message.chatId != 0L && message.id != 0L) {
+                        pendingSenderUserIds.computeIfAbsent(sender.userId) {
+                            java.util.concurrent.ConcurrentHashMap.newKeySet()
+                        }.add(message.chatId to message.id)
+                    }
+                    tdClient?.send(TdApi.GetUser(sender.userId), this)
                 }
             }
             is TdApi.MessageSenderChat -> {
@@ -2863,7 +2932,7 @@ class TelegramManager(
                     val text = extractMessageText(msg.content)
                     val time = formatTime(msg.date.toLong() * 1000)
                     val chatTitle = chatTitleMap[cId] ?: "Chat #$cId"
-                    val sender = if (msg.isOutgoing) "You" else "Contact"
+                    val sender = getSenderDisplayName(msg)
 
                     list.add(
                         MessageSearchResult(
@@ -2956,7 +3025,7 @@ class TelegramManager(
                 for (msg in obj.messages) {
                     val text = extractMessageText(msg.content)
                     val time = formatTime(msg.date.toLong() * 1000)
-                    val sender = if (msg.isOutgoing) "You" else "Contact"
+                    val sender = getSenderDisplayName(msg)
                     list.add(
                         MessageSearchResult(
                             messageId = msg.id,
@@ -4354,16 +4423,21 @@ class TelegramManager(
                 val update = obj as TdApi.UpdateChatReadOutbox
                 lastReadOutboxIds[update.chatId] = update.lastReadOutboxMessageId
                 _messages.update { current ->
-                    current + (
-                        update.chatId to
-                            current[update.chatId].orEmpty().map { message ->
-                                if (message.isOutbound && message.status == MessageStatus.SENT && message.id <= update.lastReadOutboxMessageId) {
-                                    message.copy(status = MessageStatus.READ)
-                                } else {
-                                    message
+                    val existing = current[update.chatId] ?: return@update current
+                    if (existing.none { it.isOutbound && it.status == MessageStatus.SENT && it.id <= update.lastReadOutboxMessageId }) {
+                        current
+                    } else {
+                        current + (
+                            update.chatId to
+                                existing.map { message ->
+                                    if (message.isOutbound && message.status == MessageStatus.SENT && message.id <= update.lastReadOutboxMessageId) {
+                                        message.copy(status = MessageStatus.READ)
+                                    } else {
+                                        message
+                                    }
                                 }
-                            }
-                    )
+                        )
+                    }
                 }
             }
             TdApi.UpdateMessageSendSucceeded.CONSTRUCTOR -> {
@@ -4589,6 +4663,27 @@ class TelegramManager(
                 }
             }
         }
+        val fullName = "${user.firstName} ${user.lastName.orEmpty()}".trim()
+        if (fullName.isNotBlank()) {
+            val pendingRefs = pendingSenderUserIds.remove(user.id)
+            if (!pendingRefs.isNullOrEmpty()) {
+                _messages.update { current ->
+                    current.mapValues { (cId, msgList) ->
+                        if (pendingRefs.any { it.first == cId }) {
+                            msgList.map { m ->
+                                if (pendingRefs.contains(cId to m.id) && !m.isOutbound) {
+                                    m.copy(senderName = fullName)
+                                } else {
+                                    m
+                                }
+                            }
+                        } else {
+                            msgList
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private val pendingChats = mutableMapOf<Long, ChatModel>()
@@ -4681,8 +4776,10 @@ class TelegramManager(
         var avatarFileId = 0
         if (small != null) {
             avatarFileId = small.id
-            if (small.local.isDownloadingCompleted && small.local.path.isNotBlank()) {
-                avatarPath = small.local.path
+            val resolvedAvatar =
+                localFilePath(small) ?: downloadedFilePaths[small.id]?.takeIf { File(it).isFile }
+            if (resolvedAvatar != null) {
+                avatarPath = resolvedAvatar
             } else if (small.local.canBeDownloaded && !small.local.isDownloadingActive) {
                 tdClient?.send(TdApi.DownloadFile(small.id, 32, 0, 0, false), this)
             }
@@ -4936,6 +5033,31 @@ class TelegramManager(
             PollOption(option.text.text, option.voterCount, option.votePercentage, option.isChosen)
         }
 
+    private fun extractForwardedFrom(forwardInfo: TdApi.MessageForwardInfo?): String {
+        val origin = forwardInfo?.origin ?: return ""
+        return when (origin) {
+            is TdApi.MessageOriginUser -> {
+                val user = userCache[origin.senderUserId]
+                if (user != null) {
+                    "${user.firstName} ${user.lastName.orEmpty()}".trim().ifBlank { "User" }
+                } else {
+                    if (origin.senderUserId > 0L) tdClient?.send(TdApi.GetUser(origin.senderUserId), this)
+                    "User"
+                }
+            }
+            is TdApi.MessageOriginHiddenUser -> origin.senderName.ifBlank { "Hidden User" }
+            is TdApi.MessageOriginChat -> {
+                _chats.value.find { it.id == origin.senderChatId }?.title
+                    ?: origin.authorSignature.ifBlank { "Chat" }
+            }
+            is TdApi.MessageOriginChannel -> {
+                _chats.value.find { it.id == origin.chatId }?.title
+                    ?: origin.authorSignature.ifBlank { "Channel" }
+            }
+            else -> ""
+        }
+    }
+
     private fun toMessageModel(msg: TdApi.Message): MessageModel {
         (msg.content as? TdApi.MessagePoll)?.poll?.let { pollMessageIds[msg.chatId to msg.id] = it.id }
         val mediaType = extractMediaType(msg.content)
@@ -4945,7 +5067,7 @@ class TelegramManager(
             MessageModel(
                 id = msg.id,
                 chatId = msg.chatId,
-                senderName = if (msg.isOutgoing) "You" else "Contact",
+                senderName = getSenderDisplayName(msg),
                 text = extractMessageText(msg.content),
                 time = formatTime(msg.date.toLong() * 1000),
                 isOutbound = msg.isOutgoing,
@@ -4973,6 +5095,7 @@ class TelegramManager(
                         is TdApi.MessageVoiceNote -> content.voiceNote?.duration ?: 0
                         is TdApi.MessageAudio -> content.audio?.duration ?: 0
                         is TdApi.MessageVideo -> content.video?.duration ?: 0
+                        is TdApi.MessageVideoNote -> content.videoNote?.duration ?: 0
                         is TdApi.MessageAnimation -> content.animation?.duration ?: 0
                         else -> 0
                     },
@@ -4992,6 +5115,7 @@ class TelegramManager(
                     (msg.replyTo as? TdApi.MessageReplyToMessage)?.let { reply ->
                         reply.quote?.text?.text ?: extractMessageText(reply.content)
                     }.orEmpty(),
+                forwardedFrom = extractForwardedFrom(msg.forwardInfo),
                 selfDestructSeconds = (msg.selfDestructType as? TdApi.MessageSelfDestructTypeTimer)?.selfDestructTime ?: 0,
                 isEdited = msg.editDate > 0,
                 isPinned = msg.isPinned,
@@ -5069,10 +5193,34 @@ class TelegramManager(
         if (msgs.isEmpty()) return
         val chatId = msgs.first().chatId
         val list = msgs.reversed().filterNot { it.schedulingState != null || replacedMessageIds.containsKey(it.chatId to it.id) }.map { toMessageModel(it) }
+        val unresolvedReplyIds = mutableSetOf<Long>()
         _messages.update { current ->
             val existing = current[chatId].orEmpty()
             // Live updates already in memory take precedence over a history response.
-            current + (chatId to (existing + list).distinctBy { it.id }.map { it.copy(mediaFilePath = downloadedFilePaths[it.mediaFileId] ?: it.mediaFilePath) }.sortedBy { it.id })
+            val rawMerged = (existing + list).distinctBy { it.id }.sortedBy { it.id }
+            val byId = rawMerged.associateBy { it.id }
+            val merged =
+                rawMerged.map { item ->
+                    val resolvedPath = downloadedFilePaths[item.mediaFileId] ?: item.mediaFilePath
+                    val resolvedPreview =
+                        if (item.replyToMessageId != 0L && item.replyToPreview.isBlank()) {
+                            val target = byId[item.replyToMessageId]
+                            if (target != null) {
+                                val snippet = target.text.ifBlank { target.mediaCaption }.replace('\n', ' ').trim().take(40)
+                                "${target.senderName}: $snippet"
+                            } else {
+                                unresolvedReplyIds.add(item.replyToMessageId)
+                                item.replyToPreview
+                            }
+                        } else {
+                            item.replyToPreview
+                        }
+                    item.copy(mediaFilePath = resolvedPath, replyToPreview = resolvedPreview)
+                }
+            if (merged == existing) current else current + (chatId to merged)
+        }
+        unresolvedReplyIds.forEach { replyId ->
+            resolveReplyPreviewAsync(chatId, replyId)
         }
     }
 
@@ -5102,7 +5250,18 @@ class TelegramManager(
             _chats.value = synchronized(chatMap) { chatMap.values.toList() }
         }
         _messages.update { current ->
-            current.mapValues { (_, messages) -> messages.map { if (it.mediaFileId == file.id) it.copy(mediaFilePath = path) else it } }
+            val hasMatch = current.values.any { list -> list.any { it.mediaFileId == file.id && it.mediaFilePath != path } }
+            if (!hasMatch) {
+                current
+            } else {
+                current.mapValues { (_, messages) ->
+                    if (messages.none { it.mediaFileId == file.id && it.mediaFilePath != path }) {
+                        messages
+                    } else {
+                        messages.map { if (it.mediaFileId == file.id) it.copy(mediaFilePath = path) else it }
+                    }
+                }
+            }
         }
         if (path != null && com.teleflip.app.storage.StorageManager.isSaveToDownloadsEnabled(context)) {
             scope.launch(Dispatchers.IO) {
@@ -5252,6 +5411,10 @@ class TelegramManager(
                 val video = (content as TdApi.MessageVideo).video
                 resolveFile(video.video)
             }
+            TdApi.MessageVideoNote.CONSTRUCTOR -> {
+                val videoNote = (content as TdApi.MessageVideoNote).videoNote
+                resolveFile(videoNote.video)
+            }
             TdApi.MessageDocument.CONSTRUCTOR -> {
                 val doc = (content as TdApi.MessageDocument).document
                 resolveFile(doc.document)
@@ -5288,7 +5451,9 @@ class TelegramManager(
         if (f == null) return Pair(0, null)
         val path = localFilePath(f) ?: downloadedFilePaths[f.id]?.takeIf { File(it).isFile }
         if (path != null) return Pair(f.id, path)
+        val fileBytes = if (f.expectedSize > 0) f.expectedSize else f.size
         if (f.local?.canBeDownloaded == true && !f.local.isDownloadingActive &&
+            fileBytes <= 15L * 1024L * 1024L &&
             com.teleflip.app.storage.StorageManager.shouldAutoDownloadMedia(context)
         ) {
             requestFileDownload(f.id)
@@ -5320,7 +5485,7 @@ class TelegramManager(
             TdApi.MessagePhoto.CONSTRUCTOR -> MediaType.PHOTO
             TdApi.MessageDocument.CONSTRUCTOR -> MediaType.DOCUMENT
             TdApi.MessageSticker.CONSTRUCTOR -> MediaType.STICKER
-            TdApi.MessageVideo.CONSTRUCTOR -> MediaType.VIDEO
+            TdApi.MessageVideo.CONSTRUCTOR, TdApi.MessageVideoNote.CONSTRUCTOR -> MediaType.VIDEO
             TdApi.MessageAnimation.CONSTRUCTOR -> MediaType.ANIMATION
             TdApi.MessagePoll.CONSTRUCTOR -> MediaType.POLL
             TdApi.MessagePaidMedia.CONSTRUCTOR -> MediaType.PAID_MEDIA
@@ -5338,6 +5503,7 @@ class TelegramManager(
             TdApi.MessageLocation.CONSTRUCTOR -> "📍 [Location]"
             TdApi.MessageAudio.CONSTRUCTOR -> "🎵 [Audio]"
             TdApi.MessageVideo.CONSTRUCTOR -> "📹 [Video] " + (content as TdApi.MessageVideo).caption.text
+            TdApi.MessageVideoNote.CONSTRUCTOR -> "📹 [Video]"
             TdApi.MessageAnimation.CONSTRUCTOR -> "🎞️ [GIF] " + (content as TdApi.MessageAnimation).caption.text
             TdApi.MessagePoll.CONSTRUCTOR -> "📊 [Poll]"
             TdApi.MessageDocument.CONSTRUCTOR -> "📄 " + (content as TdApi.MessageDocument).document.fileName
@@ -5353,6 +5519,33 @@ class TelegramManager(
                 val base = "⭐ ${paid.starCount} Stars • $lockTag"
                 if (cap.isNotBlank()) "$base • $cap" else base
             }
+            TdApi.MessageCall.CONSTRUCTOR -> {
+                val call = content as TdApi.MessageCall
+                val icon = if (call.isVideo) "📹" else "📞"
+                val dur = if (call.duration > 0) " (${call.duration}s)" else ""
+                "$icon [Call$dur]"
+            }
+            TdApi.MessagePinMessage.CONSTRUCTOR -> "📌 [Pinned a message]"
+            TdApi.MessageChatAddMembers.CONSTRUCTOR -> "👥 [Added member(s)]"
+            TdApi.MessageChatJoinByLink.CONSTRUCTOR -> "👥 [Joined via invite link]"
+            TdApi.MessageChatJoinByRequest.CONSTRUCTOR -> "👥 [Joined the chat]"
+            TdApi.MessageChatDeleteMember.CONSTRUCTOR -> "👤 [Left the chat]"
+            TdApi.MessageChatChangeTitle.CONSTRUCTOR -> "✏️ [Changed title to \"${(content as TdApi.MessageChatChangeTitle).title}\"]"
+            TdApi.MessageChatChangePhoto.CONSTRUCTOR -> "🖼️ [Changed chat photo]"
+            TdApi.MessageChatDeletePhoto.CONSTRUCTOR -> "🖼️ [Removed chat photo]"
+            TdApi.MessageScreenshotTaken.CONSTRUCTOR -> "📸 [Took a screenshot]"
+            TdApi.MessageAnimatedEmoji.CONSTRUCTOR -> (content as TdApi.MessageAnimatedEmoji).emoji.ifBlank { "✨ [Emoji]" }
+            TdApi.MessageDice.CONSTRUCTOR -> {
+                val dice = content as TdApi.MessageDice
+                val valStr = if (dice.value > 0) " (${dice.value})" else ""
+                "${dice.emoji.ifBlank { "🎲" }}$valStr"
+            }
+            TdApi.MessageForumTopicCreated.CONSTRUCTOR -> "🧵 [Topic created: ${(content as TdApi.MessageForumTopicCreated).name}]"
+            TdApi.MessageForumTopicEdited.CONSTRUCTOR -> "🧵 [Topic edited]"
+            TdApi.MessageForumTopicIsClosedToggled.CONSTRUCTOR -> "🧵 [Topic status updated]"
+            TdApi.MessageBasicGroupChatCreate.CONSTRUCTOR -> "👥 [Group created]"
+            TdApi.MessageSupergroupChatCreate.CONSTRUCTOR -> "👥 [Chat created]"
+            TdApi.MessageCustomServiceAction.CONSTRUCTOR -> (content as TdApi.MessageCustomServiceAction).text.ifBlank { "ℹ️ [Service message]" }
             else -> "[Message]"
         }
     }
