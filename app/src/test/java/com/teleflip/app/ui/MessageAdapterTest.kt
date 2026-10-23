@@ -172,4 +172,54 @@ class MessageAdapterTest {
         // Text remains unaffected
         assertEquals("Hello world", tvText.text.toString())
     }
+
+    @Test
+    fun testMediaCaptionRenderingAndEditedBadge() {
+        val parent = FrameLayout(context)
+
+        val photoMsg =
+            MessageModel(
+                id = 201L,
+                chatId = 1L,
+                senderName = "You",
+                text = "📷 [Photo] Updated photo caption",
+                time = "10:10 AM",
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.PHOTO,
+                mediaCaption = "Updated photo caption",
+                isEdited = true,
+            )
+        val viewHolderPhoto = adapter.onCreateViewHolder(parent, 0)
+        adapter.submitList(listOf(photoMsg)) {
+            adapter.onBindViewHolder(viewHolderPhoto, 0)
+
+            val tvMediaPhoto = viewHolderPhoto.itemView.findViewById<TextView>(R.id.tv_media_indicator)
+            val tvTimePhoto = viewHolderPhoto.itemView.findViewById<TextView>(R.id.tv_message_time)
+            assertEquals("📷 Updated photo caption", tvMediaPhoto.text.toString())
+            assertEquals("edited 10:10 AM", tvTimePhoto.text.toString())
+        }
+
+        val videoMsg =
+            MessageModel(
+                id = 202L,
+                chatId = 1L,
+                senderName = "You",
+                text = "📹 [Video]",
+                time = "10:11 AM",
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.VIDEO,
+                mediaCaption = "Sunset clip",
+                durationSeconds = 12,
+                isEdited = true,
+            )
+        val viewHolderVideo = adapter.onCreateViewHolder(parent, 0)
+        adapter.submitList(listOf(videoMsg)) {
+            adapter.onBindViewHolder(viewHolderVideo, 0)
+
+            val tvMediaVideo = viewHolderVideo.itemView.findViewById<TextView>(R.id.tv_media_indicator)
+            assertEquals("📹 [Video (12s)] Sunset clip", tvMediaVideo.text.toString())
+        }
+    }
 }
