@@ -13,6 +13,7 @@ import com.teleflip.app.R
 import com.teleflip.app.model.ChatModel
 
 class ChatListAdapter(
+    private val onChatFocused: ((ChatModel) -> Unit)? = null,
     private val onChatSelected: (ChatModel) -> Unit,
 ) : ListAdapter<ChatModel, ChatListAdapter.ChatViewHolder>(ChatDiffCallback()) {
     private var attachedRecyclerView: RecyclerView? = null
@@ -87,12 +88,12 @@ class ChatListAdapter(
         )
     }
 
-    override fun submitList(newItems: List<ChatModel>?) {
-        submitList(newItems, null)
-    }
-
     fun getItemAt(position: Int): ChatModel? {
         return if (position in 0 until currentList.size) getItem(position) else null
+    }
+
+    fun getPositionForChatId(chatId: Long): Int {
+        return currentList.indexOfFirst { it.id == chatId }
     }
 
     override fun onCreateViewHolder(
@@ -174,11 +175,17 @@ class ChatListAdapter(
                 tvLastMsg.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             }
 
-            if (chat.unreadCount > 0) {
+            if (chat.unreadCount > 0 || chat.isMarkedUnread) {
                 tvUnread.visibility = View.VISIBLE
-                tvUnread.text = chat.unreadCount.toString()
+                tvUnread.text = if (chat.unreadCount > 0) chat.unreadCount.toString() else "•"
             } else {
                 tvUnread.visibility = View.GONE
+            }
+
+            itemView.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    onChatFocused?.invoke(chat)
+                }
             }
 
             itemView.setOnClickListener {

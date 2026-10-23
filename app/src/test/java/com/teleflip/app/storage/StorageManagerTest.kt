@@ -139,9 +139,10 @@ class StorageManagerTest {
     }
 
     @Test
-    fun testDefaultStorageLocationIsInternal() {
+    fun testDefaultStorageLocationPrefersSdCardWhenAvailable() {
         val selected = StorageManager.getSelectedStorageType(context)
-        assertEquals(StorageLocationType.INTERNAL, selected)
+        val expected = if (StorageManager.isSdCardAvailable(context)) StorageLocationType.SD_CARD else StorageLocationType.INTERNAL
+        assertEquals(expected, selected)
         val filesDir = StorageManager.getFilesDirectory(context)
         assertNotNull(filesDir)
         assertTrue(filesDir.exists())

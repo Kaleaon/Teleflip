@@ -94,6 +94,7 @@ class SearchDialog(
             )
 
         rvResults.layoutManager = LinearLayoutManager(context)
+        rvResults.itemAnimator = null
 
         chatAdapter =
             ChatListAdapter { chat ->
@@ -333,6 +334,21 @@ class SearchDialog(
         }
     }
 
+    private fun focusResultAt(position: Int) {
+        val total = rvResults.adapter?.itemCount ?: 0
+        if (position !in 0 until total) return
+        val existing = rvResults.findViewHolderForAdapterPosition(position)
+        if (existing != null) {
+            rvResults.scrollToPosition(position)
+            existing.itemView.requestFocus()
+        } else {
+            rvResults.scrollToPosition(position)
+            rvResults.post {
+                rvResults.findViewHolderForAdapterPosition(position)?.itemView?.requestFocus()
+            }
+        }
+    }
+
     override fun onStop() {
         super.onStop()
         searchJob?.cancel()
@@ -356,6 +372,7 @@ class SearchDialog(
 
         if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT) {
             etSearchInput.setText("")
+            etSearchInput.requestFocus()
             return true
         }
 
@@ -373,63 +390,32 @@ class SearchDialog(
             keypadEngine?.commitCurrentChar()
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                val itemCount = rvResults.adapter?.itemCount ?: 0
-                if (itemCount > 0) {
-                    rvResults.scrollToPosition(0)
-                    val vh = rvResults.findViewHolderForAdapterPosition(0)
-                    if (vh != null) {
-                        vh.itemView.requestFocus()
-                    } else {
-                        val listener =
-                            object : RecyclerView.OnChildAttachStateChangeListener {
-                                override fun onChildViewAttachedToWindow(view: View) {
-                                    if (rvResults.getChildAdapterPosition(view) == 0) {
-                                        view.requestFocus()
-                                        rvResults.removeOnChildAttachStateChangeListener(this)
-                                    }
-                                }
-
-                                override fun onChildViewDetachedFromWindow(view: View) {}
-                            }
-                        rvResults.addOnChildAttachStateChangeListener(listener)
-                    }
+                val count = rvResults.adapter?.itemCount ?: 0
+                if (count > 0) {
+                    focusResultAt(0)
                 }
                 return true
             }
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                 if ((rvResults.adapter?.itemCount ?: 0) > 0) {
-                    rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                    focusResultAt(0)
                     return true
                 }
             }
 
             return super.onKeyDown(keyCode, event)
         } else {
-            val isTabFocused = currentFocus === tabChats || currentFocus === tabContacts || currentFocus === tabMessages
-            if (isTabFocused && keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                val itemCount = rvResults.adapter?.itemCount ?: 0
-                if (itemCount > 0) {
-                    rvResults.scrollToPosition(0)
-                    val vh = rvResults.findViewHolderForAdapterPosition(0)
-                    if (vh != null) {
-                        vh.itemView.requestFocus()
-                    } else {
-                        val listener =
-                            object : RecyclerView.OnChildAttachStateChangeListener {
-                                override fun onChildViewAttachedToWindow(view: View) {
-                                    if (rvResults.getChildAdapterPosition(view) == 0) {
-                                        view.requestFocus()
-                                        rvResults.removeOnChildAttachStateChangeListener(this)
-                                    }
-                                }
-
-                                override fun onChildViewDetachedFromWindow(view: View) {}
-                            }
-                        rvResults.addOnChildAttachStateChangeListener(listener)
-                    }
+            val isKeypadCharKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL
+            if (isKeypadCharKey) {
+                etSearchInput.requestFocus()
+                if (keypadEngine?.handleKeyEvent(keyCode, event) == true) {
+                    return true
                 }
-                return true
             }
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
@@ -443,6 +429,44 @@ class SearchDialog(
                 val nextIndex = (currentTab.ordinal + 1) % tabs.size
                 selectTab(tabs[nextIndex])
                 return true
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                val focused = currentFocus
+                val vh = focused?.let { rvResults.findContainingViewHolder(it) }
+                val total = rvResults.adapter?.itemCount ?: 0
+                if (vh != null) {
+                    val pos = vh.adapterPosition
+                    if (pos in 0 until (total - 1)) {
+                        val nextPos = pos + 1
+                        if (currentTab == SearchTab.MESSAGES && nextPos >= total - 3) {
+                            loadMoreMessageResults()
+                        }
+                        focusResultAt(nextPos)
+                    }
+                    return true
+                } else if (total > 0) {
+                    focusResultAt(0)
+                    return true
+                }
+                return true
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                val focused = currentFocus
+                val vh = focused?.let { rvResults.findContainingViewHolder(it) }
+                if (vh != null) {
+                    val pos = vh.adapterPosition
+                    if (pos > 0) {
+                        focusResultAt(pos - 1)
+                    } else {
+                        etSearchInput.requestFocus()
+                    }
+                    return true
+                } else {
+                    etSearchInput.requestFocus()
+                    return true
+                }
             }
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -470,7 +494,7 @@ class SearchDialog(
                         }
                     }
                 } else if ((rvResults.adapter?.itemCount ?: 0) > 0) {
-                    rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                    focusResultAt(0)
                     return true
                 }
             }
