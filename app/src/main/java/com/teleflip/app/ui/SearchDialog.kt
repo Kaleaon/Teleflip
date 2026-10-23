@@ -94,6 +94,7 @@ class SearchDialog(
             )
 
         rvResults.layoutManager = LinearLayoutManager(context)
+        rvResults.itemAnimator = null
 
         chatAdapter =
             ChatListAdapter { chat ->
@@ -115,7 +116,10 @@ class SearchDialog(
             left = "Clear",
             center = "Select",
             right = "Back",
-            onLeft = { etSearchInput.setText("") },
+            onLeft = {
+                etSearchInput.setText("")
+                etSearchInput.requestFocus()
+            },
             onCenter = { handleCenterAction() },
             onRight = { dismiss() },
         )
@@ -225,12 +229,6 @@ class SearchDialog(
         )
     }
 
-    private fun performSearch(query: String) {
-        searchJob?.cancel()
-        val requestId = ++searchSequence
-        performSearch(query.trim(), requestId)
-    }
-
     private fun performSearch(
         trimmed: String,
         requestId: Long,
@@ -317,6 +315,21 @@ class SearchDialog(
         }
     }
 
+    private fun focusResultAt(position: Int) {
+        val total = rvResults.adapter?.itemCount ?: 0
+        if (position !in 0 until total) return
+        val existing = rvResults.findViewHolderForAdapterPosition(position)
+        if (existing != null) {
+            rvResults.scrollToPosition(position)
+            existing.itemView.requestFocus()
+        } else {
+            rvResults.scrollToPosition(position)
+            rvResults.post {
+                rvResults.findViewHolderForAdapterPosition(position)?.itemView?.requestFocus()
+            }
+        }
+    }
+
     override fun onStop() {
         super.onStop()
         searchJob?.cancel()
@@ -376,8 +389,34 @@ class SearchDialog(
 
             keypadEngine?.commitCurrentChar()
 
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                val count = rvResults.adapter?.itemCount ?: 0
+                if (count > 0) {
+                    focusResultAt(0)
+                } else {
+                    when (currentTab) {
+                        SearchTab.CHATS -> tabChats.requestFocus()
+                        SearchTab.CONTACTS -> tabContacts.requestFocus()
+                        SearchTab.MESSAGES -> tabMessages.requestFocus()
+                    }
+                }
+                return true
+            }
+
             return super.onKeyDown(keyCode, event)
         } else {
+            val isKeypadCharKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL
+            if (isKeypadCharKey) {
+                etSearchInput.requestFocus()
+                if (keypadEngine?.handleKeyEvent(keyCode, event) == true) {
+                    return true
+                }
+            }
+
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                 val tabs = SearchTab.values()
                 val prevIndex = (currentTab.ordinal - 1 + tabs.size) % tabs.size
@@ -389,6 +428,44 @@ class SearchDialog(
                 val nextIndex = (currentTab.ordinal + 1) % tabs.size
                 selectTab(tabs[nextIndex])
                 return true
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                val focused = currentFocus
+                val vh = focused?.let { rvResults.findContainingViewHolder(it) }
+                val total = rvResults.adapter?.itemCount ?: 0
+                if (vh != null) {
+                    val pos = vh.adapterPosition
+                    if (pos in 0 until (total - 1)) {
+                        val nextPos = pos + 1
+                        if (currentTab == SearchTab.MESSAGES && nextPos >= total - 3) {
+                            loadMoreMessageResults()
+                        }
+                        focusResultAt(nextPos)
+                    }
+                    return true
+                } else if (total > 0) {
+                    focusResultAt(0)
+                    return true
+                }
+                return true
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                val focused = currentFocus
+                val vh = focused?.let { rvResults.findContainingViewHolder(it) }
+                if (vh != null) {
+                    val pos = vh.adapterPosition
+                    if (pos > 0) {
+                        focusResultAt(pos - 1)
+                    } else {
+                        etSearchInput.requestFocus()
+                    }
+                    return true
+                } else {
+                    etSearchInput.requestFocus()
+                    return true
+                }
             }
 
             return super.onKeyDown(keyCode, event)

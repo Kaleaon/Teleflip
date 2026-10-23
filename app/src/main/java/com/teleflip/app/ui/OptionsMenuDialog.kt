@@ -21,7 +21,28 @@ class OptionsMenuDialog(
     context: Context,
     private val title: String,
     private val options: List<MenuOption>,
+    initialPage: Int = 0,
 ) : BaseDialog(context) {
+    internal var currentPage: Int = initialPage.coerceIn(0, ((options.size - 1).coerceAtLeast(0) / 9))
+        private set
+    private val pageCount get() = ((options.size + PAGE_SIZE - 1) / PAGE_SIZE).coerceAtLeast(1)
+    private val visibleOptions get() = options.drop(currentPage * PAGE_SIZE).take(PAGE_SIZE)
+
+    override fun onStart() {
+        super.onStart()
+        window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    }
+
+    private fun updatePage() {
+        findViewById<TextView>(R.id.tv_menu_title)?.text = if (pageCount > 1) "$title • ${currentPage + 1}/$pageCount" else title
+        findViewById<TextView>(R.id.tv_menu_hint)?.text = if (pageCount > 1) "◄/►: Pages • 1–9: Select • RSK: Back" else "1–9: Select • RSK: Back"
+        findViewById<RecyclerView>(R.id.rv_menu_options)?.let { rv ->
+            rv.adapter?.notifyDataSetChanged()
+            rv.scrollToPosition(0)
+            rv.post { rv.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus() }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_options_menu)
@@ -53,6 +74,7 @@ class OptionsMenuDialog(
         rv?.layoutManager = LinearLayoutManager(context)
         rv?.adapter = MenuAdapter()
 
+        updatePage()
         // Focus the first option
         rv?.post {
             rv.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
@@ -67,17 +89,31 @@ class OptionsMenuDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        if (pageCount > 1 && (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_POUND || keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_STAR)) {
+            if (event.repeatCount == 0) {
+                val step = if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_POUND) 1 else -1
+                currentPage = (currentPage + step + pageCount) % pageCount
+                updatePage()
+            }
+            return true
+        }
         // Direct number selection (1-9)
         if (keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9) {
             val index = keyCode - KeyEvent.KEYCODE_1
-            if (index in options.indices) {
+            if (event.repeatCount > 0) return true
+            if (index in visibleOptions.indices) {
+                val option = visibleOptions[index]
                 dismiss()
-                options[index].action.invoke()
+                option.action.invoke()
                 return true
             }
         }
 
         return super.onKeyDown(keyCode, event)
+    }
+
+    companion object {
+        private const val PAGE_SIZE = 9
     }
 
     inner class MenuAdapter : RecyclerView.Adapter<MenuAdapter.OptionViewHolder>() {
@@ -93,7 +129,7 @@ class OptionsMenuDialog(
             holder: OptionViewHolder,
             position: Int,
         ) {
-            val opt = options[position]
+            val opt = visibleOptions[position]
             holder.tvShortcut.text = "${position + 1}."
             holder.tvLabel.text = opt.title
             holder.itemView.contentDescription = "${position + 1}. ${opt.title}"
@@ -103,7 +139,7 @@ class OptionsMenuDialog(
             }
         }
 
-        override fun getItemCount(): Int = options.size
+        override fun getItemCount(): Int = visibleOptions.size
 
         inner class OptionViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val tvShortcut: TextView = view.findViewById(R.id.tv_option_shortcut)

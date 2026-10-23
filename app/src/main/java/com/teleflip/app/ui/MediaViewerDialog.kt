@@ -10,6 +10,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.VideoView
 import androidx.core.view.ViewCompat
+import coil.dispose
 import coil.load
 import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
@@ -18,16 +19,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 
 class MediaViewerDialog(
     context: Context,
-    private val message: MessageModel,
+    private var message: MessageModel,
     private val onSaveMedia: (MessageModel) -> Unit,
     private val onRequestDownload: (Int) -> Unit,
+    private val messageUpdates: StateFlow<Map<Long, List<MessageModel>>>? = null,
 ) : BaseDialog(context) {
     private val dialogJob = SupervisorJob()
     private val dialogScope = CoroutineScope(Dispatchers.Main + dialogJob)
@@ -53,6 +55,11 @@ class MediaViewerDialog(
     private val playbackSpeedSteps = listOf(1.0f, 1.25f, 1.5f, 2.0f)
     private val panStepPx = 48f
     private var isVideoPlaying = false
+    private val isVideoMedia: Boolean
+        get() =
+            message.mediaType == MediaType.VIDEO || message.mediaType == MediaType.ANIMATION ||
+                (message.mediaType == MediaType.STICKER && message.stickerFormat == "webm") ||
+                (message.mediaType == MediaType.PAID_MEDIA && !message.isPaidMediaLocked && message.mediaMimeType.startsWith("video/"))
 
     internal var mediaPlayer: android.media.MediaPlayer? = null
     internal var sdkVersion: Int = android.os.Build.VERSION_CODES.M
@@ -66,7 +73,6 @@ class MediaViewerDialog(
             ViewGroup.LayoutParams.MATCH_PARENT,
         )
 
-        val tvTitle = findViewById<TextView>(R.id.tv_viewer_title)
         tvZoomBadge = findViewById(R.id.tv_viewer_zoom_badge)
         ivPhoto = findViewById(R.id.iv_viewer_photo)
         vvVideo = findViewById(R.id.vv_viewer_video)
@@ -74,10 +80,35 @@ class MediaViewerDialog(
         tvCaption = findViewById(R.id.tv_viewer_caption)
         tvHint = findViewById(R.id.tv_viewer_controls_hint)
 
+        renderMedia()
+        dialogScope.launch {
+            messageUpdates?.collect { chats ->
+                val messages = chats[message.chatId].orEmpty()
+                val updated =
+                    messages.find { it.id == message.id }
+                        ?: messages.find { message.mediaFileId != 0 && it.mediaFileId == message.mediaFileId }
+                if (updated != null) updateMessage(updated)
+            }
+        }
+    }
+
+    internal fun updateMessage(updated: MessageModel) {
+        val needsRender = updated.mediaFilePath != message.mediaFilePath || updated.isPaidMediaLocked != message.isPaidMediaLocked || updated.mediaFileId != message.mediaFileId || updated.mediaMimeType != message.mediaMimeType || updated.mediaType != message.mediaType
+        message = updated
+        if (needsRender) renderMedia()
+    }
+
+    private fun renderMedia() {
+        val tvTitle = findViewById<TextView>(R.id.tv_viewer_title)
+        vvVideo?.stopPlayback()
+        vvVideo?.visibility = View.GONE
+        ivPhoto?.dispose()
+        ivPhoto?.visibility = View.GONE
         val captionStr = message.mediaCaption.ifBlank { message.text }
         if (captionStr.isNotBlank()) {
             tvCaption?.visibility = View.VISIBLE
-            tvCaption?.text = captionStr
+            val captionMessage = if (message.mediaCaption.isNotBlank()) message.copy(text = message.mediaCaption, mediaCaption = "", mediaType = MediaType.NONE) else message
+            tvCaption?.text = MessageTextFormatter.format(captionMessage)
         } else {
             tvCaption?.visibility = View.GONE
         }
@@ -99,7 +130,22 @@ class MediaViewerDialog(
                 val emoji = message.stickerEmoji.ifBlank { "Sticker" }
                 tvTitle?.text = "🎨 $emoji Viewer"
                 tvHint?.text = "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
-                setupPhoto(filePath, fileExists)
+                if (message.stickerFormat == "webm") {
+                    tvHint?.text = "[OK] Play/Pause • [LSK] Restart • [1] Save • [RSK] Back"
+                    setupVideoOrGif(filePath, fileExists, true)
+                } else {
+                    setupPhoto(filePath, fileExists)
+                }
+            }
+            MediaType.PAID_MEDIA -> {
+                if (message.isPaidMediaLocked) {
+                    tvTitle?.text = "🔒 Locked Media (⭐ ${message.starCount} Stars)"
+                    tvHint?.text = "Unlock this media from the conversation • [RSK] Back"
+                } else {
+                    tvTitle?.text = "🔓 Unlocked Paid Media"
+                    tvHint?.text = if (isVideoMedia) "[OK] Play/Pause • [◄/►] ±5s • [3] Speed • [LSK] Restart • [1] Save • [RSK] Back" else "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
+                }
+                if (isVideoMedia) setupVideoOrGif(filePath, fileExists, false) else setupPhoto(filePath, fileExists)
             }
             else -> {
                 tvTitle?.text = "📷 Photo Viewer"
@@ -127,25 +173,20 @@ class MediaViewerDialog(
         tvStatus?.visibility = View.VISIBLE
         tvStatus?.text = "Loading photo..."
 
-        val displayMetrics = context.resources.displayMetrics
-        val reqWidth = displayMetrics.widthPixels
-        val reqHeight = displayMetrics.heightPixels
-
-        dialogScope.launch {
-            val bmp =
-                withContext(Dispatchers.IO) {
-                    decodeSampledBitmapFromFile(filePath, reqWidth, reqHeight)
-                }
-            if (bmp != null) {
-                ivPhoto?.setImageBitmap(bmp)
-                ivPhoto?.visibility = View.VISIBLE
-                tvStatus?.visibility = View.GONE
-                applyPhotoTransform()
-            } else {
-                ivPhoto?.visibility = View.GONE
-                tvStatus?.visibility = View.VISIBLE
-                tvStatus?.text = "Unable to decode photo file."
-            }
+        ivPhoto?.load(File(filePath)) {
+            size(context.resources.displayMetrics.widthPixels.coerceAtLeast(1), context.resources.displayMetrics.heightPixels.coerceAtLeast(1))
+            listener(
+                onSuccess = { _, _ ->
+                    ivPhoto?.visibility = View.VISIBLE
+                    tvStatus?.visibility = View.GONE
+                    applyPhotoTransform()
+                },
+                onError = { _, _ ->
+                    ivPhoto?.visibility = View.GONE
+                    tvStatus?.visibility = View.VISIBLE
+                    tvStatus?.text = "Unable to display this media file."
+                },
+            )
         }
     }
 
@@ -164,6 +205,10 @@ class MediaViewerDialog(
             return
         }
 
+        if (isLoopingGif && File(filePath).extension.equals("gif", ignoreCase = true)) {
+            setupPhoto(filePath, true)
+            return
+        }
         vvVideo?.visibility = View.VISIBLE
         tvStatus?.visibility = View.GONE
         vvVideo?.setVideoURI(Uri.fromFile(File(filePath)))
@@ -189,8 +234,19 @@ class MediaViewerDialog(
             if (isLoopingGif) {
                 vvVideo?.visibility = View.GONE
                 ivPhoto?.visibility = View.VISIBLE
-                ivPhoto?.load(File(filePath))
-                tvStatus?.visibility = View.GONE
+                ivPhoto?.load(File(filePath)) {
+                    listener(
+                        onSuccess = { _, _ ->
+                            tvStatus?.visibility = View.VISIBLE
+                            tvStatus?.text = "Showing preview; animation codec unavailable on this device."
+                        },
+                        onError = { _, _ ->
+                            ivPhoto?.visibility = View.GONE
+                            tvStatus?.visibility = View.VISIBLE
+                            tvStatus?.text = "Unable to decode this animation on this device."
+                        },
+                    )
+                }
                 tvZoomBadge?.text = "GIF ▶"
             } else {
                 vvVideo?.visibility = View.GONE
@@ -346,6 +402,7 @@ class MediaViewerDialog(
             vvVideo?.stopPlayback()
         } catch (_: Exception) {
         }
+        ivPhoto?.dispose()
         dialogJob.cancelChildren()
         super.onStop()
     }
@@ -363,8 +420,7 @@ class MediaViewerDialog(
             return true
         }
 
-        val isVideoMode = message.mediaType == MediaType.VIDEO || message.mediaType == MediaType.ANIMATION
-        if (isVideoMode) {
+        if (isVideoMedia) {
             when {
                 keyCode == KeyEvent.KEYCODE_3 -> {
                     cyclePlaybackSpeed()
