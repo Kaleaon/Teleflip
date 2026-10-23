@@ -3937,17 +3937,67 @@ class MainActivity : AppCompatActivity() {
         val options =
             targetChats.take(20).mapIndexed { idx, chat ->
                 MenuOption(idx + 1, "↪ ${chat.title} (${chat.chatType})") {
-                    telegramManager.forwardMessage(msg.chatId, chat.id, msg.id) { success ->
-                        if (success) {
-                            showToast("Forwarded to ${chat.title}")
-                        } else {
-                            showToast("Failed to forward message", true)
-                        }
-                    }
+                    showForwardCustomizationDialog(msg, chat)
                 }
             }
 
         OptionsMenuDialog(this, "Forward Message To...", options).show()
+    }
+
+    private fun showForwardCustomizationDialog(
+        msg: MessageModel,
+        targetChat: ChatModel,
+        sendCopy: Boolean = false,
+        removeCaption: Boolean = false,
+    ) {
+        val options = mutableListOf<MenuOption>()
+        val hasCaption = msg.mediaType != MediaType.NONE && msg.mediaCaption.isNotBlank()
+
+        val senderLabel = if (sendCopy) "✓ Hide Sender Name" else "Hide Sender Name"
+        options.add(
+            MenuOption(options.size + 1, senderLabel) {
+                showForwardCustomizationDialog(
+                    msg = msg,
+                    targetChat = targetChat,
+                    sendCopy = !sendCopy,
+                    removeCaption = removeCaption,
+                )
+            },
+        )
+
+        if (hasCaption) {
+            val captionLabel = if (removeCaption) "✓ Remove Caption" else "Remove Caption"
+            options.add(
+                MenuOption(options.size + 1, captionLabel) {
+                    showForwardCustomizationDialog(
+                        msg = msg,
+                        targetChat = targetChat,
+                        sendCopy = sendCopy,
+                        removeCaption = !removeCaption,
+                    )
+                },
+            )
+        }
+
+        options.add(
+            MenuOption(options.size + 1, "Send Message") {
+                telegramManager.forwardMessage(
+                    fromChatId = msg.chatId,
+                    toChatId = targetChat.id,
+                    messageId = msg.id,
+                    sendCopy = sendCopy,
+                    removeCaption = removeCaption,
+                ) { success ->
+                    if (success) {
+                        showToast("Forwarded to ${targetChat.title}")
+                    } else {
+                        showToast("Failed to forward message", true)
+                    }
+                }
+            },
+        )
+
+        OptionsMenuDialog(this, "Forward Options (${targetChat.title})", options).show()
     }
 
     private fun saveMessageToDevice(msg: MessageModel) {
