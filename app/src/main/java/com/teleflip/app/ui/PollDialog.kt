@@ -2,10 +2,13 @@ package com.teleflip.app.ui
 
 import android.content.Context
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.KeyEvent
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 
@@ -32,6 +35,30 @@ class PollDialog(
         val btnCancel = findViewById<Button>(R.id.btn_poll_cancel)
 
         listOfNotNull(etQuestion, etOpt1, etOpt2, etOpt3).forEach { field ->
+            field.addTextChangedListener(
+                object : TextWatcher {
+                    override fun beforeTextChanged(
+                        s: CharSequence?,
+                        start: Int,
+                        count: Int,
+                        after: Int,
+                    ) {}
+
+                    override fun onTextChanged(
+                        s: CharSequence?,
+                        start: Int,
+                        before: Int,
+                        count: Int,
+                    ) {}
+
+                    override fun afterTextChanged(s: Editable?) {
+                        if (field.error != null) {
+                            field.error = null
+                        }
+                    }
+                },
+            )
+
             engines[field.id] =
                 KeypadInputEngine(
                     editText = field,
@@ -50,18 +77,43 @@ class PollDialog(
 
         btnSubmit?.setOnClickListener {
             engines.values.forEach { it.commitCurrentChar() }
-            val question = etQuestion?.text?.toString()?.trim().orEmpty()
-            val opts =
-                listOfNotNull(
-                    etOpt1?.text?.toString()?.trim(),
-                    etOpt2?.text?.toString()?.trim(),
-                    etOpt3?.text?.toString()?.trim(),
-                ).filter { it.isNotBlank() }
 
-            if (question.isNotBlank() && opts.size >= 2) {
-                dismiss()
-                onCreatePoll(question, opts, isAnonymous)
+            etQuestion?.error = null
+            etOpt1?.error = null
+            etOpt2?.error = null
+            etOpt3?.error = null
+
+            val question = etQuestion?.text?.toString()?.trim().orEmpty()
+            val opt1 = etOpt1?.text?.toString()?.trim().orEmpty()
+            val opt2 = etOpt2?.text?.toString()?.trim().orEmpty()
+            val opt3 = etOpt3?.text?.toString()?.trim().orEmpty()
+
+            val opts = listOf(opt1, opt2, opt3).filter { it.isNotBlank() }
+
+            if (question.isBlank()) {
+                val errorMsg = "Question cannot be empty"
+                etQuestion?.error = errorMsg
+                etQuestion?.requestFocus()
+                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+
+            if (opts.size < 2) {
+                val errorMsg = "At least 2 options required"
+                val targetField =
+                    when {
+                        opt1.isBlank() -> etOpt1
+                        opt2.isBlank() -> etOpt2
+                        else -> etOpt1
+                    }
+                targetField?.error = errorMsg
+                targetField?.requestFocus()
+                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            dismiss()
+            onCreatePoll(question, opts, isAnonymous)
         }
 
         btnCancel?.setOnClickListener {
