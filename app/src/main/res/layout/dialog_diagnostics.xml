@@ -6,7 +6,7 @@
     android:background="@color/bg_dark_card"
     android:padding="12dp">
 
-    <TextView
+    <com.teleflip.app.ui.SectionHeaderView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="System Diagnostics &amp; Error Log"
