@@ -1529,6 +1529,21 @@ class MainActivity : AppCompatActivity() {
                 customEmojiResolver = { key ->
                     telegramManager.getCustomEmojiFilePath(key)
                 },
+                onReplyQuoteClick = { quoteMsg ->
+                    val targetId = quoteMsg.replyToMessageId
+                    if (targetId != 0L) {
+                        val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                        if (pos >= 0) {
+                            rvMessages?.scrollToPosition(pos)
+                            rvMessages?.post {
+                                rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+                            }
+                        }
+                    }
+                },
+                onReactionsClick = { rxnMsg ->
+                    showReactionPickerDialog(rxnMsg)
+                },
             )
         rvMessages?.adapter = messageAdapter
 

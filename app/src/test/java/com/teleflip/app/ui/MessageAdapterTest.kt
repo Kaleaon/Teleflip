@@ -172,4 +172,58 @@ class MessageAdapterTest {
         // Text remains unaffected
         assertEquals("Hello world", tvText.text.toString())
     }
+
+    @Test
+    fun testReplyQuoteAndReactionsCallbacksAndFocusability() {
+        var replyQuoteClickedMsg: MessageModel? = null
+        var reactionsClickedMsg: MessageModel? = null
+
+        val customAdapter =
+            MessageAdapter(
+                onReplyQuoteClick = { replyQuoteClickedMsg = it },
+                onReactionsClick = { reactionsClickedMsg = it },
+            )
+
+        val msgWithReplyAndReactions =
+            MessageModel(
+                id = 201L,
+                chatId = 1L,
+                senderName = "Alice",
+                text = "Replying with reactions",
+                time = "11:00 AM",
+                isOutbound = false,
+                replyToMessageId = 101L,
+                replyToPreview = "Original quote",
+                reactions = listOf("👍", "❤️"),
+            )
+
+        customAdapter.submitList(listOf(msgWithReplyAndReactions))
+
+        val parent = FrameLayout(context)
+        val viewHolder = customAdapter.onCreateViewHolder(parent, 0)
+        customAdapter.onBindViewHolder(viewHolder, 0)
+
+        val tvReplyQuote = viewHolder.itemView.findViewById<TextView>(R.id.tv_reply_quote)
+        val tvReactions = viewHolder.itemView.findViewById<TextView>(R.id.tv_reactions)
+
+        assertNotNull(tvReplyQuote)
+        assertNotNull(tvReactions)
+
+        assertEquals(android.view.View.VISIBLE, tvReplyQuote.visibility)
+        assertEquals(android.view.View.VISIBLE, tvReactions.visibility)
+
+        org.junit.Assert.assertTrue("tv_reply_quote should be focusable", tvReplyQuote.isFocusable)
+        org.junit.Assert.assertTrue("tv_reply_quote should be clickable", tvReplyQuote.isClickable)
+        org.junit.Assert.assertTrue("tv_reactions should be focusable", tvReactions.isFocusable)
+        org.junit.Assert.assertTrue("tv_reactions should be clickable", tvReactions.isClickable)
+
+        assertEquals("Quoted reply: Original quote", tvReplyQuote.contentDescription.toString())
+        assertEquals("Reactions: 👍, ❤️", tvReactions.contentDescription.toString())
+
+        tvReplyQuote.performClick()
+        assertEquals(201L, replyQuoteClickedMsg?.id)
+
+        tvReactions.performClick()
+        assertEquals(201L, reactionsClickedMsg?.id)
+    }
 }
