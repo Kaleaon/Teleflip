@@ -61,7 +61,6 @@ class ChatExportProgressDialog : BaseDialog {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         val currentFormat = format
         val currentScope = scope
         val currentTelegramManager = telegramManager
@@ -69,7 +68,7 @@ class ChatExportProgressDialog : BaseDialog {
 
         if (currentFormat != null && currentScope != null && currentTelegramManager != null && currentOnComplete != null) {
             setContentView(R.layout.dialog_export_progress)
-            setupDismissKeys()
+            setupDismissKeys { cancelExportAndDismiss() }
 
             val tvChatName = findViewById<TextView>(R.id.tv_export_chat_name)
             val tvEngineStatus = findViewById<TextView>(R.id.tv_export_status)
@@ -104,7 +103,7 @@ class ChatExportProgressDialog : BaseDialog {
         } else {
             setContentView(R.layout.dialog_chat_export_progress)
             setCancelable(false)
-            setupDismissKeys()
+            setupDismissKeys { cancelExportAndDismiss() }
 
             tvTitle = findViewById(R.id.tv_progress_title)
             tvStatus = findViewById(R.id.tv_progress_status)
@@ -112,8 +111,7 @@ class ChatExportProgressDialog : BaseDialog {
             progressBar = findViewById(R.id.pb_export_progress)
 
             findViewById<Button>(R.id.btn_cancel_progress)?.setOnClickListener {
-                onCancelRequested?.invoke()
-                dismiss()
+                cancelExportAndDismiss()
             }
         }
     }
