@@ -8,7 +8,6 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.model.ProxyType
@@ -23,12 +22,16 @@ class ProxySettingsDialog(
 ) : BaseDialog(context) {
     private val engines = mutableMapOf<Int, KeypadInputEngine>()
     private var selectedType = ProxyType.SOCKS5
+    private var tvError: TextView? = null
+
+    override fun getErrorTextView(): TextView? = tvError
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_proxy_settings)
         setupDismissKeys()
 
+        tvError = findViewById(R.id.tv_proxy_error)
         val tvMode = findViewById<TextView>(R.id.tv_proxy_input_mode)
         val tvStatus = findViewById<TextView>(R.id.tv_proxy_active_status)
         val btnSocks5 = findViewById<Button>(R.id.btn_proxy_type_socks5)
@@ -154,10 +157,11 @@ class ProxySettingsDialog(
                             } else {
                                 telegramManager.enableProxy(proxy.id) { success, err ->
                                     if (success) {
+                                        clearDialogError()
                                         refreshSavedProxiesList()
                                         onProxyChanged?.invoke()
                                     } else {
-                                        Toast.makeText(context, err ?: "Error enabling proxy", Toast.LENGTH_SHORT).show()
+                                        showDialogError(err ?: "Error enabling proxy")
                                     }
                                 }
                             }
@@ -198,7 +202,7 @@ class ProxySettingsDialog(
             val port = portStr.toIntOrNull() ?: 1080
 
             if (server.isEmpty()) {
-                Toast.makeText(context, "Please enter a valid server address", Toast.LENGTH_SHORT).show()
+                showDialogError("Please enter a valid server address", etServer)
                 return@setOnClickListener
             }
 
@@ -216,7 +220,8 @@ class ProxySettingsDialog(
                 enableNow = true,
             ) { success, errorMsg ->
                 if (success) {
-                    Toast.makeText(context, "Proxy enabled successfully!", Toast.LENGTH_SHORT).show()
+                    clearDialogError()
+                    StatusMessageDispatcher.showStatus(context, "Proxy enabled successfully!", isError = false)
                     etServer?.text?.clear()
                     etPort?.text?.clear()
                     etUsername?.text?.clear()
@@ -225,7 +230,7 @@ class ProxySettingsDialog(
                     refreshSavedProxiesList()
                     onProxyChanged?.invoke()
                 } else {
-                    Toast.makeText(context, errorMsg ?: "Failed to set proxy", Toast.LENGTH_SHORT).show()
+                    showDialogError(errorMsg ?: "Failed to set proxy", etServer)
                 }
             }
         }
@@ -233,7 +238,8 @@ class ProxySettingsDialog(
         btnDisable?.setOnClickListener {
             telegramManager.disableProxy { success, _ ->
                 if (success) {
-                    Toast.makeText(context, "Proxy disabled", Toast.LENGTH_SHORT).show()
+                    clearDialogError()
+                    StatusMessageDispatcher.showStatus(context, "Proxy disabled", isError = false)
                     refreshSavedProxiesList()
                     onProxyChanged?.invoke()
                 }
