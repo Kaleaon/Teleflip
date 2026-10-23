@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/bg_dark_card"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:id="@+id/tv_notification_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🔔 Notification Settings"
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tv_notification_input_mode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mode: 123"
+            android:textColor="@color/tg_blue"
+            android:textSize="11sp"
+            android:paddingBottom="8dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/softkey_divider"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Mute Duration Options -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mute Duration:"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:orientation="horizontal"
+                android:layout_marginBottom="4dp">
+
+                <Button
+                    android:id="@+id/btn_mute_preset_unmute"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="Unmute"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:background="@drawable/bg_button_selector"
+                    android:focusable="true"
+                    android:layout_marginEnd="2dp" />
+
+                <Button
+                    android:id="@+id/btn_mute_preset_1h"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="1 Hour"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:background="@drawable/bg_item_selector"
+                    android:focusable="true"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp" />
+
+                <Button
+                    android:id="@+id/btn_mute_preset_8h"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="8 Hours"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:background="@drawable/bg_item_selector"
+                    android:focusable="true"
+                    android:layout_marginStart="2dp" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_mute_preset_2d"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="2 Days"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:background="@drawable/bg_item_selector"
+                    android:focusable="true"
+                    android:layout_marginEnd="2dp" />
+
+                <Button
+                    android:id="@+id/btn_mute_preset_forever"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="Forever"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:background="@drawable/bg_item_selector"
+                    android:focusable="true"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp" />
+
+                <Button
+                    android:id="@+id/btn_mute_preset_custom"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="Custom"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:background="@drawable/bg_item_selector"
+                    android:focusable="true"
+                    android:layout_marginStart="2dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Custom Duration Section -->
+        <LinearLayout
+            android:id="@+id/layout_custom_duration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Custom Duration Value:"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="2dp" />
+
+            <EditText
+                android:id="@+id/et_custom_duration_value"
+                android:layout_width="match_parent"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_edittext_selector"
+                android:hint="e.g. 45"
+                android:inputType="number"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textSize="13sp"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="34dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_unit_minutes"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="Minutes"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:background="@drawable/bg_button_selector"
+                    android:focusable="true"
+                    android:layout_marginEnd="2dp" />
+
+                <Button
+                    android:id="@+id/btn_unit_hours"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="Hours"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:background="@drawable/bg_item_selector"
+                    android:focusable="true"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp" />
+
+                <Button
+                    android:id="@+id/btn_unit_days"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="Days"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:background="@drawable/bg_item_selector"
+                    android:focusable="true"
+                    android:layout_marginStart="2dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Sound Settings -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Audio Options:"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_toggle_sound_mute"
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:text="🔊 Sound: ON"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btn_select_ringtone"
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:text="🔔 Ringtone: Default"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:background="@drawable/bg_item_selector"
+            android:focusable="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Actions -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_save_notification_settings"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="Save"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:background="@drawable/bg_button_selector"
+                android:focusable="true"
+                android:layout_marginEnd="4dp" />
+
+            <Button
+                android:id="@+id/btn_cancel_notification_settings"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="Cancel"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:background="@drawable/bg_item_selector"
+                android:focusable="true"
+                android:layout_marginStart="4dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>
