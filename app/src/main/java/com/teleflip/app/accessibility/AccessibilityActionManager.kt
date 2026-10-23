@@ -16,7 +16,10 @@ import java.util.concurrent.ConcurrentHashMap
  * Functional interface for handling accessibility action dispatches.
  */
 fun interface AccessibilityActionListener<T> {
-    fun onAccessibilityAction(actionId: Int, item: T): Boolean
+    fun onAccessibilityAction(
+        actionId: Int,
+        item: T,
+    ): Boolean
 }
 
 /**
@@ -32,7 +35,10 @@ data class AccessibilityAction<T>(
  * Interface for entity action providers.
  */
 interface AccessibilityActionProvider<T> {
-    fun getActions(item: T, listener: AccessibilityActionListener<T>? = null): List<AccessibilityAction<T>>
+    fun getActions(
+        item: T,
+        listener: AccessibilityActionListener<T>? = null,
+    ): List<AccessibilityAction<T>>
 }
 
 /**

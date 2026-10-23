@@ -2,6 +2,7 @@ package com.teleflip.app.accessibility
 
 import android.content.Context
 import android.view.View
+import android.widget.FrameLayout
 import androidx.test.core.app.ApplicationProvider
 import com.teleflip.app.R
 import com.teleflip.app.model.ChatModel
@@ -21,8 +22,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-
-import android.widget.FrameLayout
 
 @RunWith(RobolectricTestRunner::class)
 class AccessibilityActionManagerTest {
@@ -96,14 +95,15 @@ class AccessibilityActionManagerTest {
     fun testCustomProviderRegistrationAndUnregistration() {
         class CustomEntity(val id: Int)
 
-        val customProvider = object : AccessibilityActionProvider<CustomEntity> {
-            override fun getActions(
-                item: CustomEntity,
-                listener: AccessibilityActionListener<CustomEntity>?,
-            ): List<AccessibilityAction<CustomEntity>> {
-                return listOf(AccessibilityAction(1001, "Custom Action") { true })
+        val customProvider =
+            object : AccessibilityActionProvider<CustomEntity> {
+                override fun getActions(
+                    item: CustomEntity,
+                    listener: AccessibilityActionListener<CustomEntity>?,
+                ): List<AccessibilityAction<CustomEntity>> {
+                    return listOf(AccessibilityAction(1001, "Custom Action") { true })
+                }
             }
-        }
 
         AccessibilityActionManager.registerProvider(CustomEntity::class.java, customProvider)
         assertNotNull(AccessibilityActionManager.getProvider(CustomEntity::class.java))
@@ -195,24 +195,26 @@ class AccessibilityActionManagerTest {
         }
 
         val provider = AccessibilityActionManager.getProvider(ChatModel::class.java)!!
-        val actions = provider.getActions(sampleChat) { _, _ ->
-            throw RuntimeException("Simulated error during action execution")
-        }
+        val actions =
+            provider.getActions(sampleChat) { _, _ ->
+                throw RuntimeException("Simulated error during action execution")
+            }
 
         // Verify performing an action that throws doesn't bubble up or crash
         val openAction = actions.find { it.id == R.id.action_chat_open }!!
-        val result = try {
-            openAction.perform(sampleChat)
-        } catch (e: Exception) {
-            false
-        }
+        val result =
+            try {
+                openAction.perform(sampleChat)
+            } catch (e: Exception) {
+                false
+            }
         assertFalse("Failing action perform returning false or caught safely", result)
     }
 
     @Test
     fun testAdapterRecyclingClearsActions() {
         val parent = FrameLayout(context)
-        val chatAdapter = ChatListAdapter({})
+        val chatAdapter = ChatListAdapter(onChatSelected = {})
         val messageAdapter = MessageAdapter()
         val searchAdapter = MessageSearchResultAdapter({})
 

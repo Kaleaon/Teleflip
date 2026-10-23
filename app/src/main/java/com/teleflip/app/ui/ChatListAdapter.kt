@@ -14,6 +14,7 @@ import com.teleflip.app.accessibility.AccessibilityActionManager
 import com.teleflip.app.model.ChatModel
 
 class ChatListAdapter(
+    private val onChatFocused: ((ChatModel) -> Unit)? = null,
     private val onChatSelected: (ChatModel) -> Unit,
     private val onChatAction: ((actionId: Int, chat: ChatModel) -> Boolean)? = null,
 ) : ListAdapter<ChatModel, ChatListAdapter.ChatViewHolder>(ChatDiffCallback()) {
@@ -21,8 +22,19 @@ class ChatListAdapter(
         super.submitList(if (newItems != null) ArrayList(newItems) else null)
     }
 
+    override fun submitList(
+        newItems: List<ChatModel>?,
+        commitCallback: Runnable?,
+    ) {
+        super.submitList(if (newItems != null) ArrayList(newItems) else null, commitCallback)
+    }
+
     fun getItemAt(position: Int): ChatModel? {
         return if (position in 0 until currentList.size) getItem(position) else null
+    }
+
+    fun getPositionForChatId(chatId: Long): Int {
+        return currentList.indexOfFirst { it.id == chatId }
     }
 
     override fun onCreateViewHolder(
@@ -105,11 +117,17 @@ class ChatListAdapter(
                 tvLastMsg.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             }
 
-            if (chat.unreadCount > 0) {
+            if (chat.unreadCount > 0 || chat.isMarkedUnread) {
                 tvUnread.visibility = View.VISIBLE
-                tvUnread.text = chat.unreadCount.toString()
+                tvUnread.text = if (chat.unreadCount > 0) chat.unreadCount.toString() else "•"
             } else {
                 tvUnread.visibility = View.GONE
+            }
+
+            itemView.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    onChatFocused?.invoke(chat)
+                }
             }
 
             itemView.setOnClickListener {

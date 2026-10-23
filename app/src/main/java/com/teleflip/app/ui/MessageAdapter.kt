@@ -35,6 +35,16 @@ class MessageAdapter(
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     companion object {
         const val PAYLOAD_PLAYBACK_STATE = "PAYLOAD_PLAYBACK_STATE"
+        private val REDUNDANT_MEDIA_TAGS =
+            setOf(
+                "📷 [Photo]",
+                "📹 [Video]",
+                "🎞️ [GIF]",
+                "🎤 [Voice Note]",
+                "🎵 [Audio]",
+                "📍 [Location]",
+                "📊 [Poll]",
+            )
     }
 
     private var playingMessageId: Long? = null
@@ -42,6 +52,13 @@ class MessageAdapter(
 
     override fun submitList(newItems: List<MessageModel>?) {
         super.submitList(if (newItems != null) ArrayList(newItems) else null)
+    }
+
+    override fun submitList(
+        newItems: List<MessageModel>?,
+        commitCallback: Runnable?,
+    ) {
+        super.submitList(if (newItems != null) ArrayList(newItems) else null, commitCallback)
     }
 
     fun setPlayingMessageId(
@@ -130,6 +147,7 @@ class MessageAdapter(
         private val tvReplyQuote: TextView? = itemView.findViewById(R.id.tv_reply_quote)
         private val tvMedia: TextView = itemView.findViewById(R.id.tv_media_indicator)
         private val ivPhoto: ImageView = itemView.findViewById(R.id.iv_message_photo)
+        private val tvStarBadge: TextView? = itemView.findViewById(R.id.tv_star_badge)
         private val tvText: TextView = itemView.findViewById(R.id.tv_message_text)
         private val btnTranscribe: TextView? = itemView.findViewById(R.id.btn_transcribe)
         private val tvTranscript: TextView? = itemView.findViewById(R.id.tv_transcript)
@@ -138,12 +156,12 @@ class MessageAdapter(
         private val tvStatus: TextView = itemView.findViewById(R.id.tv_read_status)
 
         fun bindPlaybackState(message: MessageModel) {
-            if (message.mediaType == MediaType.VOICE) {
+            if (message.mediaType in setOf(MediaType.VOICE, MediaType.AUDIO)) {
                 tvMedia.visibility = View.VISIBLE
                 val isPlaying = (playingMessageId == message.id)
                 val speedStr = String.format(Locale.US, "%.1fx", currentSpeed)
                 val icon = if (isPlaying) "⏸ Playing ($speedStr)" else "▶ Play (${message.durationSeconds}s)"
-                tvMedia.text = "🎤 [Voice Message] $icon"
+                tvMedia.text = if (message.mediaType == MediaType.AUDIO) "🎵 [Audio] $icon" else "🎤 [Voice Message] $icon"
             }
         }
 
@@ -194,12 +212,12 @@ class MessageAdapter(
 
             // Media attachment preview
             when (message.mediaType) {
-                MediaType.VOICE -> {
+                MediaType.VOICE, MediaType.AUDIO -> {
                     tvMedia.visibility = View.VISIBLE
                     val isPlaying = (playingMessageId == message.id)
                     val speedStr = String.format(Locale.US, "%.1fx", currentSpeed)
                     val icon = if (isPlaying) "⏸ Playing ($speedStr)" else "▶ Play (${message.durationSeconds}s)"
-                    tvMedia.text = "🎤 [Voice Message] $icon"
+                    tvMedia.text = if (message.mediaType == MediaType.AUDIO) "🎵 [Audio] $icon" else "🎤 [Voice Message] $icon"
 
                     val stateDesc =
                         ContentDescriptionFormatter.getVoiceStateDescription(
@@ -211,7 +229,9 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, stateDesc)
                     tvMedia.contentDescription =
                         ContentDescriptionFormatter.getVoiceMessageDescription(
-                            context, isPlaying, message.durationSeconds,
+                            context,
+                            isPlaying,
+                            message.durationSeconds,
                         )
                 }
                 MediaType.LOCATION -> {
@@ -224,7 +244,7 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "📷 ${message.mediaCaption}" else "📷 [Photo • OK to Zoom]"
+                    tvMedia.text = "📷 [Photo • OK to Zoom]"
                 }
                 MediaType.DOCUMENT -> {
                     ViewCompat.setStateDescription(tvMedia, null)
@@ -266,18 +286,28 @@ class MessageAdapter(
                         }
                     tvMedia.text = "📊 [$statusTag • Press OK to Vote]"
                 }
-                MediaType.NONE -> {
+                MediaType.PAID_MEDIA -> {
+                    tvMedia.visibility = View.VISIBLE
+                    if (message.isPaidMediaLocked) {
+                        val cap = ""
+                        tvMedia.text = "🔒 [Paid Media • ⭐ ${message.starCount} Stars$cap • Press OK to Unlock]"
+                    } else {
+                        tvMedia.text = if (message.mediaCaption.isNotBlank()) "🔓 ${message.mediaCaption}" else "🔓 [Unlocked Media • Press OK to View]"
+                    }
+                }
+                MediaType.NONE, MediaType.CONTACT -> {
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.GONE
                 }
             }
 
-            // Photo, Sticker, and GIF display with accessibility contentDescription
+            // Photo, Sticker, GIF, and Paid Media display with accessibility contentDescription
             val isVisualMedia =
                 message.mediaType == MediaType.PHOTO ||
                     message.mediaType == MediaType.STICKER ||
-                    message.mediaType == MediaType.ANIMATION
+                    message.mediaType == MediaType.ANIMATION ||
+                    message.mediaType == MediaType.PAID_MEDIA
             if (isVisualMedia) {
                 ivPhoto.contentDescription =
                     when (message.mediaType) {
@@ -286,6 +316,13 @@ class MessageAdapter(
                             "Sticker $emo"
                         }
                         MediaType.ANIMATION -> "GIF Animation"
+                        MediaType.PAID_MEDIA -> {
+                            if (message.isPaidMediaLocked) {
+                                "Paid Media post, ${message.starCount} Stars"
+                            } else {
+                                "Unlocked Paid Media"
+                            }
+                        }
                         else -> ContentDescriptionFormatter.getPhotoDescription(context, message.mediaCaption)
                     }
                 val density = context.resources.displayMetrics.density
@@ -300,10 +337,27 @@ class MessageAdapter(
                     lp.height = (120 * density).toInt()
                 }
                 ivPhoto.layoutParams = lp
-                ivPhoto.loadMediaFromFile(message.mediaFilePath)
+
+                if (!message.mediaFilePath.isNullOrEmpty()) {
+                    ivPhoto.loadMediaFromFile(message.mediaFilePath)
+                } else if (message.mediaType == MediaType.PAID_MEDIA && message.isPaidMediaLocked) {
+                    ivPhoto.setImageResource(R.drawable.bg_inbound_bubble)
+                    ivPhoto.visibility = View.VISIBLE
+                } else {
+                    ivPhoto.setImageDrawable(null)
+                    ivPhoto.visibility = View.GONE
+                }
+
+                if (message.mediaType == MediaType.PAID_MEDIA && message.isPaidMediaLocked) {
+                    tvStarBadge?.visibility = View.VISIBLE
+                    tvStarBadge?.text = "⭐ ${message.starCount} Stars"
+                } else {
+                    tvStarBadge?.visibility = View.GONE
+                }
             } else {
                 ivPhoto.setImageDrawable(null)
                 ivPhoto.visibility = View.GONE
+                tvStarBadge?.visibility = View.GONE
             }
 
             if (message.mediaType == MediaType.POLL && message.pollOptions.isNotEmpty()) {
@@ -319,8 +373,21 @@ class MessageAdapter(
                 tvText.text = pollBody
                 tvText.visibility = View.VISIBLE
             } else {
-                tvText.text = message.text
-                tvText.visibility = if (message.text.isNotBlank()) View.VISIBLE else View.GONE
+                val trimmedText = message.text.trim()
+                val isRedundantMediaText =
+                    message.mediaType != MediaType.NONE &&
+                        (
+                            trimmedText in REDUNDANT_MEDIA_TAGS ||
+                                (message.mediaType == MediaType.STICKER && trimmedText.startsWith("🎨 [Sticker")) ||
+                                (message.mediaType == MediaType.DOCUMENT && trimmedText == "📄 ${message.mediaCaption}".trim())
+                        )
+                if (isRedundantMediaText) {
+                    tvText.text = ""
+                    tvText.visibility = View.GONE
+                } else {
+                    tvText.text = MessageTextFormatter.format(message)
+                    tvText.visibility = if (message.text.isNotBlank()) View.VISIBLE else View.GONE
+                }
             }
 
             if (message.mediaType == MediaType.VOICE) {
@@ -328,6 +395,8 @@ class MessageAdapter(
                 btnTranscribe?.setOnClickListener {
                     onTranscribeClick?.invoke(message)
                 }
+                btnTranscribe?.isFocusable = false
+                btnTranscribe?.isFocusableInTouchMode = false
                 if (message.transcript.isNotBlank()) {
                     tvTranscript?.visibility = View.VISIBLE
                     tvTranscript?.text = "💬 ${message.transcript}"
