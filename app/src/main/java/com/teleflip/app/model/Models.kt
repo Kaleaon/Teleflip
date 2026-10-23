@@ -196,6 +196,8 @@ data class SavedGifItem(
     val filePath: String? = null,
     val durationSeconds: Int = 0,
     val caption: String = "",
+    val queryId: Long = 0L,
+    val resultId: String = "",
 )
 
 data class ContactModel(
