@@ -251,7 +251,7 @@ object StorageManager {
 
     fun getSelectedStorageType(context: Context): StorageLocationType {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val value = prefs.getString(PREF_STORAGE_LOCATION, "internal")
+        val value = prefs.getString(PREF_STORAGE_LOCATION, "sd_card")
         return if (value == "sd_card" && isSdCardAvailable(context)) {
             StorageLocationType.SD_CARD
         } else {
