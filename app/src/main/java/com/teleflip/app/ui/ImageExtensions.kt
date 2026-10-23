@@ -111,37 +111,6 @@ fun ImageView.loadCircularAvatarOrFallback(
 }
 
 /**
- * Extension function for [ImageView] to handle loading standard image attachments from file paths safely.
- *
- * @param path The local file path to the image file.
- */
-fun ImageView.loadBitmapFromFile(path: String?) {
-    if (path.isNullOrEmpty()) {
-        dispose()
-        setImageDrawable(null)
-        visibility = View.GONE
-        return
-    }
-
-    try {
-        val file = File(path)
-        visibility = View.VISIBLE
-        load(file) {
-            listener(
-                onSuccess = { _, _ ->
-                    visibility = View.VISIBLE
-                },
-                onError = { _, _ ->
-                    visibility = View.GONE
-                },
-            )
-        }
-    } catch (_: Throwable) {
-        visibility = View.GONE
-    }
-}
-
-/**
  * Extension function for [ImageView] to load photos, stickers, and animated GIFs safely.
  */
 fun ImageView.loadMediaFromFile(path: String?) {
