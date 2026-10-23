@@ -53,6 +53,7 @@ data class ChatModel(
     val isMuted: Boolean = false,
     val draftText: String = "",
     val pinnedMessageId: Long = 0L,
+    val pinnedMessageIds: List<Long> = emptyList(),
     val isArchived: Boolean = false,
     val folderName: String = "",
     val isSecretChat: Boolean = false,
@@ -62,7 +63,17 @@ data class ChatModel(
     val activeTopicId: Long = 0L,
     val activeTopicName: String = "",
     val isMarkedUnread: Boolean = false,
-)
+) {
+    fun getEffectivePinnedMessageIds(): List<Long> {
+        return if (pinnedMessageIds.isNotEmpty()) {
+            pinnedMessageIds
+        } else if (pinnedMessageId != 0L) {
+            listOf(pinnedMessageId)
+        } else {
+            emptyList()
+        }
+    }
+}
 
 enum class MessageStatus {
     SENDING,
