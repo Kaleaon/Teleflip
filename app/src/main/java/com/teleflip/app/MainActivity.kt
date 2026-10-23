@@ -5066,9 +5066,21 @@ class MainActivity : AppCompatActivity() {
         val btnAccept = findViewById<Button>(R.id.btn_call_accept)
         val btnMute = findViewById<Button>(R.id.btn_call_mute)
         val btnSpeaker = findViewById<Button>(R.id.btn_call_speaker)
+        val btnEnd = findViewById<Button>(R.id.btn_call_end)
 
+        val wasAcceptVisible = btnAccept?.visibility == View.VISIBLE
         val isIncomingPending = !call.isOutgoing && call.state == CallState.PENDING
         btnAccept?.visibility = if (isIncomingPending) View.VISIBLE else View.GONE
+
+        if (isIncomingPending) {
+            btnAccept?.post { btnAccept.requestFocus() }
+        } else {
+            val focused = currentFocus
+            val isCallButtonFocused = focused == btnMute || focused == btnSpeaker || focused == btnEnd
+            if (wasAcceptVisible || !isCallButtonFocused) {
+                btnMute?.post { btnMute.requestFocus() }
+            }
+        }
 
         tvMuteInd?.text = if (call.isMuted) "🎤 Mic: Muted" else "🎤 Mic: On"
         tvSpeakerInd?.text = if (call.isSpeakerOn) "🔊 Speaker: On" else "🔈 Earpiece"
@@ -5603,7 +5615,7 @@ class MainActivity : AppCompatActivity() {
                 activeChat?.let { stopAndSendVoiceRecording(it) }
                 return true
             }
-            val focused = currentFocus
+            val focused = currentFocus ?: window.decorView.findFocus()
             if (focused is Button) {
                 focused.performClick()
                 return true
