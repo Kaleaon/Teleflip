@@ -2,7 +2,6 @@ package com.teleflip.app.ui
 
 import android.app.Application
 import android.view.KeyEvent
-import android.widget.EditText
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.teleflip.app.R
@@ -28,7 +27,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         etQuestion.requestFocus()
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)
@@ -42,7 +41,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         etQuestion.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -55,8 +54,8 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
 
         etQuestion.requestFocus()
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)

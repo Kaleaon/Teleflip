@@ -88,56 +88,28 @@
         </LinearLayout>
 
         <!-- Server Field -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Server Host / IP:"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="2dp" />
-
-        <EditText
-            android:id="@+id/et_proxy_server"
+        <com.teleflip.app.ui.LabeledInputView
+            android:id="@+id/liv_proxy_server"
+            xmlns:app="http://schemas.android.com/apk/res-auto"
             android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:hint="e.g. 192.168.1.1 or proxy.com"
-            android:textColor="@color/text_primary"
-            android:textColorHint="@color/text_hint"
-            android:textSize="13sp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:background="@drawable/bg_edittext_selector"
-            android:inputType="text"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:layout_marginBottom="8dp" />
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            app:inputLabel="Server Host / IP:"
+            app:inputHint="e.g. 192.168.1.1 or proxy.com"
+            app:inputType="text"
+            app:inputSingleLine="true" />
 
         <!-- Port Field -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Port:"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="2dp" />
-
-        <EditText
-            android:id="@+id/et_proxy_port"
+        <com.teleflip.app.ui.LabeledInputView
+            android:id="@+id/liv_proxy_port"
+            xmlns:app="http://schemas.android.com/apk/res-auto"
             android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:hint="1080"
-            android:textColor="@color/text_primary"
-            android:textColorHint="@color/text_hint"
-            android:textSize="13sp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:background="@drawable/bg_edittext_selector"
-            android:inputType="number"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:layout_marginBottom="8dp" />
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            app:inputLabel="Port:"
+            app:inputHint="1080"
+            app:inputType="number"
+            app:inputSingleLine="true" />
 
         <!-- SOCKS5 Credentials Group -->
         <LinearLayout
@@ -146,55 +118,27 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Username (Optional):"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="2dp" />
-
-            <EditText
-                android:id="@+id/et_proxy_username"
+            <com.teleflip.app.ui.LabeledInputView
+                android:id="@+id/liv_proxy_username"
+                xmlns:app="http://schemas.android.com/apk/res-auto"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:hint="Username"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_hint"
-                android:textSize="13sp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:background="@drawable/bg_edittext_selector"
-                android:inputType="text"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Password (Optional):"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="2dp" />
+                android:layout_marginBottom="8dp"
+                app:inputLabel="Username (Optional):"
+                app:inputHint="Username"
+                app:inputType="text"
+                app:inputSingleLine="true" />
 
-            <EditText
-                android:id="@+id/et_proxy_password"
+            <com.teleflip.app.ui.LabeledInputView
+                android:id="@+id/liv_proxy_password"
+                xmlns:app="http://schemas.android.com/apk/res-auto"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:hint="Password"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_hint"
-                android:textSize="13sp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:background="@drawable/bg_edittext_selector"
-                android:inputType="textPassword"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:layout_marginBottom="8dp" />
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                app:inputLabel="Password (Optional):"
+                app:inputHint="Password"
+                app:inputType="password"
+                app:inputSingleLine="true" />
 
         </LinearLayout>
 
@@ -206,30 +150,16 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="MTProto Secret:"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="2dp" />
-
-            <EditText
-                android:id="@+id/et_proxy_secret"
+            <com.teleflip.app.ui.LabeledInputView
+                android:id="@+id/liv_proxy_secret"
+                xmlns:app="http://schemas.android.com/apk/res-auto"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:hint="e.g. ee123456789012345678901234567890"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_hint"
-                android:textSize="13sp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:background="@drawable/bg_edittext_selector"
-                android:inputType="text"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:layout_marginBottom="8dp" />
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                app:inputLabel="MTProto Secret:"
+                app:inputHint="e.g. ee123456789012345678901234567890"
+                app:inputType="text"
+                app:inputSingleLine="true" />
 
         </LinearLayout>
 
