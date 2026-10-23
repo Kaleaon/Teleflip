@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.telephony.TelephonyManager
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.teleflip.app.MainActivity
 import com.teleflip.app.R
 import com.teleflip.app.telegram.TelegramManager
@@ -71,7 +72,8 @@ class TeleFlipNotificationService : Service() {
                     .build()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
+                ServiceCompat.startForeground(
+                    this,
                     FG_NOTIFICATION_ID,
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
