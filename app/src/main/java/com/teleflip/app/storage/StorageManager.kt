@@ -254,7 +254,7 @@ object StorageManager {
 
     fun getSelectedStorageType(context: Context): StorageLocationType {
         val prefs = getPrefs(context)
-        val value = prefs.getString(PREF_STORAGE_LOCATION, "internal")
+        val value = prefs.getString(PREF_STORAGE_LOCATION, "sd_card")
         return if (value == "sd_card" && isSdCardAvailable(context)) {
             StorageLocationType.SD_CARD
         } else {
@@ -294,17 +294,31 @@ object StorageManager {
 
     fun getDownloadDirectory(context: Context): File {
         val currentType = getSelectedStorageType(context)
-        val target =
+        val baseDir =
             if (currentType == StorageLocationType.SD_CARD) {
-                val sd = detectSdCardDirectory(context)
-                if (sd != null) {
-                    File(sd, "TeleFlip_Downloads")
-                } else {
-                    File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TeleFlip")
-                }
+                detectSdCardDirectory(context) ?: context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
             } else {
-                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TeleFlip")
+                context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
             }
+        val target = File(baseDir, "TeleFlip_Downloads")
+        if (!target.exists()) {
+            target.mkdirs()
+        }
+        return target
+    }
+
+    fun getExportDirectory(
+        context: Context,
+        type: StorageLocationType? = null,
+    ): File {
+        val targetType = type ?: getSelectedStorageType(context)
+        val baseDir =
+            if (targetType == StorageLocationType.SD_CARD) {
+                detectSdCardDirectory(context) ?: context.getExternalFilesDir(null) ?: context.filesDir
+            } else {
+                context.getExternalFilesDir(null) ?: context.filesDir
+            }
+        val target = File(baseDir, "TeleFlip_Exports")
         if (!target.exists()) {
             target.mkdirs()
         }
