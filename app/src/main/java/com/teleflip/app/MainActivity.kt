@@ -1151,11 +1151,20 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, msg, if (isError) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
     }
 
-    private var activeDialogCount = 0
-    private var savedFocusView: View? = null
+    @VisibleForTesting
+    internal var activeDialogCount = 0
+
+    @VisibleForTesting
+    internal var savedFocusView: View? = null
+
+    fun captureFocusForDialog() {
+        if (activeDialogCount == 0 && savedFocusView == null) {
+            savedFocusView = currentFocus ?: window?.decorView?.findFocus()
+        }
+    }
 
     fun onDialogShown() {
-        if (activeDialogCount == 0) {
+        if (activeDialogCount == 0 && savedFocusView == null) {
             savedFocusView = currentFocus ?: window?.decorView?.findFocus()
         }
         activeDialogCount++
@@ -1170,10 +1179,19 @@ class MainActivity : AppCompatActivity() {
             softkeyManager.setSoftkeyBarVisible(true)
             val targetView = savedFocusView
             savedFocusView = null
-            targetView?.post {
-                if (targetView.isAttachedToWindow) {
+            val postContainer = targetView?.takeIf { it.isAttachedToWindow } ?: mainContainer
+            postContainer.post {
+                if (targetView != null && targetView.isAttachedToWindow) {
                     targetView.requestFocus()
                     targetView.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED)
+                } else {
+                    val fallbackView =
+                        rvChats?.takeIf { it.isAttachedToWindow && it.visibility == View.VISIBLE }
+                            ?: mainContainer.takeIf { it.isAttachedToWindow }
+                    fallbackView?.isFocusable = true
+                    fallbackView?.isFocusableInTouchMode = true
+                    fallbackView?.requestFocus()
+                    fallbackView?.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED)
                 }
             }
         }
