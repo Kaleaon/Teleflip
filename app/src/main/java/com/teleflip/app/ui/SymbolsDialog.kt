@@ -26,7 +26,27 @@ class SymbolsDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_symbols)
-        setupDismissKeys()
+        setupSoftkeys(
+            left = "",
+            center = "Select",
+            right = "Close",
+            onLeft = null,
+            onCenter = {
+                val focused = currentFocus
+                val rv = findViewById<RecyclerView>(R.id.rv_symbols_grid)
+                if (focused != null && rv != null) {
+                    val itemView = rv.findContainingItemView(focused)
+                    if (itemView != null) {
+                        val pos = rv.getChildAdapterPosition(itemView)
+                        if (pos in symbols.indices) {
+                            dismiss()
+                            onSymbolSelected(symbols[pos])
+                        }
+                    }
+                }
+            },
+            onRight = { dismiss() },
+        )
 
         val rv = findViewById<RecyclerView>(R.id.rv_symbols_grid)
         rv?.layoutManager = GridLayoutManager(context, 4)
@@ -45,10 +65,6 @@ class SymbolsDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (isBackOrRightSoftKey(keyCode)) {
-            dismiss()
-            return true
-        }
         return super.onKeyDown(keyCode, event)
     }
 
