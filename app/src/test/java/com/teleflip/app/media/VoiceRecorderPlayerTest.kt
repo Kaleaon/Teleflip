@@ -62,7 +62,6 @@ class VoiceRecorderPlayerTest {
     @Test
     fun testVoicePlayerPlaybackParamsFallbackOnFailure() {
         val player = VoicePlayer(dummyContext())
-        player.sdkVersion = android.os.Build.VERSION_CODES.M
         val mockMediaPlayer = mock(MediaPlayer::class.java)
 
         `when`(mockMediaPlayer.playbackParams).thenThrow(IllegalStateException("Audio driver error"))
