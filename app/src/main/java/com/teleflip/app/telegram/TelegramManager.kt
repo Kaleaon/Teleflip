@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -5694,6 +5695,83 @@ class TelegramManager(
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not delete proxy") }
             }
+        }
+    }
+
+    fun pingProxy(
+        proxy: ProxyItem,
+        callback: (Long?) -> Unit,
+    ) {
+        scope.launch {
+            try {
+                val tdProxy = buildTdApiProxy(proxy)
+                val result = sendQuery(TdApi.PingProxy(tdProxy))
+                val latencyMs =
+                    if (result is TdApi.Seconds) {
+                        (result.seconds * 1000.0).toLong()
+                    } else {
+                        null
+                    }
+                withContext(Dispatchers.Main) { callback(latencyMs) }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { callback(null) }
+            }
+        }
+    }
+
+    fun pingProxy(
+        proxyId: Int,
+        callback: (Long?) -> Unit,
+    ) {
+        val proxy = getProxies().find { it.id == proxyId }
+        if (proxy != null) {
+            pingProxy(proxy, callback)
+        } else {
+            callback(null)
+        }
+    }
+
+    fun parseProxyUri(uri: Uri): ProxyItem? {
+        val scheme = uri.scheme?.lowercase(Locale.getDefault()) ?: return null
+        val host = uri.host?.lowercase(Locale.getDefault()) ?: ""
+        val path = uri.path?.lowercase(Locale.getDefault()) ?: ""
+
+        val isMtproto: Boolean
+        val isSocks5: Boolean
+
+        if (scheme == "tg") {
+            isMtproto = host == "proxy"
+            isSocks5 = host == "socks"
+        } else if (scheme == "http" || scheme == "https") {
+            if (host != "t.me" && host != "telegram.me") return null
+            isMtproto = path.startsWith("/proxy")
+            isSocks5 = path.startsWith("/socks")
+        } else {
+            return null
+        }
+
+        if (!isMtproto && !isSocks5) return null
+
+        val server = uri.getQueryParameter("server") ?: uri.getQueryParameter("host") ?: ""
+        if (server.isBlank()) return null
+
+        val port = uri.getQueryParameter("port")?.toIntOrNull() ?: 1080
+
+        return if (isMtproto) {
+            val secret = uri.getQueryParameter("secret") ?: ""
+            ProxyItem(server = server, port = port, type = ProxyType.MTPROTO, secret = secret)
+        } else {
+            val username = uri.getQueryParameter("user") ?: uri.getQueryParameter("username") ?: ""
+            val password = uri.getQueryParameter("pass") ?: uri.getQueryParameter("password") ?: ""
+            ProxyItem(server = server, port = port, type = ProxyType.SOCKS5, username = username, password = password)
+        }
+    }
+
+    fun parseProxyUrl(url: String): ProxyItem? {
+        return try {
+            parseProxyUri(Uri.parse(url))
+        } catch (e: Exception) {
+            null
         }
     }
 }
