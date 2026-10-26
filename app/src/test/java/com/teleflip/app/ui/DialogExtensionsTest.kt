@@ -174,6 +174,62 @@ class DialogExtensionsTest {
         assertFalse(dialog.isShowing)
     }
 
+    private class TestBaseDialog(context: android.content.Context) : BaseDialog(context) {
+        fun checkIsBackOrRightSoftKey(keyCode: Int): Boolean = isBackOrRightSoftKey(keyCode)
+    }
+
+    @Test
+    fun baseDialog_isBackOrRightSoftKey_delegatesToSoftkeyUtils() {
+        val testDialog = TestBaseDialog(context)
+        val validCodes =
+            listOf(
+                KeyEvent.KEYCODE_BACK,
+                KeyEvent.KEYCODE_SOFT_RIGHT,
+                229,
+                230,
+                61,
+                158,
+            )
+        for (code in validCodes) {
+            assertTrue(
+                "Keycode $code should return true in BaseDialog.isBackOrRightSoftKey",
+                testDialog.checkIsBackOrRightSoftKey(code),
+            )
+        }
+
+        val invalidCodes =
+            listOf(
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_SOFT_LEFT,
+                132,
+                60,
+                228,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+            )
+        for (code in invalidCodes) {
+            assertFalse(
+                "Keycode $code should return false in BaseDialog.isBackOrRightSoftKey",
+                testDialog.checkIsBackOrRightSoftKey(code),
+            )
+        }
+    }
+
+    @Test
+    fun diagnosticsDialog_dismissesOnVendorSoftRightKey() {
+        val vendorCodes = listOf(229, 230, 61, 158)
+        for (code in vendorCodes) {
+            val dialog = DiagnosticsDialog(context)
+            dialog.show()
+            assertTrue(dialog.isShowing)
+
+            val event = KeyEvent(KeyEvent.ACTION_DOWN, code)
+            val handled = dialog.dispatchKeyEvent(event)
+
+            assertTrue("Vendor keycode $code should be handled by DiagnosticsDialog", handled)
+            assertFalse("DiagnosticsDialog should be dismissed on vendor keycode $code", dialog.isShowing)
+        }
+    }
+
     @Test
     fun testFocusRestorationOnDialogDismissal() {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
