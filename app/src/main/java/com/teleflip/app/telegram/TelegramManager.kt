@@ -34,6 +34,7 @@ import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.model.ProxyType
 import com.teleflip.app.model.SavedGifItem
 import com.teleflip.app.model.SessionModel
+import com.teleflip.app.model.SlowModeState
 import com.teleflip.app.model.StickerItem
 import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.model.UserProfileModel
@@ -64,6 +65,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -119,6 +121,69 @@ class TelegramManager(
 
     private val _messages = MutableStateFlow<Map<Long, List<MessageModel>>>(emptyMap())
     val messages: StateFlow<Map<Long, List<MessageModel>>> = _messages.asStateFlow()
+
+    private val supergroupToChatIdMap = ConcurrentHashMap<Long, Long>()
+
+    private val _slowModeStates = MutableStateFlow<Map<Long, SlowModeState>>(emptyMap())
+    val slowModeStates: StateFlow<Map<Long, SlowModeState>> = _slowModeStates.asStateFlow()
+
+    fun getChatIdForSupergroup(supergroupId: Long): Long {
+        val cached = supergroupToChatIdMap[supergroupId]
+        if (cached != null) return cached
+        val found =
+            pendingChats.values.find {
+                (it as? TdApi.Chat)?.type is TdApi.ChatTypeSupergroup &&
+                    ((it as TdApi.Chat).type as TdApi.ChatTypeSupergroup).supergroupId == supergroupId
+            } as? TdApi.Chat
+        if (found != null) {
+            supergroupToChatIdMap[supergroupId] = found.id
+            return found.id
+        }
+        val chatModel =
+            _chats.value.find {
+                (it.chatType == ChatType.GROUP || it.chatType == ChatType.CHANNEL)
+            }
+        return chatModel?.id ?: 0L
+    }
+
+    fun getSlowModeState(chatId: Long): SlowModeState? {
+        return _slowModeStates.value[chatId]
+    }
+
+    fun getSlowModeRemainingSeconds(chatId: Long): Int {
+        return _slowModeStates.value[chatId]?.remainingSeconds() ?: 0
+    }
+
+    fun updateSlowModeCooldown(
+        chatId: Long,
+        seconds: Int,
+    ) {
+        if (seconds <= 0) return
+        val now = System.currentTimeMillis()
+        val expiresAtMs = now + (seconds * 1000L)
+        _slowModeStates.update { current ->
+            val existing = current[chatId]
+            val delay = if ((existing?.delaySeconds ?: 0) > 0) existing!!.delaySeconds else seconds
+            current + (chatId to SlowModeState(chatId, delay, expiresAtMs))
+        }
+    }
+
+    fun updateSlowModeStateFromSupergroupInfo(
+        chatId: Long,
+        delaySeconds: Int,
+        expiresInSeconds: Double,
+    ) {
+        val now = System.currentTimeMillis()
+        val expiresAtMs =
+            if (expiresInSeconds > 0) {
+                now + (expiresInSeconds * 1000).toLong()
+            } else {
+                0L
+            }
+        _slowModeStates.update { current ->
+            current + (chatId to SlowModeState(chatId, delaySeconds, expiresAtMs))
+        }
+    }
 
     private val _activeCall = MutableStateFlow<ActiveCall?>(null)
     val activeCall: StateFlow<ActiveCall?> = _activeCall.asStateFlow()
@@ -805,6 +870,11 @@ class TelegramManager(
         saveChatDraft(chatId, "")
 
         // Live TDLib send text message
+        val delay = _slowModeStates.value[chatId]?.delaySeconds ?: 0
+        if (delay > 0) {
+            updateSlowModeCooldown(chatId, delay)
+        }
+
         val content =
             TdApi.InputMessageText(
                 TdApi.FormattedText(text, emptyArray()),
@@ -831,6 +901,11 @@ class TelegramManager(
     }
 
     private fun reportOperationError(message: String) {
+        val slowModeMatch = Regex("""SLOWMODE_WAIT_(\d+)""", RegexOption.IGNORE_CASE).find(message)
+        if (slowModeMatch != null) {
+            Log.d(tag, "Suppressed operation error due to slow mode wait: $message")
+            return
+        }
         _operationError.value = message
         Log.e(tag, message)
     }
@@ -847,7 +922,16 @@ class TelegramManager(
         }
         client.send(request) { result ->
             if (result is TdApi.Error) {
-                reportOperationError("Message was not sent: ${result.message}")
+                val msg = result.message.orEmpty()
+                val slowModeMatch = Regex("""SLOWMODE_WAIT_(\d+)""", RegexOption.IGNORE_CASE).find(msg)
+                if (slowModeMatch != null) {
+                    val seconds = slowModeMatch.groupValues[1].toIntOrNull() ?: 0
+                    if (seconds > 0) {
+                        updateSlowModeCooldown(request.chatId, seconds)
+                    }
+                } else {
+                    reportOperationError("Message was not sent: $msg")
+                }
             }
             // UpdateNewMessage owns insertion. The send callback may arrive after
             // UpdateMessageSendSucceeded and contain an obsolete pending ID.
@@ -3857,6 +3941,7 @@ class TelegramManager(
                     statusText = "$memberCount members"
                 } else if (chatObj?.type is TdApi.ChatTypeSupergroup) {
                     val supergroupId = (chatObj.type as TdApi.ChatTypeSupergroup).supergroupId
+                    supergroupToChatIdMap[supergroupId] = chatId
                     val supergroupFull =
                         withTimeoutOrNull(3000L) {
                             sendQuery(TdApi.GetSupergroupFullInfo(supergroupId))
@@ -3866,6 +3951,13 @@ class TelegramManager(
                     statusText = if (chatType == ChatType.CHANNEL) "$memberCount subscribers" else "$memberCount members"
                     if (!supergroupFull?.inviteLink?.inviteLink.isNullOrBlank()) {
                         username = supergroupFull?.inviteLink?.inviteLink ?: ""
+                    }
+                    if (supergroupFull != null) {
+                        updateSlowModeStateFromSupergroupInfo(
+                            chatId = chatId,
+                            delaySeconds = supergroupFull.slowModeDelay,
+                            expiresInSeconds = supergroupFull.slowModeDelayExpiresIn,
+                        )
                     }
                 }
 
@@ -3893,6 +3985,14 @@ class TelegramManager(
                         isSecretChat = chatModel?.isSecretChat ?: false,
                         selfDestructTimerSec = chatModel?.selfDestructTimerSec ?: 0,
                         members = membersList,
+                        slowModeDelay =
+                            (chatObj?.type as? TdApi.ChatTypeSupergroup)?.let {
+                                _slowModeStates.value[chatId]?.delaySeconds ?: 0
+                            } ?: 0,
+                        slowModeDelayExpiresIn =
+                            (chatObj?.type as? TdApi.ChatTypeSupergroup)?.let {
+                                _slowModeStates.value[chatId]?.remainingSeconds()?.toDouble() ?: 0.0
+                            } ?: 0.0,
                     )
 
                 try {
@@ -4283,6 +4383,20 @@ class TelegramManager(
         if (obj == null) return
 
         when (obj.constructor) {
+            TdApi.UpdateSupergroupFullInfo.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateSupergroupFullInfo
+                val fullInfo = update.supergroupFullInfo
+                if (fullInfo != null) {
+                    val chatId = getChatIdForSupergroup(update.supergroupId)
+                    if (chatId != 0L) {
+                        updateSlowModeStateFromSupergroupInfo(
+                            chatId = chatId,
+                            delaySeconds = fullInfo.slowModeDelay,
+                            expiresInSeconds = fullInfo.slowModeDelayExpiresIn,
+                        )
+                    }
+                }
+            }
             TdApi.UpdateChatIsMarkedAsUnread.CONSTRUCTOR -> {
                 val update = obj as TdApi.UpdateChatIsMarkedAsUnread
                 synchronized(pendingChats) { pendingChats[update.chatId]?.let { pendingChats[update.chatId] = it.copy(isMarkedUnread = update.isMarkedAsUnread) } }
@@ -4714,6 +4828,10 @@ class TelegramManager(
     }
 
     private fun addOrUpdateChat(chat: TdApi.Chat) {
+        if (chat.type is TdApi.ChatTypeSupergroup) {
+            val supergroupId = (chat.type as TdApi.ChatTypeSupergroup).supergroupId
+            supergroupToChatIdMap[supergroupId] = chat.id
+        }
         lastReadOutboxIds[chat.id] = chat.lastReadOutboxMessageId
         val title = chat.title.ifBlank { "Chat #${chat.id}" }
         val lastMsg = chat.lastMessage
