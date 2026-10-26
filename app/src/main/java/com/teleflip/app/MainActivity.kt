@@ -3062,6 +3062,7 @@ class MainActivity : AppCompatActivity() {
                     telegramManager.terminateAllOtherSessions { ok, err ->
                         if (ok) {
                             showToast("All other sessions terminated")
+                            showActiveSessionsMenu()
                         } else {
                             showToast("Error: ${err ?: "Failed"}", isError = true)
                         }
@@ -3073,7 +3074,30 @@ class MainActivity : AppCompatActivity() {
                 val info = "${session.deviceModel} • ${session.platform} • ${session.ip}$currentBadge"
                 options.add(
                     MenuOption(idx + 2, "📱 $info") {
-                        showToast("Session: ${session.appName} ${session.appVersion} (${session.activeDate})")
+                        if (session.isCurrent) {
+                            showToast("Current device session cannot be removed")
+                        } else {
+                            AlertDialog.Builder(this)
+                                .setTitle("Stop Session?")
+                                .setMessage(
+                                    "${session.deviceModel} (${session.platform})\n" +
+                                        "${session.appName} ${session.appVersion}\n" +
+                                        "IP: ${session.ip}\n" +
+                                        "Last active: ${session.activeDate}",
+                                )
+                                .setPositiveButton("Stop Session") { _, _ ->
+                                    telegramManager.terminateSession(session.id) { ok, err ->
+                                        if (ok) {
+                                            showToast("Session terminated")
+                                            showActiveSessionsMenu()
+                                        } else {
+                                            showToast("Error: ${err ?: "Failed"}", isError = true)
+                                        }
+                                    }
+                                }
+                                .setNegativeButton("Cancel", null)
+                                .show()
+                        }
                     },
                 )
             }

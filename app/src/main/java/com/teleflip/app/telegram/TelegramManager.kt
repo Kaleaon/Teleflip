@@ -3277,6 +3277,28 @@ class TelegramManager(
         }
     }
 
+    fun terminateSession(
+        sessionId: Long,
+        onResult: (Boolean, String?) -> Unit,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult(false, "Not connected")
+            return
+        }
+        client.send(TdApi.TerminateSession(sessionId)) { obj ->
+            scope.launch(Dispatchers.Main) {
+                if (obj is TdApi.Ok) {
+                    onResult(true, null)
+                } else if (obj is TdApi.Error) {
+                    onResult(false, obj.message)
+                } else {
+                    onResult(false, "Failed to terminate session")
+                }
+            }
+        }
+    }
+
     // =========================================================================
     // Storage & Media Cache Cleaner
     // =========================================================================
