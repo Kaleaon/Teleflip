@@ -2,7 +2,10 @@ package com.teleflip.app.ui
 
 import android.content.Context
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.KeyEvent
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -20,6 +23,7 @@ class NewChatDialog(
 ) : BaseDialog(context) {
     private var etInput: EditText? = null
     private var keypadEngine: KeypadInputEngine? = null
+    private var softkeyManager: SoftkeyManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +38,15 @@ class NewChatDialog(
         val btnChannel = findViewById<Button>(R.id.btn_create_channel)
         val btnSecret = findViewById<Button>(R.id.btn_start_secret_chat)
         val btnCancel = findViewById<Button>(R.id.btn_cancel_new_chat)
+
+        val softkeyBar = findViewById<View>(R.id.softkey_bar)
+        val tvLeft = findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
+
+        if (tvLeft != null && tvCenter != null && tvRight != null) {
+            softkeyManager = SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight)
+        }
 
         etInput = input
 
@@ -88,7 +101,86 @@ class NewChatDialog(
             dismiss()
         }
 
-        input?.requestFocus()
+        val focusListener = View.OnFocusChangeListener { _, _ -> updateSoftkeys() }
+        input?.onFocusChangeListener = focusListener
+        btnDirect?.onFocusChangeListener = focusListener
+        btnSaved?.onFocusChangeListener = focusListener
+        btnGroup?.onFocusChangeListener = focusListener
+        btnChannel?.onFocusChangeListener = focusListener
+        btnSecret?.onFocusChangeListener = focusListener
+        btnCancel?.onFocusChangeListener = focusListener
+
+        input?.addTextChangedListener(
+            object : TextWatcher {
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int,
+                ) {}
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int,
+                ) {
+                    updateSoftkeys()
+                }
+
+                override fun afterTextChanged(s: Editable?) {}
+            },
+        )
+
+        btnDirect?.requestFocus()
+        updateSoftkeys()
+    }
+
+    private fun updateSoftkeys() {
+        val input = etInput
+        if (input?.hasFocus() == true) {
+            softkeyManager?.update(
+                left = "Clear",
+                center = "Start",
+                right = "Back",
+                onLeft = {
+                    keypadEngine?.commitCurrentChar()
+                    input.setText("")
+                },
+                onCenter = {
+                    findViewById<Button>(R.id.btn_start_direct_chat)?.performClick()
+                },
+                onRight = {
+                    keypadEngine?.commitCurrentChar()
+                    dismiss()
+                },
+            )
+        } else {
+            val hasText = !input?.text.isNullOrEmpty()
+            softkeyManager?.update(
+                left = if (hasText) "Clear Input" else "",
+                center = "Select",
+                right = "Back",
+                onLeft = {
+                    if (hasText) {
+                        keypadEngine?.commitCurrentChar()
+                        input?.setText("")
+                    }
+                },
+                onCenter = {
+                    val focused = currentFocus
+                    if (focused != null && focused.isClickable) {
+                        focused.performClick()
+                    } else {
+                        findViewById<Button>(R.id.btn_start_direct_chat)?.performClick()
+                    }
+                },
+                onRight = {
+                    keypadEngine?.commitCurrentChar()
+                    dismiss()
+                },
+            )
+        }
     }
 
     override fun onBackPressed() {
@@ -100,6 +192,10 @@ class NewChatDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
+            return true
+        }
+
         if (isBackOrRightSoftKey(keyCode)) {
             keypadEngine?.commitCurrentChar()
             dismiss()
