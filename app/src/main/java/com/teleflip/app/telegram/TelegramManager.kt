@@ -1566,6 +1566,10 @@ class TelegramManager(
         question: String,
         options: List<String>,
         isAnonymous: Boolean = true,
+        isQuiz: Boolean = false,
+        correctOptionIndex: Int = -1,
+        explanation: String = "",
+        allowsMultipleAnswers: Boolean = false,
         disableNotification: Boolean = false,
         schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
@@ -1577,7 +1581,15 @@ class TelegramManager(
             val pollContent =
                 TdApi.InputMessagePoll().apply {
                     this.isAnonymous = isAnonymous
-                    this.type = TdApi.InputPollTypeRegular(false)
+                    this.allowsMultipleAnswers = if (!isQuiz) allowsMultipleAnswers else false
+                    if (isQuiz) {
+                        val validIndex = if (correctOptionIndex in cleanOptions.indices) correctOptionIndex else 0
+                        val correctOptionIds = intArrayOf(validIndex)
+                        val formattedExp = TdApi.FormattedText(explanation.trim(), emptyArray())
+                        this.type = TdApi.InputPollTypeQuiz(correctOptionIds, formattedExp, null)
+                    } else {
+                        this.type = TdApi.InputPollTypeRegular(false)
+                    }
                 }
             setPollQuestionAndOptionsCompat(pollContent, trimmedQuestion, cleanOptions)
             val sendReq =
@@ -4991,6 +5003,58 @@ class TelegramManager(
         }
     }
 
+    private data class PollData(
+        val question: String = "",
+        val options: List<PollOption> = emptyList(),
+        val isAnonymous: Boolean = true,
+        val isClosed: Boolean = false,
+        val totalVoters: Int = 0,
+        val isQuiz: Boolean = false,
+        val correctOptionIndex: Int = -1,
+        val explanation: String = "",
+        val allowsMultipleAnswers: Boolean = false,
+    )
+
+    private fun extractPollData(content: TdApi.MessageContent?): PollData {
+        if (content !is TdApi.MessagePoll) return PollData()
+        val poll = content.poll ?: return PollData()
+        val questionText = poll.question?.text ?: ""
+        val optionsList =
+            poll.options?.map { opt ->
+                PollOption(
+                    text = opt.text?.text ?: "",
+                    voterCount = opt.voterCount,
+                    votePercentage = opt.votePercentage,
+                    isChosen = opt.isChosen,
+                )
+            } ?: emptyList()
+
+        var isQuizMode = false
+        var correctIndex = -1
+        var explanationText = ""
+
+        when (val pollType = poll.type) {
+            is TdApi.PollTypeQuiz -> {
+                isQuizMode = true
+                correctIndex = pollType.correctOptionIds?.firstOrNull() ?: -1
+                explanationText = pollType.explanation?.text ?: ""
+            }
+            else -> {}
+        }
+
+        return PollData(
+            question = questionText,
+            options = optionsList,
+            isAnonymous = poll.isAnonymous,
+            isClosed = poll.isClosed,
+            totalVoters = poll.totalVoterCount,
+            isQuiz = isQuizMode,
+            correctOptionIndex = correctIndex,
+            explanation = explanationText,
+            allowsMultipleAnswers = poll.allowsMultipleAnswers,
+        )
+    }
+
     private fun messageStatus(msg: TdApi.Message): MessageStatus =
         when {
             !msg.isOutgoing -> MessageStatus.READ
@@ -5058,6 +5122,7 @@ class TelegramManager(
         val mediaType = extractMediaType(msg.content)
         val mediaInfo = extractMediaFileInfo(msg.content)
         val stickerInfo = extractStickerInfo(msg.content)
+        val pollData = extractPollData(msg.content)
         val model =
             MessageModel(
                 id = msg.id,
@@ -5096,14 +5161,15 @@ class TelegramManager(
                     },
                 latitude = (msg.content as? TdApi.MessageLocation)?.location?.latitude ?: 0.0,
                 longitude = (msg.content as? TdApi.MessageLocation)?.location?.longitude ?: 0.0,
-                pollQuestion = (msg.content as? TdApi.MessagePoll)?.poll?.question?.text.orEmpty(),
-                pollOptions =
-                    (msg.content as? TdApi.MessagePoll)?.poll?.options?.map { option ->
-                        PollOption(option.text.text, option.voterCount, option.votePercentage, option.isChosen)
-                    }.orEmpty(),
-                pollIsAnonymous = (msg.content as? TdApi.MessagePoll)?.poll?.isAnonymous ?: true,
-                pollIsClosed = (msg.content as? TdApi.MessagePoll)?.poll?.isClosed ?: false,
-                pollTotalVoters = (msg.content as? TdApi.MessagePoll)?.poll?.totalVoterCount ?: 0,
+                pollQuestion = pollData.question,
+                pollOptions = pollData.options,
+                pollIsAnonymous = pollData.isAnonymous,
+                pollIsClosed = pollData.isClosed,
+                pollTotalVoters = pollData.totalVoters,
+                pollIsQuiz = pollData.isQuiz,
+                pollCorrectOptionIndex = pollData.correctOptionIndex,
+                pollExplanation = pollData.explanation,
+                pollAllowsMultipleAnswers = pollData.allowsMultipleAnswers,
                 messageThreadId = (msg.topicId as? TdApi.MessageTopicForum)?.forumTopicId?.toLong() ?: 0L,
                 replyToMessageId = (msg.replyTo as? TdApi.MessageReplyToMessage)?.messageId ?: 0L,
                 replyToPreview =
