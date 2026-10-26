@@ -20,7 +20,6 @@ class PollDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_create_poll)
-        setupDismissKeys()
 
         val tvMode = findViewById<TextView>(R.id.tv_poll_input_mode)
         val etQuestion = findViewById<EditText>(R.id.et_poll_question)
@@ -30,6 +29,38 @@ class PollDialog(
         val btnAnon = findViewById<Button>(R.id.btn_poll_anonymous_toggle)
         val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
         val btnCancel = findViewById<Button>(R.id.btn_poll_cancel)
+
+        setupSoftkeys(
+            left = "Clear",
+            center = "Submit",
+            right = "Cancel",
+            onLeft = {
+                val focusedEdit = currentFocus as? EditText
+                if (focusedEdit != null) {
+                    engines[focusedEdit.id]?.commitCurrentChar()
+                    focusedEdit.setText("")
+                }
+            },
+            onCenter = {
+                engines.values.forEach { it.commitCurrentChar() }
+                val question = etQuestion?.text?.toString()?.trim().orEmpty()
+                val opts =
+                    listOfNotNull(
+                        etOpt1?.text?.toString()?.trim(),
+                        etOpt2?.text?.toString()?.trim(),
+                        etOpt3?.text?.toString()?.trim(),
+                    ).filter { it.isNotBlank() }
+
+                if (question.isNotBlank() && opts.size >= 2) {
+                    dismiss()
+                    onCreatePoll(question, opts, isAnonymous)
+                }
+            },
+            onRight = {
+                engines.values.forEach { it.commitCurrentChar() }
+                dismiss()
+            },
+        )
 
         listOfNotNull(etQuestion, etOpt1, etOpt2, etOpt3).forEach { field ->
             engines[field.id] =
@@ -81,19 +112,8 @@ class PollDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (isBackOrRightSoftKey(keyCode)) {
-            engines.values.forEach { it.commitCurrentChar() }
-            dismiss()
-            return true
-        }
-
         val focusedEdit = currentFocus as? EditText
         if (focusedEdit != null) {
-            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
-                engines[focusedEdit.id]?.commitCurrentChar()
-                focusedEdit.setText("")
-                return true
-            }
             val isInputKey =
                 (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
                     keyCode == KeyEvent.KEYCODE_STAR ||

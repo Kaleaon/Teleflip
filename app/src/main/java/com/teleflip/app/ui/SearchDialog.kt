@@ -112,6 +112,18 @@ class SearchDialog(
         setupSearchInput()
         setupPagination()
 
+        setupSoftkeys(
+            left = "Clear",
+            center = "Select",
+            right = "Back",
+            onLeft = {
+                etSearchInput.setText("")
+                etSearchInput.requestFocus()
+            },
+            onCenter = { handleCenterAction() },
+            onRight = { dismiss() },
+        )
+
         selectTab(SearchTab.CHATS)
 
         etSearchInput.requestFocus()
@@ -330,21 +342,40 @@ class SearchDialog(
         super.dismiss()
     }
 
+    private fun handleCenterAction() {
+        val focused = currentFocus
+        if (focused != null && focused !== etSearchInput && focused !== tabChats && focused !== tabContacts && focused !== tabMessages) {
+            val itemView = rvResults.findContainingItemView(focused)
+            if (itemView != null) {
+                val pos = rvResults.getChildAdapterPosition(itemView)
+                if (pos != RecyclerView.NO_POSITION) {
+                    if (currentTab == SearchTab.MESSAGES) {
+                        val msgItem = messageSearchAdapter?.getItemAt(pos)
+                        if (msgItem != null) {
+                            dismiss()
+                            onMessageSelected(msgItem.chatId, msgItem.messageId)
+                            return
+                        }
+                    } else {
+                        val chatItem = chatAdapter?.getItemAt(pos)
+                        if (chatItem != null) {
+                            dismiss()
+                            onChatSelected(chatItem)
+                            return
+                        }
+                    }
+                }
+            }
+        }
+        if ((rvResults.adapter?.itemCount ?: 0) > 0) {
+            rvResults.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
+    }
+
     override fun onKeyDown(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
-            dismiss()
-            return true
-        }
-
-        if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT) {
-            etSearchInput.setText("")
-            etSearchInput.requestFocus()
-            return true
-        }
-
         if (etSearchInput.hasFocus()) {
             val isInputKey =
                 (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
@@ -370,13 +401,6 @@ class SearchDialog(
                     }
                 }
                 return true
-            }
-
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                if ((rvResults.adapter?.itemCount ?: 0) > 0) {
-                    focusResultAt(0)
-                    return true
-                }
             }
 
             return super.onKeyDown(keyCode, event)
@@ -440,36 +464,6 @@ class SearchDialog(
                     return true
                 } else {
                     etSearchInput.requestFocus()
-                    return true
-                }
-            }
-
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                val focused = currentFocus
-                if (focused != null && focused !== etSearchInput && focused !== tabChats && focused !== tabContacts && focused !== tabMessages) {
-                    val itemView = rvResults.findContainingItemView(focused)
-                    if (itemView != null) {
-                        val pos = rvResults.getChildAdapterPosition(itemView)
-                        if (pos != RecyclerView.NO_POSITION) {
-                            if (currentTab == SearchTab.MESSAGES) {
-                                val msgItem = messageSearchAdapter?.getItemAt(pos)
-                                if (msgItem != null) {
-                                    dismiss()
-                                    onMessageSelected(msgItem.chatId, msgItem.messageId)
-                                    return true
-                                }
-                            } else {
-                                val chatItem = chatAdapter?.getItemAt(pos)
-                                if (chatItem != null) {
-                                    dismiss()
-                                    onChatSelected(chatItem)
-                                    return true
-                                }
-                            }
-                        }
-                    }
-                } else if ((rvResults.adapter?.itemCount ?: 0) > 0) {
-                    focusResultAt(0)
                     return true
                 }
             }
