@@ -24,6 +24,13 @@ class DiagnosticsDialog(context: Context) : BaseDialog(context) {
             dismiss()
         }
 
+        setupSoftkeys(
+            left = "",
+            center = "",
+            right = "Close",
+            onRight = { dismiss() },
+        )
+
         btnClose?.requestFocus()
     }
 

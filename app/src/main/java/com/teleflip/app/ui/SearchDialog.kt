@@ -112,6 +112,19 @@ class SearchDialog(
         setupSearchInput()
         setupPagination()
 
+        setupSoftkeys(
+            left = "Clear",
+            center = "Select",
+            right = "Back",
+            onLeft = {
+                etSearchInput.setText("")
+                etSearchInput.requestFocus()
+            },
+            onRight = {
+                dismiss()
+            },
+        )
+
         selectTab(SearchTab.CHATS)
 
         etSearchInput.requestFocus()
@@ -334,12 +347,12 @@ class SearchDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
+        if (SoftkeyUtils.isBackOrSoftRightKey(keyCode)) {
             dismiss()
             return true
         }
 
-        if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT) {
+        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
             etSearchInput.setText("")
             etSearchInput.requestFocus()
             return true
