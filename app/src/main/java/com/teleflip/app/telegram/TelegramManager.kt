@@ -912,6 +912,62 @@ class TelegramManager(
         }
     }
 
+    fun editMessageCaption(
+        chatId: Long,
+        messageId: Long,
+        newCaption: String,
+        onComplete: ((Boolean) -> Unit)? = null,
+    ) {
+        val trimmed = newCaption.trim()
+
+        val currentMap = _messages.value.toMutableMap()
+        val chatMsgs = (currentMap[chatId] ?: emptyList()).toMutableList()
+        val idx = chatMsgs.indexOfFirst { it.id == messageId }
+        if (idx >= 0) {
+            val updatedMsg = chatMsgs[idx].copy(mediaCaption = trimmed, isEdited = true)
+            chatMsgs[idx] = updatedMsg
+            currentMap[chatId] = chatMsgs
+            _messages.value = currentMap
+
+            if (idx == chatMsgs.lastIndex) {
+                _chats.value =
+                    _chats.value.map {
+                        if (it.id == chatId) {
+                            val newSummary = updatedMsg.text.ifBlank { trimmed }
+                            it.copy(lastMessage = newSummary)
+                        } else {
+                            it
+                        }
+                    }
+            }
+        }
+
+        val client = tdClient
+        if (client == null) {
+            onComplete?.invoke(idx >= 0)
+            return
+        }
+
+        try {
+            val req =
+                TdApi.EditMessageCaption().apply {
+                    this.chatId = chatId
+                    this.messageId = messageId
+                    this.replyMarkup = null
+                    this.caption = TdApi.FormattedText(trimmed, emptyArray())
+                }
+            client.send(req) { result ->
+                val ok = result is TdApi.Message || result is TdApi.Ok
+                scope.launch(Dispatchers.Main) {
+                    onComplete?.invoke(ok)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to edit message caption via TDLib: ${e.message}")
+            onComplete?.invoke(idx >= 0)
+        }
+    }
+
     fun toggleMessageReaction(
         chatId: Long,
         messageId: Long,
@@ -5360,15 +5416,15 @@ class TelegramManager(
     private fun extractMediaCaption(content: TdApi.MessageContent?): String {
         if (content == null) return ""
         return when (content.constructor) {
-            TdApi.MessagePhoto.CONSTRUCTOR -> (content as TdApi.MessagePhoto).caption.text
+            TdApi.MessagePhoto.CONSTRUCTOR -> (content as TdApi.MessagePhoto).caption?.text ?: ""
             TdApi.MessageDocument.CONSTRUCTOR -> {
                 val doc = content as TdApi.MessageDocument
-                doc.caption.text.ifBlank { doc.document.fileName }
+                (doc.caption?.text ?: "").ifBlank { doc.document?.fileName ?: "" }
             }
-            TdApi.MessageVideo.CONSTRUCTOR -> (content as TdApi.MessageVideo).caption.text
-            TdApi.MessageAnimation.CONSTRUCTOR -> (content as TdApi.MessageAnimation).caption.text
-            TdApi.MessageAudio.CONSTRUCTOR -> (content as TdApi.MessageAudio).caption.text
-            TdApi.MessagePaidMedia.CONSTRUCTOR -> (content as TdApi.MessagePaidMedia).caption.text
+            TdApi.MessageVideo.CONSTRUCTOR -> (content as TdApi.MessageVideo).caption?.text ?: ""
+            TdApi.MessageAnimation.CONSTRUCTOR -> (content as TdApi.MessageAnimation).caption?.text ?: ""
+            TdApi.MessageAudio.CONSTRUCTOR -> (content as TdApi.MessageAudio).caption?.text ?: ""
+            TdApi.MessagePaidMedia.CONSTRUCTOR -> (content as TdApi.MessagePaidMedia).caption?.text ?: ""
             else -> ""
         }
     }
@@ -5487,6 +5543,7 @@ class TelegramManager(
             TdApi.MessageVideo.CONSTRUCTOR, TdApi.MessageVideoNote.CONSTRUCTOR -> MediaType.VIDEO
             TdApi.MessageAnimation.CONSTRUCTOR -> MediaType.ANIMATION
             TdApi.MessagePoll.CONSTRUCTOR -> MediaType.POLL
+            TdApi.MessageAudio.CONSTRUCTOR -> MediaType.AUDIO
             TdApi.MessagePaidMedia.CONSTRUCTOR -> MediaType.PAID_MEDIA
             else -> MediaType.NONE
         }

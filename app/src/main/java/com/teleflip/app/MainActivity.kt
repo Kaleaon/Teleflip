@@ -1432,7 +1432,9 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
     // SCREEN 2: CONVERSATION / CHAT
     // =========================================================================
-    private fun openConversation(
+    @androidx.annotation.VisibleForTesting
+    @JvmName("openConversation")
+    internal fun openConversation(
         chat: ChatModel,
         targetMessageId: Long? = null,
     ) {
@@ -1618,16 +1620,27 @@ class MainActivity : AppCompatActivity() {
             draftSyncJob?.cancel()
             draftSyncJob = null
             val text = etComposeInput?.text?.toString()?.trim() ?: ""
-            if (text.isNotEmpty()) {
-                val editing = activeEditMessage
-                val replying = activeReplyMessage
-                if (editing != null) {
+            val editing = activeEditMessage
+            val replying = activeReplyMessage
+            if (editing != null) {
+                var handled = false
+                if (isCaptionableMedia(editing)) {
+                    telegramManager.editMessageCaption(chat.id, editing.id, text) {
+                        showToast("Caption edited")
+                    }
+                    handled = true
+                } else if (text.isNotEmpty()) {
                     telegramManager.editMessageText(chat.id, editing.id, text) {
                         showToast("Message edited")
                     }
+                    handled = true
+                }
+                if (handled) {
                     clearReplyOrEditMode()
                     etComposeInput?.setText("")
-                } else if (replying != null) {
+                }
+            } else if (text.isNotEmpty()) {
+                if (replying != null) {
                     val preview = "${replying.senderName}: ${replying.text.take(35)}"
                     telegramManager.sendMessage(
                         chatId = chat.id,
@@ -2189,13 +2202,29 @@ class MainActivity : AppCompatActivity() {
         etComposeInput?.requestFocus()
     }
 
-    private fun startEditingMessage(msg: MessageModel) {
+    private fun isCaptionableMedia(msg: MessageModel?): Boolean {
+        if (msg == null) return false
+        return msg.mediaType == MediaType.PHOTO ||
+            msg.mediaType == MediaType.VIDEO ||
+            msg.mediaType == MediaType.DOCUMENT ||
+            msg.mediaType == MediaType.ANIMATION ||
+            msg.mediaType == MediaType.AUDIO
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun startEditingMessage(msg: MessageModel) {
         activeEditMessage = msg
         activeReplyMessage = null
         layoutReplyEditBar?.visibility = View.VISIBLE
-        tvReplyEditPreview?.text = "✏️ Editing: ${msg.text.take(35)}"
-        etComposeInput?.setText(msg.text)
-        etComposeInput?.setSelection(msg.text.length)
+        if (isCaptionableMedia(msg)) {
+            tvReplyEditPreview?.text = "✏️ Editing Caption: ${msg.mediaCaption.take(35)}"
+            etComposeInput?.setText(msg.mediaCaption)
+            etComposeInput?.setSelection(msg.mediaCaption.length)
+        } else {
+            tvReplyEditPreview?.text = "✏️ Editing: ${msg.text.take(35)}"
+            etComposeInput?.setText(msg.text)
+            etComposeInput?.setSelection(msg.text.length)
+        }
         etComposeInput?.requestFocus()
     }
 
@@ -2395,19 +2424,28 @@ class MainActivity : AppCompatActivity() {
     ) {
         commitActiveInputEngines()
         val text = etComposeInput?.text?.toString()?.trim() ?: ""
-        if (text.isEmpty()) {
-            showToast("Please enter a message first")
-            return
-        }
         val editing = activeEditMessage
         val replying = activeReplyMessage
         if (editing != null) {
-            telegramManager.editMessageText(chat.id, editing.id, text) {
-                showToast("Message edited")
+            if (isCaptionableMedia(editing)) {
+                telegramManager.editMessageCaption(chat.id, editing.id, text) {
+                    showToast("Caption edited")
+                }
+            } else if (text.isNotEmpty()) {
+                telegramManager.editMessageText(chat.id, editing.id, text) {
+                    showToast("Message edited")
+                }
+            } else {
+                showToast("Please enter a message first")
+                return
             }
             clearReplyOrEditMode()
             etComposeInput?.setText("")
         } else if (replying != null) {
+            if (text.isEmpty()) {
+                showToast("Please enter a message first")
+                return
+            }
             val preview = "${replying.senderName}: ${replying.text.take(35)}"
             telegramManager.sendMessage(
                 chatId = chat.id,
@@ -2420,6 +2458,10 @@ class MainActivity : AppCompatActivity() {
             clearReplyOrEditMode()
             etComposeInput?.setText("")
         } else {
+            if (text.isEmpty()) {
+                showToast("Please enter a message first")
+                return
+            }
             telegramManager.sendMessage(
                 chatId = chat.id,
                 text = text,
@@ -4070,12 +4112,20 @@ class MainActivity : AppCompatActivity() {
                 startReplyToMessage(msg)
             },
         )
-        if (msg.isOutbound && msg.mediaType == MediaType.NONE && msg.text.isNotBlank()) {
-            options.add(
-                MenuOption(options.size + 1, "✏️ Edit Message") {
-                    startEditingMessage(msg)
-                },
-            )
+        if (msg.isOutbound) {
+            if (msg.mediaType == MediaType.NONE && msg.text.isNotBlank()) {
+                options.add(
+                    MenuOption(options.size + 1, "✏️ Edit Message") {
+                        startEditingMessage(msg)
+                    },
+                )
+            } else if (isCaptionableMedia(msg)) {
+                options.add(
+                    MenuOption(options.size + 1, "✏️ Edit Caption") {
+                        startEditingMessage(msg)
+                    },
+                )
+            }
         }
         options.add(
             MenuOption(options.size + 1, if (msg.isPinned) "📌 Unpin Message" else "📌 Pin Message") {
