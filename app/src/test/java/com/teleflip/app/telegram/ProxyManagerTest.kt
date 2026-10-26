@@ -180,4 +180,58 @@ class ProxyManagerTest {
 
         assertEquals("Online via Proxy", telegramManager.connectionState.value)
     }
+
+    @Test
+    fun testParseProxyUriAndUrl() {
+        val mtprotoTgUri = android.net.Uri.parse("tg://proxy?server=1.2.3.4&port=1080&secret=ee12345")
+        val parsed1 = telegramManager.parseProxyUri(mtprotoTgUri)
+        assertNotNull(parsed1)
+        assertEquals("1.2.3.4", parsed1?.server)
+        assertEquals(1080, parsed1?.port)
+        assertEquals(ProxyType.MTPROTO, parsed1?.type)
+        assertEquals("ee12345", parsed1?.secret)
+
+        val socksTmeUrl = "https://t.me/socks?server=5.6.7.8&port=1080&user=usr&pass=pwd"
+        val parsed2 = telegramManager.parseProxyUrl(socksTmeUrl)
+        assertNotNull(parsed2)
+        assertEquals("5.6.7.8", parsed2?.server)
+        assertEquals(1080, parsed2?.port)
+        assertEquals(ProxyType.SOCKS5, parsed2?.type)
+        assertEquals("usr", parsed2?.username)
+        assertEquals("pwd", parsed2?.password)
+    }
+
+    @Test
+    fun testPingProxyDispatchesPingQuery() {
+        val mockClient = mock(Client::class.java)
+        var capturedPingLatency: Long? = null
+        val latch = java.util.concurrent.CountDownLatch(1)
+
+        org.mockito.Mockito.`doAnswer` { invocation ->
+            val handler = invocation.getArgument<Client.ResultHandler>(1)
+            handler.onResult(TdApi.Seconds(0.25))
+            null
+        }.`when`(mockClient).send(any(), any())
+
+        telegramManager.setTdClientForTesting(mockClient)
+
+        val proxyItem = ProxyItem(server = "1.2.3.4", port = 1080, type = ProxyType.SOCKS5)
+        val queryCaptor = ArgumentCaptor.forClass(TdApi.Function::class.java)
+
+        telegramManager.pingProxy(proxyItem) { latency ->
+            capturedPingLatency = latency
+            latch.countDown()
+        }
+
+        latch.await(2, java.util.concurrent.TimeUnit.SECONDS)
+        org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+        verify(mockClient).send(queryCaptor.capture(), any())
+        val query = queryCaptor.value
+        assertTrue("Captured function should be TdApi.PingProxy", query is TdApi.PingProxy)
+        val pingQuery = query as TdApi.PingProxy
+        assertEquals("1.2.3.4", pingQuery.proxy.server)
+        assertEquals(1080, pingQuery.proxy.port)
+        assertEquals(250L, capturedPingLatency)
+    }
 }

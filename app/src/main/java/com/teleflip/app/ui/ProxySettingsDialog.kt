@@ -11,6 +11,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
+import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.model.ProxyType
 import com.teleflip.app.telegram.TelegramManager
 
@@ -19,6 +20,7 @@ class ProxySettingsDialog(
     context: Context,
     private val telegramManager: TelegramManager,
     private val timeoutMs: Long = 500L,
+    private val initialProxyItem: ProxyItem? = null,
     private val onProxyChanged: (() -> Unit)? = null,
 ) : BaseDialog(context) {
     private val engines = mutableMapOf<Int, KeypadInputEngine>()
@@ -75,7 +77,18 @@ class ProxySettingsDialog(
 
         btnSocks5?.setOnClickListener { updateTypeSelection(ProxyType.SOCKS5) }
         btnMtproto?.setOnClickListener { updateTypeSelection(ProxyType.MTPROTO) }
-        updateTypeSelection(ProxyType.SOCKS5)
+        updateTypeSelection(initialProxyItem?.type ?: ProxyType.SOCKS5)
+
+        if (initialProxyItem != null) {
+            etServer?.setText(initialProxyItem.server)
+            etPort?.setText(initialProxyItem.port.toString())
+            if (initialProxyItem.type == ProxyType.SOCKS5) {
+                etUsername?.setText(initialProxyItem.username)
+                etPassword?.setText(initialProxyItem.password)
+            } else {
+                etSecret?.setText(initialProxyItem.secret)
+            }
+        }
 
         fun refreshSavedProxiesList() {
             containerSaved?.removeAllViews()
@@ -123,6 +136,12 @@ class ProxySettingsDialog(
                         textSize = 13f
                     }
                 row.addView(titleTv)
+
+                telegramManager.pingProxy(proxy) { latencyMs ->
+                    val statusText = if (proxy.isEnabled) " [ACTIVE]" else ""
+                    val pingText = if (latencyMs != null) " • ${latencyMs} ms" else " • Offline"
+                    titleTv.text = "• [${proxy.type.name}] ${proxy.server}:${proxy.port}$statusText$pingText"
+                }
 
                 val buttonLayout =
                     LinearLayout(context).apply {
