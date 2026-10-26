@@ -61,6 +61,12 @@ data class ChatModel(
     val isForum: Boolean = false,
     val activeTopicId: Long = 0L,
     val activeTopicName: String = "",
+    val isMarkedUnread: Boolean = false,
+    // TDLib main chat list order (higher = closer to top). 0 when unknown.
+    val order: Long = 0L,
+    // Unix timestamp (seconds) of the last message, used as sort fallback.
+    val lastMessageDate: Long = 0L,
+    val lastMessageId: Long = 0L,
 )
 
 enum class MessageStatus {
@@ -74,6 +80,7 @@ enum class MediaType {
     NONE,
     PHOTO,
     VOICE,
+    AUDIO,
     LOCATION,
     DOCUMENT,
     STICKER,
@@ -81,7 +88,10 @@ enum class MediaType {
     ANIMATION,
     POLL,
     PAID_MEDIA,
+    CONTACT,
 }
+
+data class MessageFormatting(val offset: Int, val length: Int, val kind: String, val url: String = "")
 
 data class MessageModel(
     val id: Long,
@@ -116,6 +126,10 @@ data class MessageModel(
     val transcript: String = "",
     val starCount: Long = 0L,
     val isPaidMediaLocked: Boolean = false,
+    val mediaMimeType: String = "",
+    val stickerFormat: String = "",
+    val hasBotButtons: Boolean = false,
+    val formatting: List<MessageFormatting> = emptyList(),
 )
 
 data class MessageSearchResult(
@@ -131,6 +145,7 @@ data class MessageSearchResult(
 enum class CallState {
     PENDING,
     EXCHANGING_KEYS,
+    CONNECTING,
     READY,
     HANGING_UP,
     DISCARDED,
@@ -146,6 +161,7 @@ data class ActiveCall(
     val durationSec: Int = 0,
     val isMuted: Boolean = false,
     val isSpeakerOn: Boolean = false,
+    val verificationEmojis: List<String> = emptyList(),
 )
 
 data class ChatProfile(

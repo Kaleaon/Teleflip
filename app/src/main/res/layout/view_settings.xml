@@ -162,6 +162,8 @@
             android:focusable="true"
             android:layout_marginBottom="12dp" />
 
+        <Button android:id="@+id/btn_telegram_privacy" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="42dp" android:text="Telegram privacy" android:textColor="@color/text_primary" android:background="@drawable/bg_item_selector" android:focusable="true" android:layout_marginBottom="12dp" />
+        <Button android:id="@+id/btn_two_step" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="42dp" android:text="Two-step verification" android:textColor="@color/text_primary" android:background="@drawable/bg_item_selector" android:focusable="true" android:layout_marginBottom="12dp" />
         <!-- Active Sessions & Security Button -->
         <Button
             android:id="@+id/btn_active_sessions"
