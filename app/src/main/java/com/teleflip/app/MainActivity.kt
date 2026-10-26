@@ -51,8 +51,6 @@ import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
-import com.teleflip.app.model.SavedGifItem
-import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.notifications.NotificationHelper
 import com.teleflip.app.notifications.TeleFlipNotificationService
 import com.teleflip.app.security.PasscodeManager
@@ -65,6 +63,7 @@ import com.teleflip.app.telegram.TelegramManager
 import com.teleflip.app.ui.ChatExportDialog
 import com.teleflip.app.ui.ChatExportProgressDialog
 import com.teleflip.app.ui.ChatListAdapter
+import com.teleflip.app.ui.MediaPickerBottomSheetDialog
 import com.teleflip.app.ui.MediaViewerDialog
 import com.teleflip.app.ui.MenuOption
 import com.teleflip.app.ui.MessageAdapter
@@ -3680,156 +3679,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showStickerPickerMenu(chat: ChatModel) {
-        val rootOptions = mutableListOf<MenuOption>()
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "📦 My Telegram Sticker Packs") {
-                telegramManager.loadInstalledStickers { sets ->
-                    if (sets.isEmpty()) {
-                        showToast("No installed sticker sets found")
-                    } else {
-                        showInstalledStickerPacksMenu(chat, sets)
-                    }
-                }
-                showToast("Loading sticker packs...")
-            },
-        )
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "⭐ Popular Emoji Stickers") {
-                showPopularStickersMenu(chat)
-            },
-        )
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "📁 Pick Sticker from Device (.webp/.png)") {
-                showSendMediaPicker(chat, isPhoto = true, isSticker = true)
-            },
-        )
-
-        OptionsMenuDialog(this, "Send Sticker", rootOptions).show()
-    }
-
-    private fun showInstalledStickerPacksMenu(
-        chat: ChatModel,
-        sets: List<StickerSetModel>,
-    ) {
-        val packOptions =
-            sets.mapIndexed { idx, set ->
-                MenuOption(idx + 1, "📦 ${set.title} (${set.stickers.size})") {
-                    showStickerPackItemsMenu(chat, set)
-                }
-            }
-        OptionsMenuDialog(this, "Sticker Packs", packOptions).show()
-    }
-
-    private fun showStickerPackItemsMenu(
-        chat: ChatModel,
-        set: StickerSetModel,
-    ) {
-        val stickerOptions =
-            set.stickers.take(30).mapIndexed { idx, st ->
-                val label = if (st.emoji.isNotBlank()) "${st.emoji} Sticker ${idx + 1}" else "Sticker ${idx + 1}"
-                MenuOption(idx + 1, label) {
-                    telegramManager.sendSticker(chat.id, st.fileId, st.emoji)
-                    showToast("Sending sticker…")
-                }
-            }
-        OptionsMenuDialog(this, set.title.take(20), stickerOptions).show()
-    }
-
-    private fun showPopularStickersMenu(chat: ChatModel) {
-        val popular =
-            listOf(
-                "👍" to "👍 Thumbs Up",
-                "❤️" to "❤️ Red Heart",
-                "😂" to "😂 Laughing",
-                "🔥" to "🔥 Fire",
-                "🎉" to "🎉 Party / Celebrate",
-                "🙏" to "🙏 Thank You",
-                "😎" to "😎 Cool",
-                "🚀" to "🚀 Rocket",
-                "👏" to "👏 Applause",
-                "💯" to "💯 100",
-                "🤔" to "🤔 Thinking",
-                "😢" to "😢 Crying",
-            )
-        val options =
-            popular.mapIndexed { idx, (emoji, label) ->
-                MenuOption(idx + 1, label) {
-                    telegramManager.sendStickerEmoji(chat.id, emoji)
-                    showToast("Finding sticker $emoji…")
-                }
-            }
-        OptionsMenuDialog(this, "Popular Stickers", options).show()
+        val picker = MediaPickerBottomSheetDialog.newInstance(chat.id)
+        picker.show(supportFragmentManager, "media_picker")
     }
 
     private fun showGifPickerMenu(chat: ChatModel) {
-        val rootOptions = mutableListOf<MenuOption>()
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "💾 Saved Telegram GIFs") {
-                telegramManager.loadSavedGifs { gifs ->
-                    if (gifs.isEmpty()) {
-                        showToast("No saved GIFs found")
-                    } else {
-                        showSavedGifsMenu(chat, gifs)
-                    }
-                }
-                showToast("Loading saved GIFs...")
-            },
-        )
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "⚡ Popular Reaction Loops") {
-                showReactionGifsMenu(chat)
-            },
-        )
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "📁 Pick GIF from Device (.gif/.mp4)") {
-                showSendMediaPicker(chat, isPhoto = false)
-            },
-        )
-
-        OptionsMenuDialog(this, "Send GIF / Animation", rootOptions).show()
-    }
-
-    private fun showSavedGifsMenu(
-        chat: ChatModel,
-        gifs: List<SavedGifItem>,
-    ) {
-        val gifOptions =
-            gifs.take(25).mapIndexed { idx, gif ->
-                val name = gif.caption.ifBlank { "GIF #${idx + 1}" }
-                MenuOption(idx + 1, "🎞️ $name (${gif.durationSeconds}s)") {
-                    telegramManager.sendSavedAnimation(chat.id, gif.fileId, gif.durationSeconds, gif.caption)
-                    showToast("Sending GIF…")
-                }
-            }
-        OptionsMenuDialog(this, "Saved GIFs", gifOptions).show()
-    }
-
-    private fun showReactionGifsMenu(chat: ChatModel) {
-        val reactions =
-            listOf(
-                "🎉 Celebration / Party",
-                "👋 Hello / Wave",
-                "👏 Applause / Bravo",
-                "🤣 Rolling with Laughter",
-                "👍 Thumbs Up",
-                "🔥 Fire / Awesome",
-                "💃 Dance / Groove",
-                "🤝 Deal / Handshake",
-            )
-        val options =
-            reactions.mapIndexed { idx, title ->
-                MenuOption(idx + 1, title) {
-                    telegramManager.sendMessage(chat.id, "🎞️ [$title]")
-                    showToast("Updating reaction…")
-                }
-            }
-        OptionsMenuDialog(this, "Reaction GIFs", options).show()
+        val picker = MediaPickerBottomSheetDialog.newInstance(chat.id)
+        picker.show(supportFragmentManager, "media_picker")
     }
 
     private fun showBotCommandsMenu(chat: ChatModel) {
