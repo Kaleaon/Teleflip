@@ -172,4 +172,38 @@ class MessageAdapterTest {
         // Text remains unaffected
         assertEquals("Hello world", tvText.text.toString())
     }
+
+    @Test
+    fun testQuotePreviewClickTriggersCallback() {
+        var clickedQuoteId: Long? = null
+        val customAdapter = MessageAdapter(onQuoteClick = { clickedQuoteId = it })
+        val parent = FrameLayout(context)
+        val viewHolder = customAdapter.onCreateViewHolder(parent, 0)
+
+        val msgWithReply = msg1Text.copy(id = 105L, replyToMessageId = 101L, replyToPreview = "Quoted text")
+        customAdapter.submitList(listOf(msgWithReply))
+        customAdapter.onBindViewHolder(viewHolder, 0)
+
+        val tvQuote = viewHolder.itemView.findViewById<TextView>(R.id.tv_reply_quote)
+        assertNotNull(tvQuote)
+        assertEquals(android.view.View.VISIBLE, tvQuote.visibility)
+        assertEquals(true, tvQuote.isFocusable)
+        assertEquals(true, tvQuote.isClickable)
+
+        tvQuote.performClick()
+        assertEquals(101L, clickedQuoteId)
+    }
+
+    @Test
+    fun testTranscribeButtonIsFocusable() {
+        val parent = FrameLayout(context)
+        val viewHolder = adapter.onCreateViewHolder(parent, 0)
+
+        adapter.onBindViewHolder(viewHolder, 1) // msg2Voice
+
+        val btnTranscribe = viewHolder.itemView.findViewById<TextView>(R.id.btn_transcribe)
+        assertNotNull(btnTranscribe)
+        assertEquals(android.view.View.VISIBLE, btnTranscribe.visibility)
+        assertEquals(true, btnTranscribe.isFocusable)
+    }
 }
