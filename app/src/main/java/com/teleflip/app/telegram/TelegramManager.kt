@@ -1024,15 +1024,47 @@ class TelegramManager(
         currentPinned: Boolean,
         onResult: ((Boolean) -> Unit)? = null,
     ) {
+        val newPinned = !currentPinned
+        val currentMap = _messages.value.toMutableMap()
+        val chatMsgs =
+            (currentMap[chatId] ?: emptyList()).map { msg ->
+                if (msg.id == messageId) {
+                    msg.copy(isPinned = newPinned)
+                } else {
+                    msg
+                }
+            }
+        currentMap[chatId] = chatMsgs
+        _messages.value = currentMap
+
+        _chats.value =
+            _chats.value.map { chat ->
+                if (chat.id == chatId) {
+                    val currentPinnedIds = chat.getEffectivePinnedMessageIds()
+                    val newPinnedIds =
+                        if (newPinned) {
+                            if (currentPinnedIds.contains(messageId)) currentPinnedIds else currentPinnedIds + messageId
+                        } else {
+                            currentPinnedIds.filter { it != messageId }
+                        }
+                    val newPinnedSingleId = newPinnedIds.lastOrNull() ?: 0L
+                    chat.copy(
+                        pinnedMessageId = newPinnedSingleId,
+                        pinnedMessageIds = newPinnedIds,
+                    )
+                } else {
+                    chat
+                }
+            }
+
         val client = tdClient
         if (client == null) {
             reportOperationError("TDLib is not initialized")
-            onResult?.invoke(currentPinned)
+            onResult?.invoke(newPinned)
             return
         }
-        val newValue = !currentPinned
         val request =
-            if (newValue) {
+            if (newPinned) {
                 TdApi.PinChatMessage().apply {
                     this.chatId = chatId
                     this.messageId = messageId
@@ -1041,13 +1073,16 @@ class TelegramManager(
                 TdApi.UnpinChatMessage(chatId, messageId)
             }
         client.send(request) { result ->
-            if (result is TdApi.Ok) {
-                _messages.update { current -> current + (chatId to current[chatId].orEmpty().map { if (it.id == messageId) it.copy(isPinned = newValue) else it }) }
-                _chats.update { chats -> chats.map { if (it.id == chatId) it.copy(pinnedMessageId = if (newValue) messageId else 0L) else it } }
-            } else if (result is TdApi.Error) {
+            if (result is TdApi.Error) {
                 reportOperationError(result.message)
             }
-            scope.launch(Dispatchers.Main) { onResult?.invoke(if (result is TdApi.Ok) newValue else currentPinned) }
+            if (onResult != null) {
+                try {
+                    scope.launch(Dispatchers.Main) { onResult.invoke(if (result is TdApi.Ok) newPinned else currentPinned) }
+                } catch (e: Throwable) {
+                    onResult.invoke(if (result is TdApi.Ok) newPinned else currentPinned)
+                }
+            }
         }
     }
 
@@ -4749,6 +4784,7 @@ class TelegramManager(
         }
         val draftStr = chatDrafts[chat.id] ?: cloudDraft
 
+        val existingPinnedIds = existingModel?.getEffectivePinnedMessageIds() ?: emptyList()
         val newModel =
             ChatModel(
                 id = chat.id,
@@ -4767,7 +4803,8 @@ class TelegramManager(
                 isPremium = isPremium,
                 isMuted = isMutedChat,
                 draftText = draftStr,
-                pinnedMessageId = existingModel?.pinnedMessageId ?: 0L,
+                pinnedMessageId = existingModel?.pinnedMessageId ?: existingPinnedIds.lastOrNull() ?: 0L,
+                pinnedMessageIds = existingPinnedIds,
                 order = mainPosition?.order ?: existingModel?.order ?: 0L,
                 lastMessageDate = lastMsg?.date?.toLong() ?: existingModel?.lastMessageDate ?: 0L,
                 lastMessageId = lastMsg?.id ?: existingModel?.lastMessageId ?: 0L,
@@ -5187,12 +5224,24 @@ class TelegramManager(
     private fun handleMessagesList(msgs: Array<TdApi.Message>) {
         if (msgs.isEmpty()) return
         val chatId = msgs.first().chatId
-        val list = msgs.reversed().filterNot { it.schedulingState != null || replacedMessageIds.containsKey(it.chatId to it.id) }.map { toMessageModel(it) }
+        val existing = _messages.value[chatId].orEmpty()
+        val existingMap = existing.associateBy { it.id }
+        val chat = _chats.value.find { it.id == chatId }
+        val pinnedIds = chat?.getEffectivePinnedMessageIds() ?: emptyList()
+
+        val list =
+            msgs.reversed()
+                .filterNot { it.schedulingState != null || replacedMessageIds.containsKey(it.chatId to it.id) }
+                .map { msg ->
+                    val model = toMessageModel(msg)
+                    val wasPinned = existingMap[msg.id]?.isPinned == true || pinnedIds.contains(msg.id) || msg.isPinned
+                    if (wasPinned) model.copy(isPinned = true) else model
+                }
+
         val unresolvedReplyIds = mutableSetOf<Long>()
         _messages.update { current ->
-            val existing = current[chatId].orEmpty()
-            // Live updates already in memory take precedence over a history response.
-            val rawMerged = (existing + list).distinctBy { it.id }.sortedBy { it.id }
+            val currentExisting = current[chatId].orEmpty()
+            val rawMerged = (currentExisting + list).distinctBy { it.id }.sortedBy { it.id }
             val byId = rawMerged.associateBy { it.id }
             val merged =
                 rawMerged.map { item ->
@@ -5212,8 +5261,27 @@ class TelegramManager(
                         }
                     item.copy(mediaFilePath = resolvedPath, replyToPreview = resolvedPreview)
                 }
-            if (merged == existing) current else current + (chatId to merged)
+            if (merged == currentExisting) current else current + (chatId to merged)
         }
+
+        val allPinnedMsgIds = _messages.value[chatId].orEmpty().filter { it.isPinned }.map { it.id }
+        if (allPinnedMsgIds.isNotEmpty() && chat != null) {
+            val updatedPinnedIds = (chat.getEffectivePinnedMessageIds() + allPinnedMsgIds).distinct()
+            if (updatedPinnedIds != chat.pinnedMessageIds) {
+                _chats.value =
+                    _chats.value.map { c ->
+                        if (c.id == chatId) {
+                            c.copy(
+                                pinnedMessageIds = updatedPinnedIds,
+                                pinnedMessageId = updatedPinnedIds.lastOrNull() ?: c.pinnedMessageId,
+                            )
+                        } else {
+                            c
+                        }
+                    }
+            }
+        }
+
         unresolvedReplyIds.forEach { replyId ->
             resolveReplyPreviewAsync(chatId, replyId)
         }
