@@ -1,10 +1,5 @@
 package com.teleflip.app.ui
 
-import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
-import android.text.Spannable
-import android.text.SpannableStringBuilder
-import android.text.style.ImageSpan
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -21,8 +16,6 @@ import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
-import com.teleflip.app.telegram.TelegramManager
-import java.io.File
 import java.util.Locale
 
 class MessageAdapter(
@@ -253,8 +246,7 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    val emoji = message.stickerEmoji.ifBlank { message.mediaCaption }
-                    tvMedia.text = if (emoji.isNotBlank()) "🎨 [Sticker $emoji]" else "🎨 [Sticker]"
+                    tvMedia.text = StickerEffectDecorator.formatStickerHeader(message)
                 }
                 MediaType.VIDEO -> {
                     ViewCompat.setStateDescription(tvMedia, null)
@@ -308,10 +300,7 @@ class MessageAdapter(
             if (isVisualMedia) {
                 ivPhoto.contentDescription =
                     when (message.mediaType) {
-                        MediaType.STICKER -> {
-                            val emo = message.stickerEmoji.ifBlank { "Sticker" }
-                            "Sticker $emo"
-                        }
+                        MediaType.STICKER -> StickerEffectDecorator.formatStickerContentDescription(message)
                         MediaType.ANIMATION -> "GIF Animation"
                         MediaType.PAID_MEDIA -> {
                             if (message.isPaidMediaLocked) {
@@ -407,50 +396,12 @@ class MessageAdapter(
 
             if (message.reactions.isNotEmpty()) {
                 tvReactions?.visibility = View.VISIBLE
-                val ssb = SpannableStringBuilder()
-                val density = context.resources.displayMetrics.density
-                val targetSize = (16 * density).toInt().coerceAtLeast(1)
-
-                message.reactions.forEachIndexed { idx, reaction ->
-                    if (idx > 0) ssb.append(" ")
-
-                    if (reaction.startsWith("custom_emoji_")) {
-                        val filePath =
-                            customEmojiResolver?.invoke(reaction)
-                                ?: TelegramManager.getCustomEmojiFilePath(reaction)
-                        var drawableAdded = false
-                        if (!filePath.isNullOrBlank()) {
-                            try {
-                                val file = File(filePath)
-                                if (file.exists()) {
-                                    val bitmap = BitmapFactory.decodeFile(filePath)
-                                    if (bitmap != null) {
-                                        val drawable = BitmapDrawable(context.resources, bitmap)
-                                        drawable.setBounds(0, 0, targetSize, targetSize)
-                                        val startPos = ssb.length
-                                        ssb.append(" ")
-                                        ssb.setSpan(
-                                            ImageSpan(drawable, ImageSpan.ALIGN_BOTTOM),
-                                            startPos,
-                                            startPos + 1,
-                                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-                                        )
-                                        drawableAdded = true
-                                    }
-                                }
-                            } catch (_: Throwable) {
-                            }
-                        }
-                        if (!drawableAdded) {
-                            val sticker = TelegramManager.getCustomEmojiSticker(reaction)
-                            val fallbackSymbol = sticker?.emoji?.ifBlank { "✨" } ?: "✨"
-                            ssb.append(fallbackSymbol)
-                        }
-                    } else {
-                        ssb.append(reaction)
-                    }
-                }
-                tvReactions?.text = ssb
+                tvReactions?.text =
+                    StickerEffectDecorator.formatReactions(
+                        context = context,
+                        message = message,
+                        customEmojiResolver = customEmojiResolver,
+                    )
             } else {
                 tvReactions?.visibility = View.GONE
             }
