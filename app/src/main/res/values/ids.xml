@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="tag_accessibility_action_ids" type="id" />
+
+    <item name="action_chat_open" type="id" />
+    <item name="action_chat_pin" type="id" />
+    <item name="action_chat_unpin" type="id" />
+    <item name="action_chat_mute" type="id" />
+    <item name="action_chat_unmute" type="id" />
+    <item name="action_chat_archive" type="id" />
+    <item name="action_chat_unarchive" type="id" />
+
+    <item name="action_message_reply" type="id" />
+    <item name="action_message_react" type="id" />
+    <item name="action_message_copy" type="id" />
+    <item name="action_message_delete" type="id" />
+    <item name="action_message_transcribe" type="id" />
+    <item name="action_message_play_voice" type="id" />
+    <item name="action_message_pin" type="id" />
+    <item name="action_message_unpin" type="id" />
+
+    <item name="action_search_jump" type="id" />
+</resources>

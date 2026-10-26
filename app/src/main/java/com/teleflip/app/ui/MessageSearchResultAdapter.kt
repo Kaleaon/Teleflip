@@ -6,10 +6,12 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.R
+import com.teleflip.app.accessibility.AccessibilityActionManager
 import com.teleflip.app.model.MessageSearchResult
 
 class MessageSearchResultAdapter(
     private val onItemClick: (MessageSearchResult) -> Unit,
+    private val onSearchResultAccessibilityAction: ((actionId: Int, result: MessageSearchResult) -> Boolean)? = null,
 ) : RecyclerView.Adapter<MessageSearchResultAdapter.ViewHolder>() {
     private val items = mutableListOf<MessageSearchResult>()
 
@@ -45,6 +47,11 @@ class MessageSearchResultAdapter(
         holder.bind(item)
     }
 
+    override fun onViewRecycled(holder: ViewHolder) {
+        super.onViewRecycled(holder)
+        AccessibilityActionManager.clearActions(holder.itemView)
+    }
+
     override fun getItemCount(): Int = items.size
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -65,6 +72,15 @@ class MessageSearchResultAdapter(
 
             itemView.setOnClickListener {
                 onItemClick(item)
+            }
+
+            AccessibilityActionManager.bindActions(itemView, item) { actionId, searchResult ->
+                if (actionId == R.id.action_search_jump) {
+                    onItemClick(searchResult)
+                    true
+                } else {
+                    onSearchResultAccessibilityAction?.invoke(actionId, searchResult) ?: false
+                }
             }
         }
     }
