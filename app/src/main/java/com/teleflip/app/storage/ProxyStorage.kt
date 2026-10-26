@@ -17,10 +17,28 @@ object ProxyStorage {
     private const val PREF_ENCRYPTED_PROXIES = "pref_encrypted_proxy_list"
     private const val AES_KEY_SEED = "TeleFlip_Secure_Proxy_Secret_Salt_v1"
 
+    @Volatile
+    private var cachedSecretKey: SecretKeySpec? = null
+
+    @Volatile
+    private var cachedProxies: List<ProxyItem>? = null
+
+    @Synchronized
+    fun clearCache() {
+        cachedProxies = null
+        cachedSecretKey = null
+    }
+
     private fun getSecretKey(): SecretKeySpec {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val keyBytes = digest.digest(AES_KEY_SEED.toByteArray(Charsets.UTF_8))
-        return SecretKeySpec(keyBytes, "AES")
+        return cachedSecretKey ?: synchronized(this) {
+            cachedSecretKey ?: run {
+                val digest = MessageDigest.getInstance("SHA-256")
+                val keyBytes = digest.digest(AES_KEY_SEED.toByteArray(Charsets.UTF_8))
+                val key = SecretKeySpec(keyBytes, "AES")
+                cachedSecretKey = key
+                key
+            }
+        }
     }
 
     fun encrypt(plainText: String): String {
@@ -57,10 +75,21 @@ object ProxyStorage {
 
     @Synchronized
     fun getProxies(context: Context): List<ProxyItem> {
+        cachedProxies?.let { return it }
+
         val prefs = getPrefs(context)
-        val rawEncrypted = prefs.getString(PREF_ENCRYPTED_PROXIES, null) ?: return emptyList()
+        val rawEncrypted = prefs.getString(PREF_ENCRYPTED_PROXIES, null)
+        if (rawEncrypted == null) {
+            val emptyList = emptyList<ProxyItem>()
+            cachedProxies = emptyList
+            return emptyList
+        }
         val jsonStr = decrypt(rawEncrypted)
-        if (jsonStr.isBlank()) return emptyList()
+        if (jsonStr.isBlank()) {
+            val emptyList = emptyList<ProxyItem>()
+            cachedProxies = emptyList
+            return emptyList
+        }
 
         val list = mutableListOf<ProxyItem>()
         try {
@@ -89,7 +118,9 @@ object ProxyStorage {
             }
         } catch (_: Exception) {
         }
-        return list
+        val immutableList = list.toList()
+        cachedProxies = immutableList
+        return immutableList
     }
 
     @Synchronized
@@ -97,8 +128,10 @@ object ProxyStorage {
         context: Context,
         proxies: List<ProxyItem>,
     ) {
+        val listToCache = proxies.toList()
+        cachedProxies = listToCache
         val jsonArray = JSONArray()
-        for (proxy in proxies) {
+        for (proxy in listToCache) {
             val obj = JSONObject()
             obj.put("id", proxy.id)
             obj.put("server", proxy.server)
