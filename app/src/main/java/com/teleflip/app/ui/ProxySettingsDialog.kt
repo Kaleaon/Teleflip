@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -33,11 +32,17 @@ class ProxySettingsDialog(
         val tvStatus = findViewById<TextView>(R.id.tv_proxy_active_status)
         val btnSocks5 = findViewById<Button>(R.id.btn_proxy_type_socks5)
         val btnMtproto = findViewById<Button>(R.id.btn_proxy_type_mtproto)
-        val etServer = findViewById<EditText>(R.id.et_proxy_server)
-        val etPort = findViewById<EditText>(R.id.et_proxy_port)
-        val etUsername = findViewById<EditText>(R.id.et_proxy_username)
-        val etPassword = findViewById<EditText>(R.id.et_proxy_password)
-        val etSecret = findViewById<EditText>(R.id.et_proxy_secret)
+        val livServer = findViewById<LabeledInputView>(R.id.liv_proxy_server)
+        val livPort = findViewById<LabeledInputView>(R.id.liv_proxy_port)
+        val livUsername = findViewById<LabeledInputView>(R.id.liv_proxy_username)
+        val livPassword = findViewById<LabeledInputView>(R.id.liv_proxy_password)
+        val livSecret = findViewById<LabeledInputView>(R.id.liv_proxy_secret)
+
+        val etServer = livServer?.editText
+        val etPort = livPort?.editText
+        val etUsername = livUsername?.editText
+        val etPassword = livPassword?.editText
+        val etSecret = livSecret?.editText
         val layoutSocks5 = findViewById<LinearLayout>(R.id.layout_socks5_credentials)
         val layoutMtproto = findViewById<LinearLayout>(R.id.layout_mtproto_credentials)
         val btnSaveEnable = findViewById<Button>(R.id.btn_proxy_save_enable)

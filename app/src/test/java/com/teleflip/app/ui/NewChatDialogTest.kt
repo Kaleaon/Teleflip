@@ -2,7 +2,6 @@ package com.teleflip.app.ui
 
 import android.app.Application
 import android.view.KeyEvent
-import android.widget.EditText
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.teleflip.app.R
@@ -36,7 +35,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_new_chat_input).editText
         assertTrue("Input should have focus initially", etInput.hasFocus())
 
         val dpadRightEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)
@@ -58,7 +57,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_new_chat_input).editText
         assertTrue("Input should have focus initially", etInput.hasFocus())
 
         val inputKeys =
@@ -104,7 +103,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_new_chat_input).editText
         etInput.clearFocus()
         assertFalse("Input focus cleared", etInput.hasFocus())
 
@@ -159,7 +158,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_new_chat_input).editText
         etInput.setText("Test Query")
 
         val softLeftEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SOFT_LEFT)

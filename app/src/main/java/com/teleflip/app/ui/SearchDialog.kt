@@ -74,8 +74,9 @@ class SearchDialog(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
         )
 
-        etSearchInput = findViewById(R.id.et_search_input)
-        tvInputMode = findViewById(R.id.tv_search_input_mode)
+        val livSearchInput = findViewById<LabeledInputView>(R.id.liv_search_input)
+        etSearchInput = livSearchInput.editText
+        tvInputMode = livSearchInput.modeView
         tabChats = findViewById(R.id.tab_search_chats)
         tabContacts = findViewById(R.id.tab_search_contacts)
         tabMessages = findViewById(R.id.tab_search_messages)
