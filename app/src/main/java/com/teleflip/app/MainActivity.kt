@@ -2313,13 +2313,11 @@ class MainActivity : AppCompatActivity() {
                 },
             )
         }
-        if (chat.chatType == ChatType.DIRECT) {
-            options.add(
-                MenuOption(options.size + 1, "⏱️ Self-Destruct Timer") {
-                    showSelfDestructTimerMenu(chat)
-                },
-            )
-        }
+        options.add(
+            MenuOption(options.size + 1, "⏱️ Auto-Delete Timer") {
+                showSelfDestructTimerMenu(chat)
+            },
+        )
         val isMuted = telegramManager.isChatMuted(chat.id)
         val muteLabel = if (isMuted) "🔔 Unmute Notifications" else "🔇 Mute Notifications..."
         options.add(
@@ -3563,33 +3561,71 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun formatAutoDeleteTimer(sec: Int): String {
+        return when {
+            sec <= 0 -> "Off"
+            sec == 5 -> "5s"
+            sec == 15 -> "15s"
+            sec == 30 -> "30s"
+            sec == 60 -> "1m"
+            sec == 3600 -> "1h"
+            sec == 86400 -> "24 Hours"
+            sec == 604800 -> "7 Days"
+            sec == 2592000 -> "30 Days"
+            sec % 86400 == 0 -> "${sec / 86400} Days"
+            sec % 3600 == 0 -> "${sec / 3600} Hours"
+            sec % 60 == 0 -> "${sec / 60}m"
+            else -> "${sec}s"
+        }
+    }
+
     private fun showSelfDestructTimerMenu(chat: ChatModel) {
         val presets =
-            listOf(
-                0 to "Off (Keep Messages)",
-                5 to "5 Seconds",
-                15 to "15 Seconds",
-                30 to "30 Seconds",
-                60 to "1 Minute",
-                3600 to "1 Hour",
-            )
+            if (chat.isSecretChat) {
+                listOf(
+                    0 to "Off (Keep Messages)",
+                    5 to "5 Seconds",
+                    15 to "15 Seconds",
+                    30 to "30 Seconds",
+                    60 to "1 Minute",
+                    3600 to "1 Hour",
+                )
+            } else {
+                listOf(
+                    0 to "Off (Keep Messages)",
+                    86400 to "24 Hours",
+                    604800 to "7 Days",
+                    2592000 to "30 Days",
+                )
+            }
         val options =
             presets.mapIndexed { idx, (sec, label) ->
                 val prefix = if (chat.selfDestructTimerSec == sec) "✓ " else ""
                 MenuOption(idx + 1, "$prefix⏱️ $label") {
-                    telegramManager.setSelfDestructTimer(chat.id, sec) { appliedSec ->
-                        val updated = chat.copy(selfDestructTimerSec = appliedSec)
-                        activeChat = updated
-                        showToast(if (appliedSec == 0) "Self-destruct timer turned OFF" else "Self-destruct timer set to $label")
-                        if (currentScreen == Screen.CONVERSATION) {
-                            openConversation(updated)
-                        } else if (currentScreen == Screen.PROFILE) {
-                            showProfileScreen(updated)
+                    telegramManager.setSelfDestructTimer(chat.id, sec) { success, err, appliedSec ->
+                        if (success) {
+                            val updated = chat.copy(selfDestructTimerSec = appliedSec)
+                            activeChat = updated
+                            val timerLabel = formatAutoDeleteTimer(appliedSec)
+                            showToast(
+                                if (appliedSec == 0) {
+                                    "Auto-delete timer turned OFF"
+                                } else {
+                                    "Auto-delete timer set to $timerLabel"
+                                },
+                            )
+                            if (currentScreen == Screen.CONVERSATION) {
+                                openConversation(updated)
+                            } else if (currentScreen == Screen.PROFILE) {
+                                showProfileScreen(updated)
+                            }
+                        } else if (err != null) {
+                            showToast(err, isError = true)
                         }
                     }
                 }
             }
-        OptionsMenuDialog(this, "⏱️ Self-Destruct Timer", options).show()
+        OptionsMenuDialog(this, "⏱️ Auto-Delete Timer", options).show()
     }
 
     private fun showSendMediaPicker(
@@ -5372,17 +5408,16 @@ class MainActivity : AppCompatActivity() {
 
         if (chat.chatType == ChatType.DIRECT) {
             btnSecretChat?.visibility = if (chat.isSecretChat) View.GONE else View.VISIBLE
-            btnSelfDestruct?.visibility = View.VISIBLE
-            val ttlLabel = if (chat.selfDestructTimerSec > 0) "${chat.selfDestructTimerSec}s" else "Off"
-            btnSelfDestruct?.text = "⏱️ Self-Destruct Timer: $ttlLabel"
             btnMembers?.visibility = View.GONE
             btnForumTopics?.visibility = View.GONE
         } else {
             btnSecretChat?.visibility = View.GONE
-            btnSelfDestruct?.visibility = View.GONE
             btnMembers?.visibility = View.VISIBLE
             btnForumTopics?.visibility = View.VISIBLE
         }
+        btnSelfDestruct?.visibility = View.VISIBLE
+        val ttlLabel = formatAutoDeleteTimer(chat.selfDestructTimerSec)
+        btnSelfDestruct?.text = "⏱️ Auto-Delete Timer: $ttlLabel"
 
         btnSecretChat?.setOnClickListener {
             val targetUserId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id

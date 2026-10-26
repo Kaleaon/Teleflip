@@ -1774,17 +1774,60 @@ class TelegramManager(
     fun setSelfDestructTimer(
         chatId: Long,
         seconds: Int,
-        onResult: ((Int) -> Unit)? = null,
+        onResult: ((Boolean, String?, Int) -> Unit)? = null,
     ) {
         scope.launch {
             try {
                 val validSeconds = seconds.coerceAtLeast(0)
+                val targetChat = _chats.value.find { it.id == chatId }
+                if (targetChat != null && (targetChat.chatType == ChatType.GROUP || targetChat.chatType == ChatType.CHANNEL)) {
+                    val me = sendQuery(TdApi.GetMe()) as? TdApi.User
+                    if (me != null) {
+                        val member = sendQuery(TdApi.GetChatMember(chatId, TdApi.MessageSenderUser(me.id))) as? TdApi.ChatMember
+                        val status = member?.status
+                        val isAdminOrCreator = status is TdApi.ChatMemberStatusCreator || status is TdApi.ChatMemberStatusAdministrator
+                        if (!isAdminOrCreator) {
+                            val errStr = "Only administrators can change auto-delete timer in groups or channels"
+                            reportOperationError(errStr)
+                            withContext(Dispatchers.Main) { onResult?.invoke(false, errStr, 0) }
+                            return@launch
+                        }
+                    }
+                }
                 sendQuery(TdApi.SetChatMessageAutoDeleteTime(chatId, validSeconds))
-                _chats.update { chats -> chats.map { if (it.id == chatId) it.copy(selfDestructTimerSec = validSeconds) else it } }
-                withContext(Dispatchers.Main) { onResult?.invoke(validSeconds) }
+                handleChatMessageAutoDeleteTimeUpdated(chatId, validSeconds)
+                withContext(Dispatchers.Main) { onResult?.invoke(true, null, validSeconds) }
             } catch (e: Exception) {
-                reportOperationError(e.message ?: "Could not update message timer")
+                val errMsg = e.message ?: "Could not update message timer"
+                reportOperationError(errMsg)
+                withContext(Dispatchers.Main) { onResult?.invoke(false, errMsg, 0) }
             }
+        }
+    }
+
+    fun setSelfDestructTimer(
+        chatId: Long,
+        seconds: Int,
+        onResult: ((Int) -> Unit)?,
+    ) {
+        setSelfDestructTimer(chatId, seconds) { success, _, appliedSec ->
+            if (success) {
+                onResult?.invoke(appliedSec)
+            }
+        }
+    }
+
+    fun handleChatMessageAutoDeleteTimeUpdated(
+        chatId: Long,
+        autoDeleteTime: Int,
+    ) {
+        synchronized(pendingChats) {
+            pendingChats[chatId]?.let {
+                pendingChats[chatId] = it.copy(selfDestructTimerSec = autoDeleteTime)
+            }
+        }
+        _chats.update { chats ->
+            chats.map { if (it.id == chatId) it.copy(selfDestructTimerSec = autoDeleteTime) else it }
         }
     }
 
@@ -4341,6 +4384,10 @@ class TelegramManager(
                 val draftText = (updateDraft.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
                 handleChatDraftUpdated(updateDraft.chatId, draftText)
             }
+            TdApi.UpdateChatMessageAutoDeleteTime.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateChatMessageAutoDeleteTime
+                handleChatMessageAutoDeleteTimeUpdated(update.chatId, update.messageAutoDeleteTime)
+            }
             TdApi.UpdateChatNotificationSettings.CONSTRUCTOR -> {
                 val update = obj as TdApi.UpdateChatNotificationSettings
                 handleChatNotificationSettingsUpdated(update.chatId, update.notificationSettings)
@@ -4802,6 +4849,7 @@ class TelegramManager(
                 order = mainPosition?.order ?: existingModel?.order ?: 0L,
                 lastMessageDate = lastMsg?.date?.toLong() ?: existingModel?.lastMessageDate ?: 0L,
                 lastMessageId = lastMsg?.id ?: existingModel?.lastMessageId ?: 0L,
+                selfDestructTimerSec = chat.messageAutoDeleteTime,
             )
 
         synchronized(pendingChats) {
