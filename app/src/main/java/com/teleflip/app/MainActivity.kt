@@ -180,6 +180,12 @@ class MainActivity : AppCompatActivity() {
     private var etLoginInput: EditText? = null
     private var loginInputEngine: KeypadInputEngine? = null
 
+    // Settings State
+    private var etSettingsApiId: EditText? = null
+    private var etSettingsApiHash: EditText? = null
+    private var settingsApiIdEngine: KeypadInputEngine? = null
+    private var settingsApiHashEngine: KeypadInputEngine? = null
+
     // Passcode Lock State
     internal var passcodeEntry: String = ""
     private var tvPasscodeDots: TextView? = null
@@ -696,6 +702,8 @@ class MainActivity : AppCompatActivity() {
     private fun commitActiveInputEngines() {
         composeInputEngine?.commitCurrentChar()
         loginInputEngine?.commitCurrentChar()
+        settingsApiIdEngine?.commitCurrentChar()
+        settingsApiHashEngine?.commitCurrentChar()
     }
 
     // =========================================================================
@@ -4828,6 +4836,27 @@ class MainActivity : AppCompatActivity() {
 
         val etId = view.findViewById<EditText>(R.id.et_api_id)
         val etHash = view.findViewById<EditText>(R.id.et_api_hash)
+        etSettingsApiId = etId
+        etSettingsApiHash = etHash
+
+        settingsApiIdEngine =
+            etId?.let {
+                KeypadInputEngine(
+                    editText = it,
+                    timeoutMs = telegramManager.keypadTimeoutMs,
+                    onSymbolRequested = { showSymbolsDialog { symbol -> settingsApiIdEngine?.insertSymbol(symbol) } },
+                )
+            }
+
+        settingsApiHashEngine =
+            etHash?.let {
+                KeypadInputEngine(
+                    editText = it,
+                    timeoutMs = telegramManager.keypadTimeoutMs,
+                    onSymbolRequested = { showSymbolsDialog { symbol -> settingsApiHashEngine?.insertSymbol(symbol) } },
+                )
+            }
+
         val spTimeout = view.findViewById<Spinner>(R.id.sp_keypad_timeout)
         val btnBgPush = view.findViewById<Button>(R.id.btn_toggle_bg_notifications)
         val btnEditProfile = view.findViewById<Button>(R.id.btn_edit_profile)
@@ -4967,12 +4996,16 @@ class MainActivity : AppCompatActivity() {
         spTimeout.setSelection(initialIndex)
 
         val doSave = {
+            commitActiveInputEngines()
             val selIndex = spTimeout.selectedItemPosition
             if (selIndex in timeoutValues.indices) {
-                telegramManager.keypadTimeoutMs = timeoutValues[selIndex]
+                val newTimeout = timeoutValues[selIndex]
+                telegramManager.keypadTimeoutMs = newTimeout
+                settingsApiIdEngine?.timeoutMs = newTimeout
+                settingsApiHashEngine?.timeoutMs = newTimeout
             }
-            val idStr = etId.text.toString().trim()
-            val hashStr = etHash.text.toString().trim()
+            val idStr = etId?.text?.toString()?.trim().orEmpty()
+            val hashStr = etHash?.text?.toString()?.trim().orEmpty()
             if (idStr.isNotEmpty() && hashStr.isNotEmpty()) {
                 telegramManager.apiId = idStr.toIntOrNull() ?: telegramManager.apiId
                 telegramManager.apiHash = hashStr
@@ -5731,6 +5764,27 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (loginInputEngine?.handleKeyEvent(keyCode, event) == true) {
                     return true
+                }
+            }
+        }
+
+        // In Settings: Route keypad keys to settings input engines when fields have focus
+        if (currentScreen == Screen.SETTINGS) {
+            val isInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL ||
+                    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+            if (isInputKey) {
+                if (etSettingsApiId?.hasFocus() == true) {
+                    if (settingsApiIdEngine?.handleKeyEvent(keyCode, event) == true) {
+                        return true
+                    }
+                } else if (etSettingsApiHash?.hasFocus() == true) {
+                    if (settingsApiHashEngine?.handleKeyEvent(keyCode, event) == true) {
+                        return true
+                    }
                 }
             }
         }

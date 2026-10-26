@@ -269,7 +269,8 @@ class KeypadInputEngine(
             InputMode.LOWER -> charStr.lowercase()
             InputMode.CAP_FIRST -> {
                 if (charIndex == 0) {
-                    val targetIndex = if (isReplacement) editText.selectionStart - 1 else editText.selectionStart
+                    val rawStart = editText.selectionStart.coerceIn(0, editText.text.length)
+                    val targetIndex = if (isReplacement) rawStart - 1 else rawStart
                     if (isSentenceBoundary(editText.text, targetIndex)) {
                         charStr.uppercase()
                     } else {
@@ -284,20 +285,24 @@ class KeypadInputEngine(
     }
 
     private fun insertString(str: String) {
-        val start = Math.max(editText.selectionStart, 0)
-        val end = Math.max(editText.selectionEnd, 0)
-        val newPos = Math.min(start, end) + str.length
+        val len = editText.text.length
+        val start = editText.selectionStart.coerceIn(0, len)
+        val end = editText.selectionEnd.coerceIn(0, len)
+        val selMin = Math.min(start, end)
+        val selMax = Math.max(start, end)
+        val newPos = selMin + str.length
         expectedSelection = newPos
-        editText.text.replace(Math.min(start, end), Math.max(start, end), str, 0, str.length)
-        editText.setSelection(newPos)
+        editText.text.replace(selMin, selMax, str, 0, str.length)
+        editText.setSelection(newPos.coerceIn(0, editText.text.length))
     }
 
     private fun replaceLastChar(newChar: String) {
-        val pos = editText.selectionStart
+        val len = editText.text.length
+        val pos = editText.selectionStart.coerceIn(0, len)
         if (pos > 0) {
             expectedSelection = pos
             editText.text.replace(pos - 1, pos, newChar)
-            editText.setSelection(pos)
+            editText.setSelection(pos.coerceIn(0, editText.text.length))
         } else {
             insertString(newChar)
         }
