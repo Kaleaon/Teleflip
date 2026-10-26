@@ -30,6 +30,7 @@ class MessageAdapter(
     private val onMessageAction: ((MessageModel) -> Unit)? = null,
     private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
     private val customEmojiResolver: ((String) -> String?)? = null,
+    private val onQuoteClick: ((Long) -> Unit)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     companion object {
         const val PAYLOAD_PLAYBACK_STATE = "PAYLOAD_PLAYBACK_STATE"
@@ -205,6 +206,16 @@ class MessageAdapter(
                 tvReplyQuote?.text = "↩ Reply to #${message.replyToMessageId}"
             } else {
                 tvReplyQuote?.visibility = View.GONE
+            }
+
+            if (message.replyToMessageId != 0L) {
+                tvReplyQuote?.isFocusable = true
+                tvReplyQuote?.isClickable = true
+                tvReplyQuote?.setOnClickListener {
+                    onQuoteClick?.invoke(message.replyToMessageId)
+                }
+            } else {
+                tvReplyQuote?.setOnClickListener(null)
             }
 
             // Media attachment preview
@@ -392,8 +403,8 @@ class MessageAdapter(
                 btnTranscribe?.setOnClickListener {
                     onTranscribeClick?.invoke(message)
                 }
-                btnTranscribe?.isFocusable = false
-                btnTranscribe?.isFocusableInTouchMode = false
+                btnTranscribe?.isFocusable = true
+                btnTranscribe?.isFocusableInTouchMode = true
                 if (message.transcript.isNotBlank()) {
                     tvTranscript?.visibility = View.VISIBLE
                     tvTranscript?.text = "💬 ${message.transcript}"

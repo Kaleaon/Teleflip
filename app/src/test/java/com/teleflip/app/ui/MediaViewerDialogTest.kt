@@ -450,4 +450,82 @@ class MediaViewerDialogTest {
         assertTrue(status.text.toString().contains("video/GIF"))
         dialog.dismiss()
     }
+
+    @Test
+    fun testFooterActionButtonsExistAndAreFocusable() {
+        val dialog = MediaViewerDialog(context, samplePhotoMessage, {}, {})
+        dialog.show()
+
+        val btnZoomIn = dialog.findViewById<View>(R.id.btn_zoom_in)
+        val btnZoomOut = dialog.findViewById<View>(R.id.btn_zoom_out)
+        val btnPanLeft = dialog.findViewById<View>(R.id.btn_pan_left)
+        val btnPanRight = dialog.findViewById<View>(R.id.btn_pan_right)
+        val btnReset = dialog.findViewById<View>(R.id.btn_reset)
+        val btnSave = dialog.findViewById<View>(R.id.btn_save)
+
+        assertNotNull(btnZoomIn)
+        assertNotNull(btnZoomOut)
+        assertNotNull(btnPanLeft)
+        assertNotNull(btnPanRight)
+        assertNotNull(btnReset)
+        assertNotNull(btnSave)
+
+        assertTrue(btnZoomIn.isFocusable)
+        assertTrue(btnZoomOut.isFocusable)
+        assertTrue(btnPanLeft.isFocusable)
+        assertTrue(btnPanRight.isFocusable)
+        assertTrue(btnReset.isFocusable)
+        assertTrue(btnSave.isFocusable)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testFooterActionButtonsPerformZoomPanResetSave() {
+        var savedMessage: MessageModel? = null
+        val dialog = MediaViewerDialog(context, samplePhotoMessage, { savedMessage = it }, {})
+        dialog.show()
+
+        val btnZoomIn = dialog.findViewById<View>(R.id.btn_zoom_in)
+        val btnZoomOut = dialog.findViewById<View>(R.id.btn_zoom_out)
+        val btnPanLeft = dialog.findViewById<View>(R.id.btn_pan_left)
+        val btnPanRight = dialog.findViewById<View>(R.id.btn_pan_right)
+        val btnReset = dialog.findViewById<View>(R.id.btn_reset)
+        val btnSave = dialog.findViewById<View>(R.id.btn_save)
+
+        // Initial state
+        assertEquals(1.0f, dialog.zoomLevel)
+        assertEquals(0f, dialog.panX)
+
+        // Click Zoom In
+        btnZoomIn.performClick()
+        assertEquals(1.5f, dialog.zoomLevel)
+
+        // Click Pan Left
+        btnPanLeft.performClick()
+        assertEquals(48f, dialog.panX)
+
+        // Click Pan Right
+        btnPanRight.performClick()
+        assertEquals(0f, dialog.panX)
+
+        // Click Reset
+        btnPanLeft.performClick()
+        assertEquals(48f, dialog.panX)
+        btnReset.performClick()
+        assertEquals(1.0f, dialog.zoomLevel)
+        assertEquals(0f, dialog.panX)
+
+        // Click Zoom Out
+        btnZoomIn.performClick()
+        assertEquals(1.5f, dialog.zoomLevel)
+        btnZoomOut.performClick()
+        assertEquals(1.0f, dialog.zoomLevel)
+
+        // Click Save
+        btnSave.performClick()
+        assertEquals(samplePhotoMessage.id, savedMessage?.id)
+
+        dialog.dismiss()
+    }
 }
