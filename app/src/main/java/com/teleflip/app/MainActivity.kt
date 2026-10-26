@@ -3156,6 +3156,7 @@ class MainActivity : AppCompatActivity() {
         updatePasscodeDotsDisplay()
 
         val btnForgot = view.findViewById<Button>(R.id.btn_passcode_forgot)
+        btnForgot.isFocusable = false
         btnForgot.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Forgot Passcode?")
@@ -5562,8 +5563,10 @@ class MainActivity : AppCompatActivity() {
             if (SoftkeyUtils.isCenterKey(keyCode)) {
                 if (passcodeEntry.length == PASSCODE_PIN_LENGTH) {
                     attemptPasscodeUnlock()
-                    return true
+                } else {
+                    softkeyManager.handleKeyEvent(keyCode, event)
                 }
+                return true
             }
         }
 
