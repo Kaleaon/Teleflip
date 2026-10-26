@@ -75,6 +75,23 @@ class ChatExportDialog(
         findViewById<Button>(R.id.btn_cancel_export)?.setOnClickListener {
             dismiss()
         }
+
+        val tvSoftkeyLeft = findViewById<TextView>(R.id.tv_softkey_left)
+        val tvSoftkeyCenter = findViewById<TextView>(R.id.tv_softkey_center)
+        val tvSoftkeyRight = findViewById<TextView>(R.id.tv_softkey_right)
+
+        tvSoftkeyLeft?.text = "Start"
+        tvSoftkeyCenter?.text = "Toggle"
+        tvSoftkeyRight?.text = "Cancel"
+
+        tvSoftkeyLeft?.setOnClickListener { startExport() }
+        tvSoftkeyCenter?.setOnClickListener { currentFocus?.performClick() }
+        tvSoftkeyRight?.setOnClickListener { dismiss() }
+
+        btnText?.requestFocus()
+        btnText?.post {
+            btnText?.requestFocus()
+        }
     }
 
     private fun toggleText() {
@@ -158,6 +175,22 @@ class ChatExportDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+            startExport()
+            return true
+        }
+        if (SoftkeyUtils.isCenterKey(keyCode)) {
+            val focused = currentFocus
+            if (focused != null && focused.isEnabled) {
+                focused.performClick()
+                return true
+            }
+        }
+        if (SoftkeyUtils.isSoftRightKey(keyCode)) {
+            dismiss()
+            return true
+        }
+
         when (keyCode) {
             KeyEvent.KEYCODE_1 -> {
                 toggleText()
