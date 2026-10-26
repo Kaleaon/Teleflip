@@ -43,6 +43,16 @@
             android:layout_marginBottom="8dp" />
 
         <TextView
+            android:id="@+id/tv_poll_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_error"
+            android:textSize="12sp"
+            android:visibility="gone"
+            android:accessibilityLiveRegion="assertive"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Poll Question:"
