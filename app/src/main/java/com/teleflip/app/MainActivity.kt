@@ -4564,7 +4564,11 @@ class MainActivity : AppCompatActivity() {
             onRight = { finish() },
         )
 
-        etLoginInput?.requestFocus()
+        if (layoutInputContainer?.visibility == View.VISIBLE) {
+            etLoginInput?.requestFocus()
+        } else if (state is AuthState.WaitOtherDeviceConfirmation) {
+            btnPhoneLogin?.requestFocus()
+        }
     }
 
     private fun updateLoginConnectionState(status: String) {
@@ -5725,7 +5729,7 @@ class MainActivity : AppCompatActivity() {
                     keyCode == KeyEvent.KEYCODE_POUND ||
                     keyCode == KeyEvent.KEYCODE_DEL ||
                     keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-            if (isInputKey) {
+            if (isInputKey && etLoginInput?.isShown == true) {
                 if (etLoginInput?.hasFocus() != true) {
                     etLoginInput?.requestFocus()
                 }
