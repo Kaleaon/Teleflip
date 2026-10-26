@@ -61,6 +61,34 @@ class DialogExtensionsTest {
     }
 
     @Test
+    fun setupDismissKeys_invokesCustomOnDismissOnBackKey() {
+        var customDismissCalled = false
+        val dialog = Dialog(context)
+        dialog.setupDismissKeys { customDismissCalled = true }
+        dialog.show()
+
+        val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)
+        val handled = dialog.dispatchKeyEvent(event)
+
+        assertTrue(handled)
+        assertTrue(customDismissCalled)
+    }
+
+    @Test
+    fun setupDismissKeys_invokesCustomOnDismissOnSoftRightKey() {
+        var customDismissCalled = false
+        val dialog = Dialog(context)
+        dialog.setupDismissKeys { customDismissCalled = true }
+        dialog.show()
+
+        val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SOFT_RIGHT)
+        val handled = dialog.dispatchKeyEvent(event)
+
+        assertTrue(handled)
+        assertTrue(customDismissCalled)
+    }
+
+    @Test
     fun setupDismissKeys_doesNotDismissOnOtherKeys() {
         val dialog = Dialog(context)
         dialog.setupDismissKeys()
