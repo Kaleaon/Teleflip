@@ -7,9 +7,10 @@
     android:padding="12dp">
 
     <TextView
+        android:id="@+id/tv_symbols_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Symbols &amp; Emoji (D-Pad to choose)"
+        android:text="Page 1/4 (1-9)"
         android:textColor="@color/focus_highlight_gold"
         android:textSize="14sp"
         android:textStyle="bold"
@@ -26,5 +27,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:maxHeight="260dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/softkey_divider"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp" />
+
+    <include layout="@layout/layout_softkeys" />
 
 </LinearLayout>
