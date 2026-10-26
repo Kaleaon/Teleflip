@@ -203,9 +203,24 @@ class TelegramCallTransportTest {
         verify(tonePlayer, atLeast(2)).stop()
     }
 
-    @Test fun incomingCallNeverStartsDialTone() {
+    @Test fun outgoingCallPlaysBusyToneWhenDeclinedWhilePending() {
+        manager.handleCallUpdate(call(TdApi.CallStatePending()))
+        dispatcher.scheduler.runCurrent()
+        verify(tonePlayer).startDialTone()
+
+        manager.handleCallUpdate(call(TdApi.CallStateDiscarded()))
+        dispatcher.scheduler.runCurrent()
+        verify(tonePlayer).playBusyTone()
+    }
+
+    @Test fun incomingCallPlaysRingtoneAndNeverStartsDialTone() {
         manager.handleCallUpdate(call(TdApi.CallStatePending()).apply { isOutgoing = false })
         dispatcher.scheduler.runCurrent()
+        verify(tonePlayer).startRingtone()
         verify(tonePlayer, never()).startDialTone()
+
+        manager.handleCallUpdate(call(TdApi.CallStateDiscarded()).apply { isOutgoing = false })
+        dispatcher.scheduler.runCurrent()
+        verify(tonePlayer, atLeast(1)).stop()
     }
 }

@@ -1,5 +1,6 @@
 package com.teleflip.app.calls
 
+import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -11,11 +12,16 @@ import org.robolectric.annotation.Config
 class CallTonePlayerTest {
     @Test
     fun startAndStopDoesNotThrow() {
-        val player = AndroidCallTonePlayer()
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val player = AndroidCallTonePlayer(context)
         assertNotNull(player)
-        // Should handle gracefully even if ToneGenerator is not fully supported in Robolectric JVM environment
         player.startDialTone()
         player.startDialTone() // Idempotent
+        player.stop()
+        player.startRingtone()
+        player.startRingtone() // Idempotent
+        player.stop()
+        player.playBusyTone()
         player.stop()
         player.stop() // Idempotent
     }

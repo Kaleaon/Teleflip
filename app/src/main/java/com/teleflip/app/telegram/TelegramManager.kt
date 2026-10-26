@@ -101,7 +101,7 @@ class TelegramManager(
     private val transportFactory: (Context) -> CallTransport = { NtgCallTransport(it) },
     private val audioFactory: (Context) -> CallAudioSession = { AndroidCallAudioSession(it) },
     private val callTaskDispatcher: kotlinx.coroutines.CoroutineDispatcher? = null,
-    private val tonePlayerFactory: (Context) -> CallTonePlayer = { AndroidCallTonePlayer() },
+    private val tonePlayerFactory: (Context) -> CallTonePlayer = { AndroidCallTonePlayer(it) },
 ) : Client.ResultHandler {
     private val context: Context = paramContext.applicationContext ?: paramContext
     private val tag = "TelegramManager"
@@ -3742,10 +3742,23 @@ class TelegramManager(
                 isSpeakerOn = existing?.isSpeakerOn ?: false,
             )
         _activeCall.value = updated
-        if (call.isOutgoing && (state == CallState.PENDING || state == CallState.EXCHANGING_KEYS) && call.state !is TdApi.CallStateReady) {
-            callTonePlayer.startDialTone()
+        if (call.isOutgoing) {
+            if ((state == CallState.PENDING || state == CallState.EXCHANGING_KEYS) && call.state !is TdApi.CallStateReady) {
+                callTonePlayer.startDialTone()
+            } else {
+                callTonePlayer.stop()
+                if ((state == CallState.DISCARDED || state == CallState.ERROR) &&
+                    (existing?.state == CallState.PENDING || existing?.state == CallState.EXCHANGING_KEYS || existing?.state == CallState.CONNECTING)
+                ) {
+                    callTonePlayer.playBusyTone()
+                }
+            }
         } else {
-            callTonePlayer.stop()
+            if (state == CallState.PENDING) {
+                callTonePlayer.startRingtone()
+            } else {
+                callTonePlayer.stop()
+            }
         }
         if (state != CallState.PENDING) {
             runCatching { (context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager)?.cancel(900000 + call.id) }

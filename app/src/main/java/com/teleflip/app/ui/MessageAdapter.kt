@@ -463,6 +463,30 @@ class MessageAdapter(
                 }
             tvTime.text = "$metaPrefix${message.time}"
 
+            if (message.isOutbound) {
+                tvStatus.visibility = View.VISIBLE
+                when (message.status) {
+                    MessageStatus.SENDING -> {
+                        tvStatus.text = " 🕒"
+                        tvStatus.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+                    }
+                    MessageStatus.SENT -> {
+                        tvStatus.text = " ✓"
+                        tvStatus.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+                    }
+                    MessageStatus.READ -> {
+                        tvStatus.text = " ✓✓"
+                        tvStatus.setTextColor(ContextCompat.getColor(context, R.color.focus_highlight))
+                    }
+                    MessageStatus.FAILED -> {
+                        tvStatus.text = " ⚠️"
+                        tvStatus.setTextColor(ContextCompat.getColor(context, R.color.text_error))
+                    }
+                }
+            } else {
+                tvStatus.visibility = View.GONE
+            }
+
             itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     onMessageFocused?.invoke(message)
