@@ -15,6 +15,7 @@ import javax.crypto.spec.SecretKeySpec
 object ProxyStorage {
     private const val PREFS_NAME = "teleflip_proxy_secure_prefs"
     private const val PREF_ENCRYPTED_PROXIES = "pref_encrypted_proxy_list"
+    private const val PREF_AUTO_PROXY_FAILOVER = "pref_auto_proxy_failover"
     private const val AES_KEY_SEED = "TeleFlip_Secure_Proxy_Secret_Salt_v1"
 
     private fun getSecretKey(): SecretKeySpec {
@@ -181,5 +182,18 @@ object ProxyStorage {
     @Synchronized
     fun getEnabledProxy(context: Context): ProxyItem? {
         return getProxies(context).find { it.isEnabled }
+    }
+
+    @Synchronized
+    fun isAutoProxyFailoverEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(PREF_AUTO_PROXY_FAILOVER, true)
+    }
+
+    @Synchronized
+    fun setAutoProxyFailoverEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        getPrefs(context).edit().putBoolean(PREF_AUTO_PROXY_FAILOVER, enabled).apply()
     }
 }

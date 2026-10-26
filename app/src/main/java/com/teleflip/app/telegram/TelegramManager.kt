@@ -108,6 +108,13 @@ class TelegramManager(
     private val _connectionState = MutableStateFlow("Offline")
     val connectionState: StateFlow<String> = _connectionState.asStateFlow()
 
+    private val _failoverStatus = MutableStateFlow<String?>(null)
+    val failoverStatus: StateFlow<String?> = _failoverStatus.asStateFlow()
+
+    fun setFailoverStatus(status: String?) {
+        _failoverStatus.value = status
+    }
+
     private val _authState = MutableStateFlow<AuthState>(AuthState.Initial)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
@@ -629,6 +636,7 @@ class TelegramManager(
                         is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = timeoutMsg)
                         else -> _authState.value = AuthState.Error(timeoutMsg)
                     }
+                    runAutoProxyFailover()
                 }
             }
     }
@@ -652,6 +660,7 @@ class TelegramManager(
             is AuthState.WaitPassword -> _authState.value = curr.copy(errorMessage = msg)
             else -> _authState.value = AuthState.WaitPhoneNumber(errorMessage = msg)
         }
+        runAutoProxyFailover()
     }
 
     fun sendPhoneNumber(phone: String) {
@@ -5662,6 +5671,165 @@ class TelegramManager(
                 withContext(Dispatchers.Main) { callback?.invoke(true, null) }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not delete proxy") }
+            }
+        }
+    }
+
+    suspend fun pingProxy(
+        proxy: ProxyItem,
+        timeoutMs: Long = 3000L,
+    ): Long? {
+        if (tdClient != null) {
+            try {
+                val tdProxy = buildTdApiProxy(proxy)
+                val startTime = System.currentTimeMillis()
+                val result =
+                    withTimeoutOrNull(timeoutMs) {
+                        sendQuery(TdApi.PingProxy(tdProxy))
+                    }
+                if (result is TdApi.Seconds) {
+                    val duration = (result.seconds * 1000).toLong()
+                    return if (duration > 0) duration else (System.currentTimeMillis() - startTime)
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportInfo(
+                    tag,
+                    "TdApi.PingProxy failed for ${proxy.server}:${proxy.port}: ${e.message}",
+                )
+            }
+        }
+        return withContext(Dispatchers.IO) {
+            try {
+                val startTime = System.currentTimeMillis()
+                val socket = java.net.Socket()
+                socket.connect(java.net.InetSocketAddress(proxy.server, proxy.port), timeoutMs.toInt())
+                val latency = System.currentTimeMillis() - startTime
+                socket.close()
+                latency
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    fun runAutoProxyFailover(callback: ((ProxyItem?, Long?) -> Unit)? = null) {
+        if (!ProxyStorage.isAutoProxyFailoverEnabled(context)) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "Auto proxy failover disabled by user preference")
+            _failoverStatus.value = "Auto failover disabled in settings"
+            callback?.invoke(null, null)
+            return
+        }
+
+        val storedProxies = ProxyStorage.getProxies(context)
+        if (storedProxies.isEmpty()) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "No saved proxies available for failover")
+            _failoverStatus.value = "Connection timeout. No saved proxies found."
+            callback?.invoke(null, null)
+            return
+        }
+
+        scope.launch {
+            _failoverStatus.value = "⚠️ Network block detected. Benchmarking proxies..."
+            com.teleflip.app.report.AdbReporter.reportInfo(
+                tag,
+                "Starting proxy failover ping benchmarks across ${storedProxies.size} proxies",
+            )
+
+            var bestProxy: ProxyItem? = null
+            var bestPing: Long = Long.MAX_VALUE
+
+            for ((index, proxy) in storedProxies.withIndex()) {
+                _failoverStatus.value = "Benchmarking proxy ${index + 1}/${storedProxies.size} (${proxy.server}:${proxy.port})..."
+                val ping = pingProxy(proxy, timeoutMs = 2500L)
+                if (ping != null) {
+                    com.teleflip.app.report.AdbReporter.reportInfo(tag, "Proxy benchmark: ${proxy.server}:${proxy.port} = ${ping}ms")
+                    if (ping < bestPing) {
+                        bestPing = ping
+                        bestProxy = proxy
+                    }
+                    if (bestPing < 300L) {
+                        break
+                    }
+                } else {
+                    com.teleflip.app.report.AdbReporter.reportInfo(tag, "Proxy benchmark: ${proxy.server}:${proxy.port} = Failed")
+                }
+            }
+
+            if (bestProxy != null && bestPing != Long.MAX_VALUE) {
+                val pingMs = bestPing
+                _failoverStatus.value = "🟢 Auto-selected Proxy: ${bestProxy.server}:${bestProxy.port} (${pingMs}ms)"
+                com.teleflip.app.report.AdbReporter.reportInfo(
+                    tag,
+                    "Selected best proxy: ${bestProxy.server}:${bestProxy.port} with latency ${pingMs}ms",
+                )
+
+                enableProxy(bestProxy.id) { success, _ ->
+                    if (success) {
+                        retryConnection()
+                    }
+                    callback?.invoke(bestProxy, pingMs)
+                }
+            } else {
+                _failoverStatus.value = "🔴 Proxy failover: All stored proxies unreachable"
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Proxy failover failed: no working proxy found")
+                callback?.invoke(null, null)
+            }
+        }
+    }
+
+    fun handleDeepLinkProxy(
+        uri: android.net.Uri,
+        callback: ((Boolean, String) -> Unit)? = null,
+    ) {
+        val server = uri.getQueryParameter("server") ?: uri.getQueryParameter("host") ?: ""
+        if (server.isBlank()) {
+            val err = "Invalid proxy link: missing server"
+            _failoverStatus.value = "🔴 $err"
+            callback?.invoke(false, err)
+            return
+        }
+
+        val portStr = uri.getQueryParameter("port") ?: ""
+        val secret = uri.getQueryParameter("secret") ?: ""
+        val username = uri.getQueryParameter("username") ?: uri.getQueryParameter("user") ?: ""
+        val password = uri.getQueryParameter("password") ?: uri.getQueryParameter("pass") ?: ""
+
+        val type = if (secret.isNotBlank()) ProxyType.MTPROTO else ProxyType.SOCKS5
+        val defaultPort = if (type == ProxyType.MTPROTO) 443 else 1080
+        val port = portStr.toIntOrNull() ?: defaultPort
+
+        val newItem =
+            ProxyItem(
+                server = server,
+                port = port,
+                type = type,
+                username = username,
+                password = password,
+                secret = secret,
+                isEnabled = false,
+            )
+
+        val savedProxy = ProxyStorage.saveProxy(context, newItem)
+        _failoverStatus.value = "Verifying deep-link proxy ${savedProxy.server}:${savedProxy.port}..."
+
+        scope.launch {
+            val ping = pingProxy(savedProxy, timeoutMs = 3000L)
+            if (ping != null) {
+                enableProxy(savedProxy.id) { success, err ->
+                    if (success) {
+                        val msg = "🟢 Proxy deep-link activated: ${savedProxy.server}:${savedProxy.port} (${ping}ms)"
+                        _failoverStatus.value = msg
+                        callback?.invoke(true, msg)
+                    } else {
+                        val msg = "🔴 Failed to enable deep-link proxy: ${err ?: "Unknown error"}"
+                        _failoverStatus.value = msg
+                        callback?.invoke(false, msg)
+                    }
+                }
+            } else {
+                val msg = "🔴 Deep-link proxy failed latency ping test: ${savedProxy.server}:${savedProxy.port}"
+                _failoverStatus.value = msg
+                callback?.invoke(false, msg)
             }
         }
     }
