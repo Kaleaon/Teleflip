@@ -513,14 +513,27 @@ class MainActivity : AppCompatActivity() {
                     val isListFocused = wasEmpty || currentFocusedVh != null || !isTabViewFocused()
                     val anchorChatId = focusedChatId
                     val anchorTop = currentFocusedVh?.itemView?.top
+                    // If the user is sitting at the top of the list, stay at the top so
+                    // chats bumped by new messages are immediately visible.
+                    val wasAtTop =
+                        wasEmpty ||
+                            currentFocusedVh?.bindingAdapterPosition == 0 ||
+                            (anchorChatId != null && chatListAdapter?.getPositionForChatId(anchorChatId) == 0)
                     chatListAdapter?.submitList(filtered) {
                         if (currentScreen == Screen.CHAT_LIST && filtered.isNotEmpty() && isListFocused && !isTabViewFocused()) {
                             val targetPos =
-                                anchorChatId?.let { id ->
-                                    chatListAdapter?.getPositionForChatId(id)?.takeIf { it >= 0 }
-                                } ?: 0
+                                if (wasAtTop) {
+                                    0
+                                } else {
+                                    anchorChatId?.let { id ->
+                                        chatListAdapter?.getPositionForChatId(id)?.takeIf { it >= 0 }
+                                    } ?: 0
+                                }
                             val lm = rv?.layoutManager as? LinearLayoutManager
-                            if (anchorTop != null && targetPos > 0) {
+                            if (wasAtTop) {
+                                lm?.scrollToPositionWithOffset(0, 0)
+                                focusedChatId = filtered.firstOrNull()?.id
+                            } else if (anchorTop != null && targetPos > 0) {
                                 lm?.scrollToPositionWithOffset(targetPos, anchorTop)
                             }
                             rv?.post {
@@ -1255,6 +1268,11 @@ class MainActivity : AppCompatActivity() {
         val options = mutableListOf<MenuOption>()
 
         options.add(
+            MenuOption(options.size + 1, "⚙️ Settings (shortcut: 0)") {
+                showSettingsScreen()
+            },
+        )
+        options.add(
             MenuOption(options.size + 1, "🔍 Search (Chats, Contacts, Messages)") {
                 showSearchDialog()
             },
@@ -1331,11 +1349,6 @@ class MainActivity : AppCompatActivity() {
         options.add(
             MenuOption(options.size + 1, "🩺 Diagnostics & Error Log") {
                 com.teleflip.app.ui.DiagnosticsDialog(this).show()
-            },
-        )
-        options.add(
-            MenuOption(options.size + 1, "⚙️ Settings & API") {
-                showSettingsScreen()
             },
         )
         options.add(
@@ -5758,8 +5771,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // In Chat List: Keypad numbers 1-9 directly open chat 1-9!
+        // In Chat List: Keypad 0 opens Settings, numbers 1-9 directly open chat 1-9!
         if (currentScreen == Screen.CHAT_LIST && event.action == KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_0) {
+                showSettingsScreen()
+                return true
+            }
             if (keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9) {
                 val index = keyCode - KeyEvent.KEYCODE_1
                 val target = chatListAdapter?.getItemAt(index)

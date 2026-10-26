@@ -1010,7 +1010,7 @@ class TelegramManager(
             }
         client.send(request) { result ->
             if (result is TdApi.Ok) {
-                _chats.update { chats -> chats.map { if (it.id == chatId) it.copy(isPinned = newValue) else it }.sortedByDescending { it.isPinned } }
+                _chats.update { chats -> sortChatList(chats.map { if (it.id == chatId) it.copy(isPinned = newValue) else it }) }
             } else if (result is TdApi.Error) {
                 reportOperationError(result.message)
             }
@@ -2476,11 +2476,20 @@ class TelegramManager(
             resolveReplyPreviewAsync(chatId, message.replyToMessageId)
         }
 
-        val updatedChats =
-            _chats.value.map {
-                if (it.id == chatId) it.copy(lastMessage = message.text, time = message.time) else it
-            }
-        _chats.value = updatedChats
+        _chats.update { chats ->
+            val idx = chats.indexOfFirst { it.id == chatId }
+            if (idx < 0 || message.id < chats[idx].lastMessageId) return@update chats
+            val list = chats.toMutableList()
+            val nowSec = System.currentTimeMillis() / 1000L
+            list[idx] =
+                list[idx].copy(
+                    lastMessage = message.text,
+                    time = message.time,
+                    lastMessageId = message.id,
+                    lastMessageDate = maxOf(list[idx].lastMessageDate, nowSec),
+                )
+            sortChatList(list)
+        }
     }
 
     fun loadChats(limit: Int = 30) {
@@ -4325,7 +4334,11 @@ class TelegramManager(
             }
             TdApi.UpdateChatLastMessage.CONSTRUCTOR -> {
                 val updateLast = obj as TdApi.UpdateChatLastMessage
-                updateChatLastMessage(updateLast.chatId, updateLast.lastMessage)
+                updateChatLastMessage(updateLast.chatId, updateLast.lastMessage, updateLast.positions)
+            }
+            TdApi.UpdateChatPosition.CONSTRUCTOR -> {
+                val updatePosition = obj as TdApi.UpdateChatPosition
+                updateChatPosition(updatePosition.chatId, updatePosition.position)
             }
             TdApi.UpdateChatDraftMessage.CONSTRUCTOR -> {
                 val updateDraft = obj as TdApi.UpdateChatDraftMessage
@@ -4755,7 +4768,8 @@ class TelegramManager(
         }
 
         val existingModel = _chats.value.find { it.id == chat.id }
-        val isPinnedChat = existingModel?.isPinned ?: false
+        val mainPosition = chat.positions?.let { mainListPosition(it) }
+        val isPinnedChat = mainPosition?.isPinned ?: existingModel?.isPinned ?: false
         chat.notificationSettings?.let {
             chatNotificationSettingsCache[chat.id] = it
         }
@@ -4791,6 +4805,9 @@ class TelegramManager(
                 draftText = draftStr,
                 pinnedMessageId = existingModel?.pinnedMessageId ?: existingPinnedIds.lastOrNull() ?: 0L,
                 pinnedMessageIds = existingPinnedIds,
+                order = mainPosition?.order ?: existingModel?.order ?: 0L,
+                lastMessageDate = lastMsg?.date?.toLong() ?: existingModel?.lastMessageDate ?: 0L,
+                lastMessageId = lastMsg?.id ?: existingModel?.lastMessageId ?: 0L,
             )
 
         synchronized(pendingChats) {
@@ -4817,7 +4834,7 @@ class TelegramManager(
                                 currentList.add(model)
                             }
                         }
-                        _chats.value = currentList
+                        _chats.value = sortChatList(currentList)
                     }
                 }
         }
@@ -4826,17 +4843,57 @@ class TelegramManager(
     private fun updateChatLastMessage(
         chatId: Long,
         msg: TdApi.Message?,
+        positions: Array<TdApi.ChatPosition>? = null,
     ) {
-        val list = _chats.value.toMutableList()
-        val index = list.indexOfFirst { it.id == chatId }
-        if (index >= 0) {
+        _chats.update { current ->
+            val list = current.toMutableList()
+            val index = list.indexOfFirst { it.id == chatId }
+            if (index < 0) return@update current
             val old = list[index]
-            val lastMsgText = extractMessageText(msg?.content)
+            val lastMsgText = if (msg != null) extractMessageText(msg.content) else old.lastMessage
             val timeStr = if (msg != null) formatTime(msg.date.toLong() * 1000) else old.time
-            list[index] = old.copy(lastMessage = lastMsgText, time = timeStr)
-            _chats.value = list
+            val mainPosition = positions?.let { mainListPosition(it) }
+            list[index] =
+                old.copy(
+                    lastMessage = lastMsgText,
+                    time = timeStr,
+                    lastMessageDate = msg?.date?.toLong() ?: old.lastMessageDate,
+                    lastMessageId = msg?.id ?: old.lastMessageId,
+                    order = if (positions != null) mainPosition?.order ?: 0L else old.order,
+                    isPinned = if (positions != null) mainPosition?.isPinned ?: false else old.isPinned,
+                )
+            sortChatList(list)
         }
     }
+
+    private fun updateChatPosition(
+        chatId: Long,
+        position: TdApi.ChatPosition,
+    ) {
+        if (position.list !is TdApi.ChatListMain) return
+        _chats.update { current ->
+            val index = current.indexOfFirst { it.id == chatId }
+            if (index < 0) return@update current
+            val list = current.toMutableList()
+            list[index] = list[index].copy(order = position.order, isPinned = position.isPinned)
+            sortChatList(list)
+        }
+    }
+
+    private fun mainListPosition(positions: Array<TdApi.ChatPosition>): TdApi.ChatPosition? = positions.firstOrNull { it.list is TdApi.ChatListMain }
+
+    /**
+     * Sorts chats like official Telegram clients: pinned first, then by TDLib
+     * list order, falling back to the last message date (newest at top).
+     */
+    @androidx.annotation.VisibleForTesting
+    internal fun sortChatList(chats: List<ChatModel>): List<ChatModel> =
+        chats.sortedWith(
+            compareByDescending<ChatModel> { it.isPinned }
+                .thenByDescending { it.order }
+                .thenByDescending { it.lastMessageDate }
+                .thenByDescending { it.lastMessageId },
+        )
 
     @androidx.annotation.VisibleForTesting
     internal fun extractStickerInfo(content: TdApi.MessageContent?): Pair<String, Boolean> {
@@ -5389,8 +5446,16 @@ class TelegramManager(
         return when (content.constructor) {
             TdApi.MessagePhoto.CONSTRUCTOR -> {
                 val photo = content as TdApi.MessagePhoto
-                val size = photo.photo.sizes.maxByOrNull { it.width.toLong() * it.height }
-                resolveFile(size?.photo)
+                val sizes = photo.photo.sizes
+                val downloadedSize = sizes.lastOrNull { localFilePath(it.photo) != null }
+                if (downloadedSize != null) {
+                    Pair(downloadedSize.photo.id, localFilePath(downloadedSize.photo))
+                } else {
+                    val targetSize =
+                        sizes.find { it.type == "m" || it.type == "x" }
+                            ?: sizes.maxByOrNull { it.width.toLong() * it.height }
+                    resolveFile(targetSize?.photo)
+                }
             }
             TdApi.MessageVoiceNote.CONSTRUCTOR -> {
                 val voice = (content as TdApi.MessageVoiceNote).voiceNote.voice
@@ -5453,7 +5518,8 @@ class TelegramManager(
         val path = localFilePath(f) ?: downloadedFilePaths[f.id]?.takeIf { File(it).isFile }
         if (path != null) return Pair(f.id, path)
         val fileBytes = if (f.expectedSize > 0) f.expectedSize else f.size
-        if (f.local?.canBeDownloaded == true && !f.local.isDownloadingActive &&
+        if (f.local?.canBeDownloaded == true &&
+            !f.local.isDownloadingActive &&
             fileBytes <= 15L * 1024L * 1024L &&
             com.teleflip.app.storage.StorageManager.shouldAutoDownloadMedia(context)
         ) {
