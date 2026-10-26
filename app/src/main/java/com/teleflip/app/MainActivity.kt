@@ -5225,6 +5225,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun cleanupInCallAudio() {
+        if (::telegramManager.isInitialized) {
+            telegramManager.stopDialTone()
+        }
         stopCallTimer()
         callDurationSec = 0
     }

@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.teleflip.app.calls.CallAudioSession
+import com.teleflip.app.calls.CallTonePlayer
 import com.teleflip.app.calls.CallTransport
 import com.teleflip.app.calls.TransportState
 import com.teleflip.app.model.CallState
@@ -22,9 +23,11 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.any
+import org.mockito.Mockito.atLeast
 import org.mockito.Mockito.isA
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.robolectric.RobolectricTestRunner
@@ -39,6 +42,7 @@ class TelegramCallTransportTest {
     private lateinit var manager: TelegramManager
     private lateinit var client: Client
     private lateinit var audio: CallAudioSession
+    private lateinit var tonePlayer: CallTonePlayer
     private val transport = TestTransport()
 
     private class TestTransport : CallTransport {
@@ -88,8 +92,9 @@ class TelegramCallTransportTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         shadowOf(context as android.app.Application).grantPermissions(Manifest.permission.RECORD_AUDIO)
         audio = mock(CallAudioSession::class.java)
+        tonePlayer = mock(CallTonePlayer::class.java)
         client = mock(Client::class.java)
-        manager = TelegramManager(context, { transport }, { audio }, dispatcher)
+        manager = TelegramManager(context, { transport }, { audio }, dispatcher, { tonePlayer })
         manager.setTdClientForTesting(client)
     }
 
@@ -182,5 +187,25 @@ class TelegramCallTransportTest {
         assertEquals(false, success)
         verifyNoInteractions(client)
         assertTrue(mockingDetails(audio).invocations.none { it.method.name == "start" })
+    }
+
+    @Test fun outgoingCallPlaysDialToneWhilePendingAndStopsWhenReadyOrDiscarded() {
+        manager.handleCallUpdate(call(TdApi.CallStatePending()))
+        dispatcher.scheduler.runCurrent()
+        verify(tonePlayer).startDialTone()
+
+        manager.handleCallUpdate(call(ready()))
+        dispatcher.scheduler.runCurrent()
+        verify(tonePlayer).stop()
+
+        manager.handleCallUpdate(call(TdApi.CallStateDiscarded()))
+        dispatcher.scheduler.runCurrent()
+        verify(tonePlayer, atLeast(2)).stop()
+    }
+
+    @Test fun incomingCallNeverStartsDialTone() {
+        manager.handleCallUpdate(call(TdApi.CallStatePending()).apply { isOutgoing = false })
+        dispatcher.scheduler.runCurrent()
+        verify(tonePlayer, never()).startDialTone()
     }
 }

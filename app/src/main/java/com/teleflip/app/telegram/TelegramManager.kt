@@ -8,7 +8,9 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.teleflip.app.calls.AndroidCallAudioSession
+import com.teleflip.app.calls.AndroidCallTonePlayer
 import com.teleflip.app.calls.CallAudioSession
+import com.teleflip.app.calls.CallTonePlayer
 import com.teleflip.app.calls.CallTransport
 import com.teleflip.app.calls.CallTransportController
 import com.teleflip.app.calls.NtgCallTransport
@@ -99,6 +101,7 @@ class TelegramManager(
     private val transportFactory: (Context) -> CallTransport = { NtgCallTransport(it) },
     private val audioFactory: (Context) -> CallAudioSession = { AndroidCallAudioSession(it) },
     private val callTaskDispatcher: kotlinx.coroutines.CoroutineDispatcher? = null,
+    private val tonePlayerFactory: (Context) -> CallTonePlayer = { AndroidCallTonePlayer() },
 ) : Client.ResultHandler {
     private val context: Context = paramContext.applicationContext ?: paramContext
     private val tag = "TelegramManager"
@@ -122,6 +125,7 @@ class TelegramManager(
 
     private val callDispatcher by lazy { callTaskDispatcher ?: Executors.newSingleThreadExecutor { task -> Thread(task, "TeleFlipCall").apply { isDaemon = true } }.asCoroutineDispatcher() }
     private val callAudio by lazy { audioFactory(context) }
+    private val callTonePlayer by lazy { tonePlayerFactory(context) }
     private var callClock: Job? = null
     private var acceptingCallId: Int? = null
     private var connectedAt: Long? = null
@@ -183,11 +187,13 @@ class TelegramManager(
     }
 
     private fun stopPreparedCallAudio() {
+        callTonePlayer.stop()
         callAudioPrepared = false
         runCatching { callAudio.stop() }
     }
 
     private fun releaseCallAudio(id: Int) {
+        callTonePlayer.stop()
         if (acceptingCallId == id) acceptingCallId = null
         callClock?.cancel()
         callClock = null
@@ -205,6 +211,7 @@ class TelegramManager(
         message: String,
     ) {
         scope.launch(Dispatchers.Main) {
+            callTonePlayer.stop()
             if (_activeCall.value?.callId != id || _activeCall.value?.state == CallState.DISCARDED || _activeCall.value?.state == CallState.ERROR) return@launch
             _activeCall.update { it?.copy(state = CallState.ERROR) }
             releaseCallAudio(id)
@@ -3528,6 +3535,7 @@ class TelegramManager(
                                     durationSec = 0,
                                 )
                         }
+                        callTonePlayer.startDialTone()
                         onResult?.invoke(true, "Call initiated (ID: ${result.id})")
                     } else if (result is TdApi.Error) {
                         stopPreparedCallAudio()
@@ -3597,6 +3605,7 @@ class TelegramManager(
     }
 
     fun endCurrentCall() {
+        callTonePlayer.stop()
         val call = _activeCall.value
         if (call != null) {
             discardCall(call.callId, call.durationSec)
@@ -3604,6 +3613,10 @@ class TelegramManager(
             cancelCallRequest = true
             stopPreparedCallAudio()
         }
+    }
+
+    fun stopDialTone() {
+        callTonePlayer.stop()
     }
 
     fun discardCall(
@@ -3729,6 +3742,11 @@ class TelegramManager(
                 isSpeakerOn = existing?.isSpeakerOn ?: false,
             )
         _activeCall.value = updated
+        if (call.isOutgoing && (state == CallState.PENDING || state == CallState.EXCHANGING_KEYS) && call.state !is TdApi.CallStateReady) {
+            callTonePlayer.startDialTone()
+        } else {
+            callTonePlayer.stop()
+        }
         if (state != CallState.PENDING) {
             runCatching { (context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager)?.cancel(900000 + call.id) }
         }
