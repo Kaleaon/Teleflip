@@ -110,12 +110,14 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@color/bg_dark_card"
+        android:background="@drawable/bg_item_selector"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:paddingTop="4dp"
         android:paddingBottom="4dp"
         android:focusable="true"
+        android:clickable="true"
+        android:nextFocusDown="@+id/rv_messages"
         android:visibility="gone">
 
         <TextView
