@@ -3404,22 +3404,6 @@ class TelegramManager(
         }
     }
 
-    fun clickSponsoredMessage(
-        chatId: Long,
-        messageId: Long,
-    ) {
-        try {
-            val req =
-                TdApi.ClickChatSponsoredMessage().apply {
-                    this.chatId = chatId
-                    this.messageId = messageId
-                }
-            tdClient?.send(req, this)
-        } catch (e: Exception) {
-            Log.w(tag, "Click sponsored message failed: ${e.message}")
-        }
-    }
-
     fun getUserPhoneNumber(userId: Long): String? = userPhoneCache[userId]
 
     fun getDirectChatUserId(chatId: Long): Long? = chatIdToUserId[chatId] ?: if (chatId > 0) chatId else null
@@ -3903,21 +3887,6 @@ class TelegramManager(
                 }
             }
         }
-    }
-
-    fun toggleChatMute(
-        chatId: Long,
-        currentMuted: Boolean,
-        onResult: ((Boolean) -> Unit)? = null,
-    ) {
-        val client = tdClient
-        if (client == null) {
-            onResult?.invoke(currentMuted)
-            return
-        }
-        val newMuted = !currentMuted
-        val muteFor = if (newMuted) Int.MAX_VALUE else 0
-        setChatNotificationMute(chatId, muteFor, onResult)
     }
 
     fun getPersistedMutedChatIds(): MutableSet<String> {
@@ -4644,33 +4613,7 @@ class TelegramManager(
     private var batchJob: Job? = null
 
     fun handleUserUpdate(user: TdApi.User) {
-        userCache[user.id] = user
-        subscriberCache[user.id] = user.isPremium
-        if (!user.phoneNumber.isNullOrBlank()) {
-            userPhoneCache[user.id] = user.phoneNumber
-        }
-
-        val currentList = _chats.value.toMutableList()
-        var updated = false
-        for (i in currentList.indices) {
-            val chat = currentList[i]
-            if (chat.chatType == ChatType.DIRECT && chat.id == user.id) {
-                if (chat.isPremium != user.isPremium) {
-                    currentList[i] = chat.copy(isPremium = user.isPremium)
-                    updated = true
-                }
-            }
-        }
-        if (updated) {
-            _chats.value = currentList
-        }
-
-        synchronized(pendingChats) {
-            val pendingModel = pendingChats[user.id]
-            if (pendingModel != null) {
-                pendingChats[user.id] = pendingModel.copy(isPremium = user.isPremium)
-            }
-        }
+        updateUserCache(user)
     }
 
     private fun cacheCreatedChat(chat: TdApi.Chat): ChatModel {
@@ -4681,7 +4624,6 @@ class TelegramManager(
         _chats.update { chats -> listOf(model) + chats.filterNot { it.id == model.id } }
         return model
     }
-
     private fun addOrUpdateChat(chat: TdApi.Chat) {
         lastReadOutboxIds[chat.id] = chat.lastReadOutboxMessageId
         val title = chat.title.ifBlank { "Chat #${chat.id}" }
