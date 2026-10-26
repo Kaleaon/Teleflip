@@ -1614,34 +1614,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val doSend = {
-            commitActiveInputEngines()
-            draftSyncJob?.cancel()
-            draftSyncJob = null
-            val text = etComposeInput?.text?.toString()?.trim() ?: ""
-            if (text.isNotEmpty()) {
-                val editing = activeEditMessage
-                val replying = activeReplyMessage
-                if (editing != null) {
-                    telegramManager.editMessageText(chat.id, editing.id, text) {
-                        showToast("Message edited")
-                    }
-                    clearReplyOrEditMode()
-                    etComposeInput?.setText("")
-                } else if (replying != null) {
-                    val preview = "${replying.senderName}: ${replying.text.take(35)}"
-                    telegramManager.sendMessage(
-                        chatId = chat.id,
-                        text = text,
-                        replyToMessageId = replying.id,
-                        replyToPreview = preview,
-                    )
-                    clearReplyOrEditMode()
-                    etComposeInput?.setText("")
-                } else {
-                    telegramManager.sendMessage(chat.id, text)
-                    etComposeInput?.setText("")
-                }
-            }
+            dispatchOutboundMessageWithOptions(chat)
         }
 
         btnSend.setOnClickListener { doSend() }
@@ -1693,6 +1666,7 @@ class MainActivity : AppCompatActivity() {
                     right = "Back",
                     onLeft = { showAttachMenu(chat) },
                     onCenter = { doSend() },
+                    onCenterLongClick = { showSendOptionsMenu(chat) },
                     onRight = { showChatListScreen() },
                 )
             } else if (!hasFocus) {
@@ -1713,6 +1687,7 @@ class MainActivity : AppCompatActivity() {
                     etComposeInput?.requestFocus()
                 }
             },
+            onCenterLongClick = { showSendOptionsMenu(chat) },
             onRight = { showChatListScreen() },
         )
 
@@ -2140,15 +2115,8 @@ class MainActivity : AppCompatActivity() {
             center = "Send",
             right = "Back",
             onLeft = { showAttachMenu(chat) },
-            onCenter = {
-                val text = etComposeInput?.text?.toString()?.trim() ?: ""
-                if (text.isNotEmpty()) {
-                    telegramManager.sendMessage(chat.id, text)
-                    etComposeInput?.setText("")
-                } else {
-                    etComposeInput?.requestFocus()
-                }
-            },
+            onCenter = { dispatchOutboundMessageWithOptions(chat) },
+            onCenterLongClick = { showSendOptionsMenu(chat) },
             onRight = { showChatListScreen() },
         )
         etComposeInput?.requestFocus()
@@ -2394,9 +2362,12 @@ class MainActivity : AppCompatActivity() {
         schedulingState: org.drinkless.tdlib.TdApi.MessageSchedulingState? = null,
     ) {
         commitActiveInputEngines()
+        draftSyncJob?.cancel()
+        draftSyncJob = null
         val text = etComposeInput?.text?.toString()?.trim() ?: ""
         if (text.isEmpty()) {
             showToast("Please enter a message first")
+            etComposeInput?.requestFocus()
             return
         }
         val editing = activeEditMessage
