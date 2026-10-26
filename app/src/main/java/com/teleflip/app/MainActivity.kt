@@ -5565,8 +5565,8 @@ class MainActivity : AppCompatActivity() {
             if (SoftkeyUtils.isCenterKey(keyCode)) {
                 if (passcodeEntry.length == PASSCODE_PIN_LENGTH) {
                     attemptPasscodeUnlock()
-                    return true
                 }
+                return true
             }
         }
 
