@@ -33,11 +33,7 @@ class TeleFlipNotificationService : Service() {
             try {
                 val intent = Intent(context, TeleFlipNotificationService::class.java)
                 if (enabled) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(intent)
-                    } else {
-                        context.startService(intent)
-                    }
+                    context.startForegroundService(intent)
                 } else {
                     context.stopService(intent)
                 }
@@ -52,12 +48,7 @@ class TeleFlipNotificationService : Service() {
         try {
             NotificationHelper.ensureChannels(this)
             val openIntent = Intent(this, MainActivity::class.java)
-            val pendingFlags =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                } else {
-                    PendingIntent.FLAG_UPDATE_CURRENT
-                }
+            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val pendingIntent = PendingIntent.getActivity(this, 0, openIntent, pendingFlags)
 
             val notification =
