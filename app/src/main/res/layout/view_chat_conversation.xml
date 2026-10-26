@@ -236,6 +236,40 @@
 
     </LinearLayout>
 
+    <!-- Slow Mode Cooldown Banner -->
+    <LinearLayout
+        android:id="@+id/layout_slow_mode_banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1E2A38"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏳"
+            android:textSize="12sp"
+            android:layout_marginEnd="6dp" />
+
+        <TextView
+            android:id="@+id/tv_slow_mode_banner_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Slow mode active: wait 00:00 to send next message"
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="12sp"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+    </LinearLayout>
+
     <!-- Bottom Compose Box -->
     <LinearLayout
         android:id="@+id/layout_compose"
