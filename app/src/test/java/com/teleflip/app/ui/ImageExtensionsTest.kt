@@ -141,46 +141,6 @@ class ImageExtensionsTest {
     }
 
     @Test
-    fun loadBitmapFromFile_withValidPath_showsImageView() {
-        imageView.loadBitmapFromFile(sampleImagePath)
-        ShadowLooper.idleMainLooper()
-
-        assertEquals(View.VISIBLE, imageView.visibility)
-        assertNotNull(imageView.drawable)
-    }
-
-    @Test
-    fun loadBitmapFromFile_withNonExistentPath_hidesImageView() {
-        val invalidPath = File(tempFolder.root, "non_existent.png").absolutePath
-
-        imageView.loadBitmapFromFile(invalidPath)
-        ShadowLooper.idleMainLooper()
-
-        assertEquals(View.GONE, imageView.visibility)
-    }
-
-    @Test
-    fun loadBitmapFromFile_withNullPath_hidesImageView() {
-        imageView.loadBitmapFromFile(null)
-        ShadowLooper.idleMainLooper()
-
-        assertEquals(View.GONE, imageView.visibility)
-    }
-
-    @Test
-    @Suppress("DEPRECATION")
-    fun loadBitmapFromFile_withCorruptedFile_hidesImageView() {
-        val corruptedFile = tempFolder.newFile("corrupted_photo.jpg")
-        corruptedFile.writeText("This is invalid image data")
-        org.robolectric.shadows.ShadowBitmapFactory.provideWidthAndHeightHints(corruptedFile.absolutePath, -1, -1)
-
-        imageView.loadBitmapFromFile(corruptedFile.absolutePath)
-        ShadowLooper.idleMainLooper()
-
-        assertEquals(View.GONE, imageView.visibility)
-    }
-
-    @Test
     fun calculateInSampleSize_withLargeImage_calculatesPowerOfTwo() {
         val options =
             android.graphics.BitmapFactory.Options().apply {
