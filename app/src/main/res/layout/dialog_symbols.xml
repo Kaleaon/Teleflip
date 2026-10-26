@@ -25,6 +25,9 @@
         android:id="@+id/rv_symbols_grid"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxHeight="260dp" />
+        android:maxHeight="260dp"
+        android:layout_marginBottom="8dp" />
+
+    <include layout="@layout/layout_softkeys" />
 
 </LinearLayout>

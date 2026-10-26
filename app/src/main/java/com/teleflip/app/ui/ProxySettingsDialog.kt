@@ -241,6 +241,14 @@ class ProxySettingsDialog(
         }
 
         btnClose?.setOnClickListener { dismiss() }
+
+        setupSoftkeys(
+            left = "",
+            center = "Save",
+            right = "Close",
+            onCenter = { btnSaveEnable?.performClick() },
+            onRight = { dismiss() },
+        )
     }
 
     private fun setupDismissKeys() {

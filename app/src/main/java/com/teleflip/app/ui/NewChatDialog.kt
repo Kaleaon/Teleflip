@@ -88,6 +88,23 @@ class NewChatDialog(
             dismiss()
         }
 
+        setupSoftkeys(
+            left = "Clear",
+            center = "Open",
+            right = "Cancel",
+            onLeft = {
+                keypadEngine?.commitCurrentChar()
+                input?.setText("")
+            },
+            onCenter = {
+                btnDirect?.performClick()
+            },
+            onRight = {
+                keypadEngine?.commitCurrentChar()
+                dismiss()
+            },
+        )
+
         input?.requestFocus()
     }
 

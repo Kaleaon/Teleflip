@@ -69,6 +69,26 @@ class PollDialog(
             dismiss()
         }
 
+        setupSoftkeys(
+            left = "Clear",
+            center = "Send",
+            right = "Cancel",
+            onLeft = {
+                val focusedEdit = currentFocus as? EditText
+                if (focusedEdit != null) {
+                    engines[focusedEdit.id]?.commitCurrentChar()
+                    focusedEdit.setText("")
+                }
+            },
+            onCenter = {
+                btnSubmit?.performClick()
+            },
+            onRight = {
+                engines.values.forEach { it.commitCurrentChar() }
+                dismiss()
+            },
+        )
+
         etQuestion?.requestFocus()
     }
 

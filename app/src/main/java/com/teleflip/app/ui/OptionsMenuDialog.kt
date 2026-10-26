@@ -55,6 +55,24 @@ class OptionsMenuDialog(
         rv?.adapter = MenuAdapter()
 
         updatePage()
+        setupSoftkeys(
+            left = "",
+            center = "Select",
+            right = "Back",
+            onCenter = {
+                val rv = findViewById<RecyclerView>(R.id.rv_menu_options)
+                val focused = currentFocus
+                val vh = focused?.let { rv?.findContainingViewHolder(it) }
+                if (vh != null) {
+                    val pos = vh.adapterPosition
+                    if (pos in visibleOptions.indices) {
+                        dismiss()
+                        visibleOptions[pos].action.invoke()
+                    }
+                }
+            },
+            onRight = { dismiss() },
+        )
         // Focus the first option
         rv?.post {
             rv.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()

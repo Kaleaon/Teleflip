@@ -411,4 +411,77 @@ class SearchDialogTest {
 
         dialog.dismiss()
     }
+
+    @Test
+    fun testVendorSoftLeftKeycodesClearSearchInput() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val vendorLeftCodes = listOf(132, 60, 228)
+
+        for (code in vendorLeftCodes) {
+            input.setText("TestQuery")
+            val event = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, code, 0)
+            val handled = dialog.onKeyDown(code, event)
+            assertTrue("Vendor soft left keycode $code should be handled by SearchDialog", handled)
+            assertEquals("Search input should be cleared by keycode $code", "", input.text.toString())
+        }
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testVendorSoftRightKeycodesDismissSearchDialog() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        val tm = createTelegramManager()
+        val vendorRightCodes = listOf(229, 230, 61, 158)
+
+        for (code in vendorRightCodes) {
+            val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+            dialog.show()
+            assertTrue("SearchDialog should be showing", dialog.isShowing)
+
+            val event = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, code, 0)
+            val handled = dialog.onKeyDown(code, event)
+            assertTrue("Vendor soft right keycode $code should be handled", handled)
+            assertFalse("SearchDialog should be dismissed after keycode $code", dialog.isShowing)
+        }
+    }
+
+    @Test
+    fun testSearchDialogSoftkeyBarInitializedWithLabelsAndClickListener() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
+
+        assertNotNull("tv_softkey_left should exist", tvLeft)
+        assertNotNull("tv_softkey_center should exist", tvCenter)
+        assertNotNull("tv_softkey_right should exist", tvRight)
+
+        assertEquals("Clear", tvLeft.text.toString())
+        assertEquals("Select", tvCenter.text.toString())
+        assertEquals("Back", tvRight.text.toString())
+
+        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        input.setText("Some Text")
+        tvLeft.performClick()
+        assertEquals("Clicking left softkey view should clear input", "", input.text.toString())
+
+        tvRight.performClick()
+        assertFalse("Clicking right softkey view should dismiss dialog", dialog.isShowing)
+    }
 }

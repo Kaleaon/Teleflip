@@ -35,6 +35,24 @@ class SymbolsDialog(
         rv?.post {
             rv.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
         }
+
+        setupSoftkeys(
+            left = "",
+            center = "Select",
+            right = "Back",
+            onCenter = {
+                val focused = currentFocus
+                val vh = focused?.let { rv?.findContainingViewHolder(it) }
+                if (vh != null) {
+                    val pos = vh.adapterPosition
+                    if (pos in symbols.indices) {
+                        dismiss()
+                        onSymbolSelected(symbols[pos])
+                    }
+                }
+            },
+            onRight = { dismiss() },
+        )
     }
 
     override fun onBackPressed() {

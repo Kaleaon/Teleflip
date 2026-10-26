@@ -75,6 +75,14 @@ class ChatExportDialog(
         findViewById<Button>(R.id.btn_cancel_export)?.setOnClickListener {
             dismiss()
         }
+
+        setupSoftkeys(
+            left = "",
+            center = "Download",
+            right = "Cancel",
+            onCenter = { startExport() },
+            onRight = { dismiss() },
+        )
     }
 
     private fun toggleText() {
