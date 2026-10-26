@@ -25,7 +25,8 @@ allprojects {
     detekt {
         buildUponDefaultConfig = true
         allRules = false
-        ignoreFailures = true
+        ignoreFailures = false
+        baseline = file("${rootDir}/config/detekt/baseline.xml")
         config.setFrom(files("${rootDir}/config/detekt/detekt.yml"))
     }
 
