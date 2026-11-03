@@ -92,6 +92,13 @@ class MediaViewerDialog(
         pbProgress = findViewById(R.id.pb_viewer_progress)
         tvTime = findViewById(R.id.tv_viewer_time)
 
+        findViewById<View>(R.id.btn_zoom_in)?.setOnClickListener { cycleZoomIn() }
+        findViewById<View>(R.id.btn_zoom_out)?.setOnClickListener { zoomOut() }
+        findViewById<View>(R.id.btn_pan_left)?.setOnClickListener { panBy(panStepPx, 0f) }
+        findViewById<View>(R.id.btn_pan_right)?.setOnClickListener { panBy(-panStepPx, 0f) }
+        findViewById<View>(R.id.btn_reset)?.setOnClickListener { resetZoomAndPan() }
+        findViewById<View>(R.id.btn_save)?.setOnClickListener { onSaveMedia(message) }
+
         renderMedia()
         dialogScope.launch {
             messageUpdates?.collect { chats ->
