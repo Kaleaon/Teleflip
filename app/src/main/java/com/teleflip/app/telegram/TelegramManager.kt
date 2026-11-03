@@ -250,10 +250,10 @@ class TelegramManager(
             if (result.isSuccess) {
                 synchronized(pendingChats) { pendingChats[chatId]?.let { pendingChats[chatId] = it.copy(isMarkedUnread = unread) } }
                 synchronized(chatMap) {
-            val existing = chatMap[chatId]
-            if (existing != null) chatMap[chatId] = existing.copy(isMarkedUnread = unread)
-        }
-        _chats.value = synchronized(chatMap) { chatMap.values.toList() }
+                    val existing = chatMap[chatId]
+                    if (existing != null) chatMap[chatId] = existing.copy(isMarkedUnread = unread)
+                }
+                _chats.value = synchronized(chatMap) { chatMap.values.toList() }
             }
             done(result)
         }
@@ -4313,10 +4313,10 @@ class TelegramManager(
                 val update = obj as TdApi.UpdateChatIsMarkedAsUnread
                 synchronized(pendingChats) { pendingChats[update.chatId]?.let { pendingChats[update.chatId] = it.copy(isMarkedUnread = update.isMarkedAsUnread) } }
                 synchronized(chatMap) {
-                val existing = chatMap[update.chatId]
-                if (existing != null) chatMap[update.chatId] = existing.copy(isMarkedUnread = update.isMarkedAsUnread)
-            }
-            _chats.value = synchronized(chatMap) { chatMap.values.toList() }
+                    val existing = chatMap[update.chatId]
+                    if (existing != null) chatMap[update.chatId] = existing.copy(isMarkedUnread = update.isMarkedAsUnread)
+                }
+                _chats.value = synchronized(chatMap) { chatMap.values.toList() }
             }
             TdApi.UpdateNewCallSignalingData.CONSTRUCTOR -> {
                 val update = obj as TdApi.UpdateNewCallSignalingData
@@ -4723,6 +4723,7 @@ class TelegramManager(
         _chats.value = synchronized(chatMap) { chatMap.values.toList() }
         return model
     }
+
     private fun addOrUpdateChat(chat: TdApi.Chat) {
         lastReadOutboxIds[chat.id] = chat.lastReadOutboxMessageId
         val title = chat.title.ifBlank { "Chat #${chat.id}" }
