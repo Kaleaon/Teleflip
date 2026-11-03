@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import com.teleflip.app.R
+import com.teleflip.app.input.InputMode
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.model.ProxyType
 import com.teleflip.app.telegram.TelegramManager
@@ -56,6 +57,9 @@ class ProxySettingsDialog(
                         SymbolsDialog(context) { sym -> engines[field.id]?.insertSymbol(sym) }.show()
                     },
                 )
+        }
+        etPort?.id?.let { portId ->
+            engines[portId]?.setMode(InputMode.NUMERIC)
         }
 
         fun updateTypeSelection(type: ProxyType) {
@@ -240,7 +244,15 @@ class ProxySettingsDialog(
             }
         }
 
-        btnClose?.setOnClickListener { dismiss() }
+        btnClose?.setOnClickListener {
+            engines.values.forEach { it.commitCurrentChar() }
+            dismiss()
+        }
+    }
+
+    override fun dismiss() {
+        engines.values.forEach { it.commitCurrentChar() }
+        super.dismiss()
     }
 
     override fun onBackPressed() {

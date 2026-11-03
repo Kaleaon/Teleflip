@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layout_active_call_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="32dp"
+    android:background="@color/bg_dark_card"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp"
+    android:visibility="gone"
+    android:clickable="true"
+    android:focusable="false"
+    android:contentDescription="Active Call Overlay Bar">
+
+    <TextView
+        android:id="@+id/tv_overlay_icon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📞"
+        android:textSize="12sp"
+        android:layout_marginEnd="6dp" />
+
+    <TextView
+        android:id="@+id/tv_overlay_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Contact Name"
+        android:textColor="@color/text_primary"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/tv_overlay_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="In Call • 00:00"
+        android:textColor="@color/text_accent"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:maxLines="1" />
+
+</LinearLayout>
