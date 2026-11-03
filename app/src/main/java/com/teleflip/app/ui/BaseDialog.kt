@@ -20,7 +20,6 @@ abstract class BaseDialog(
     context: Context,
     themeResId: Int = R.style.Theme_TeleFlip,
 ) : Dialog(context, themeResId) {
-
     protected var softkeyManager: SoftkeyManager? = null
         private set
 
@@ -63,11 +62,13 @@ abstract class BaseDialog(
 
     protected fun isCenterKey(keyCode: Int): Boolean = SoftkeyUtils.isCenterKey(keyCode)
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
             return true
         }
         return super.onKeyDown(keyCode, event)
     }
 }
-

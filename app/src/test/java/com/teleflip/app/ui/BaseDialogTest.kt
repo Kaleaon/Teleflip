@@ -17,7 +17,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class BaseDialogTest {
-
     private class TestDialogWithSoftkeys(context: Context) : BaseDialog(context) {
         var leftClicked = false
         var rightClicked = false
@@ -35,8 +34,11 @@ class BaseDialogTest {
         }
 
         public fun checkIsBackOrRightSoftKey(keyCode: Int): Boolean = isBackOrRightSoftKey(keyCode)
+
         public fun checkIsSoftLeftKey(keyCode: Int): Boolean = isSoftLeftKey(keyCode)
+
         public fun checkIsSoftRightKey(keyCode: Int): Boolean = isSoftRightKey(keyCode)
+
         public fun checkIsCenterKey(keyCode: Int): Boolean = isCenterKey(keyCode)
     }
 
