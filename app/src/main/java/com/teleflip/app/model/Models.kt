@@ -62,6 +62,11 @@ data class ChatModel(
     val activeTopicId: Long = 0L,
     val activeTopicName: String = "",
     val isMarkedUnread: Boolean = false,
+    // TDLib main chat list order (higher = closer to top). 0 when unknown.
+    val order: Long = 0L,
+    // Unix timestamp (seconds) of the last message, used as sort fallback.
+    val lastMessageDate: Long = 0L,
+    val lastMessageId: Long = 0L,
 )
 
 enum class MessageStatus {
