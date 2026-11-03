@@ -67,35 +67,11 @@ object StorageManager {
     @Volatile
     private var sdCardCache: SdCardCache? = null
 
-    private var cacheTtlMs: Long = DEFAULT_CACHE_TTL_MS
-
     internal var timeProvider: () -> Long = System::currentTimeMillis
-
-    private val discoveryCount = java.util.concurrent.atomic.AtomicInteger(0)
 
     @Synchronized
     fun invalidateCache() {
         sdCardCache = null
-    }
-
-    fun isCacheValid(): Boolean {
-        val cache = sdCardCache ?: return false
-        val age = timeProvider() - cache.timestamp
-        return age in 0 until cacheTtlMs
-    }
-
-    @Synchronized
-    fun setCacheTtlMs(ttlMs: Long) {
-        require(ttlMs > 0) { "Cache TTL must be positive" }
-        cacheTtlMs = ttlMs
-    }
-
-    fun getCacheTtlMs(): Long = cacheTtlMs
-
-    fun getDiscoveryCount(): Int = discoveryCount.get()
-
-    fun resetDiscoveryCount() {
-        discoveryCount.set(0)
     }
 
     fun formatStorageSize(bytes: Long): String {
@@ -171,7 +147,7 @@ object StorageManager {
             val cache = sdCardCache
             if (cache != null) {
                 val age = timeProvider() - cache.timestamp
-                if (age in 0 until cacheTtlMs) {
+                if (age in 0 until DEFAULT_CACHE_TTL_MS) {
                     return cache.directory
                 }
             }
@@ -188,7 +164,7 @@ object StorageManager {
                 val cache = sdCardCache
                 if (cache != null) {
                     val age = timeProvider() - cache.timestamp
-                    if (age in 0 until cacheTtlMs) {
+                    if (age in 0 until DEFAULT_CACHE_TTL_MS) {
                         return cache
                     }
                 }
@@ -197,7 +173,6 @@ object StorageManager {
             val available = dir != null && dir.exists() && dir.canWrite()
             val newCache = SdCardCache(dir, available, timeProvider())
             sdCardCache = newCache
-            discoveryCount.incrementAndGet()
             return newCache
         }
     }
@@ -245,7 +220,7 @@ object StorageManager {
             val cache = sdCardCache
             if (cache != null) {
                 val age = timeProvider() - cache.timestamp
-                if (age in 0 until cacheTtlMs) {
+                if (age in 0 until DEFAULT_CACHE_TTL_MS) {
                     return cache.isAvailable
                 }
             }
