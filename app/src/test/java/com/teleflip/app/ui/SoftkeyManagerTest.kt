@@ -139,11 +139,4 @@ class SoftkeyManagerTest {
         val consumed = listener.onLongClick(tvCenter)
         assertFalse(consumed)
     }
-
-    @Test
-    @Suppress("DEPRECATION")
-    fun testHandleBack() {
-        val handled = softkeyManager.handleBack()
-        assertFalse(handled)
-    }
 }

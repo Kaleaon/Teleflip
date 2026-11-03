@@ -100,9 +100,4 @@ class SoftkeyManager(
 
         return false
     }
-
-    @Deprecated("Back press is handled via OnBackPressedDispatcher, bypassing softkeys.")
-    fun handleBack(): Boolean {
-        return false
-    }
 }
