@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import com.teleflip.app.R
+import com.teleflip.app.input.InputMode
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.model.ProxyType
 import com.teleflip.app.telegram.TelegramManager
@@ -56,6 +57,9 @@ class ProxySettingsDialog(
                         SymbolsDialog(context) { sym -> engines[field.id]?.insertSymbol(sym) }.show()
                     },
                 )
+        }
+        etPort?.id?.let { portId ->
+            engines[portId]?.setMode(InputMode.NUMERIC)
         }
 
         fun updateTypeSelection(type: ProxyType) {
@@ -240,17 +244,49 @@ class ProxySettingsDialog(
             }
         }
 
-        btnClose?.setOnClickListener { dismiss() }
+        btnClose?.setOnClickListener {
+            engines.values.forEach { it.commitCurrentChar() }
+            dismiss()
+        }
     }
 
-    private fun setupDismissKeys() {
-        setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN && isBackOrRightSoftKey(keyCode)) {
-                dismiss()
-                true
-            } else {
-                false
+    override fun dismiss() {
+        engines.values.forEach { it.commitCurrentChar() }
+        super.dismiss()
+    }
+
+    override fun onBackPressed() {
+        engines.values.forEach { it.commitCurrentChar() }
+        dismiss()
+    }
+
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (isBackOrRightSoftKey(keyCode)) {
+            engines.values.forEach { it.commitCurrentChar() }
+            dismiss()
+            return true
+        }
+
+        val focusedEdit = currentFocus as? EditText
+        if (focusedEdit != null) {
+            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+                engines[focusedEdit.id]?.commitCurrentChar()
+                focusedEdit.setText("")
+                return true
+            }
+            val isInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL
+            if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
+                return true
             }
         }
+
+        return super.onKeyDown(keyCode, event)
     }
 }
