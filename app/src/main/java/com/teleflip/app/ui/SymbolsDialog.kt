@@ -15,7 +15,6 @@ class SymbolsDialog(
     context: Context,
     private val onSymbolSelected: (String) -> Unit,
 ) : BaseDialog(context) {
-
     private val symbols =
         listOf(
             "?", "!", "@", "#", "$", "%", "&", "*",
@@ -46,16 +45,17 @@ class SymbolsDialog(
         val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
 
         if (tvLeft != null && tvCenter != null && tvRight != null) {
-            softkeyManager = SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight).apply {
-                update(
-                    left = "Next",
-                    center = "Select",
-                    right = "Cancel",
-                    onLeft = { nextPage() },
-                    onCenter = { selectFocusedSymbol() },
-                    onRight = { dismiss() },
-                )
-            }
+            softkeyManager =
+                SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight).apply {
+                    update(
+                        left = "Next",
+                        center = "Select",
+                        right = "Cancel",
+                        onLeft = { nextPage() },
+                        onCenter = { selectFocusedSymbol() },
+                        onRight = { dismiss() },
+                    )
+                }
         }
 
         val rv = findViewById<RecyclerView>(R.id.rv_symbols_grid)

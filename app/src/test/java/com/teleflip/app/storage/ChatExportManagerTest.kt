@@ -256,4 +256,52 @@ class ChatExportManagerTest {
             val imagesDir = File(exportDir, "images")
             assertEquals(1, imagesDir.listFiles()?.size ?: 0)
         }
+
+    @Test
+    fun testExportChat_largeStreamingExportEquivalence() =
+        runBlocking {
+            val messages =
+                (1..500).map { i ->
+                    MessageModel(
+                        id = i.toLong(),
+                        chatId = 100L,
+                        senderName = "User \"$i\"",
+                        text = "Line $i\nWith \"quotes\" & special chars \\ path/test",
+                        time = "12:${i % 60}",
+                        isOutbound = i % 2 == 0,
+                        status = MessageStatus.READ,
+                        mediaType = MediaType.NONE,
+                    )
+                }
+
+            val options =
+                ChatExportOptions(
+                    includeText = true,
+                    includePhotos = false,
+                    targetStorageType = StorageLocationType.INTERNAL,
+                )
+
+            val result =
+                ChatExportManager.exportChat(
+                    context = mockContext,
+                    chatId = 100L,
+                    chatTitle = "Streaming \"Test\" Chat",
+                    messages = messages,
+                    options = options,
+                )
+
+            assertTrue(result.isSuccess)
+            val exportDir = result.getOrNull()!!
+            val jsonFile = File(exportDir, "messages.json")
+            assertTrue("messages.json should exist", jsonFile.exists())
+
+            val lines = jsonFile.readLines()
+            assertTrue(lines.size > 500 * 8)
+            val fullContent = jsonFile.readText()
+            assertTrue(fullContent.contains("\"chatId\": 100"))
+            assertTrue(fullContent.contains("\"title\": \"Streaming \\\"Test\\\" Chat\""))
+            assertTrue(fullContent.contains("\"messageCount\": 500"))
+            assertTrue(fullContent.contains("User \\\"1\\\""))
+            assertTrue(fullContent.contains("Line 1\\nWith \\\"quotes\\\" & special chars \\\\ path/test"))
+        }
 }
