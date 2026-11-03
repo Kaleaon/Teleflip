@@ -42,40 +42,26 @@ class TelegramResendTest {
     }
 
     @Test
-    fun testResendMessageTransitionsToSending() {
+    fun retryWithoutClientPreservesFailedState() {
         val manager = TelegramManager(createMockContext())
-        manager.setConnectionStateForTesting("Ready")
-
-        val chatId = 2L
-        val msg = MessageModel(101L, chatId, "You", "Test resend outbound", "12:00", true, MessageStatus.FAILED)
-        manager.setMessagesForTesting(mapOf(chatId to listOf(msg)))
-
-        manager.resendMessage(chatId, 101L)
-
-        val chatMsgs = manager.messages.value[chatId] ?: emptyList()
-        val resendMsg = chatMsgs.find { it.id == 101L }
-        assertNotNull(resendMsg)
-        assertEquals(MessageStatus.SENDING, resendMsg?.status)
+        val message = MessageModel(101L, 2L, "You", "Retry", "", true, MessageStatus.FAILED)
+        manager.setMessagesForTesting(mapOf(2L to listOf(message)))
+        manager.resendMessage(2L, 101L)
+        assertEquals(listOf(message), manager.messages.value[2L])
+        assertNotNull(manager.operationError.value)
     }
 
     @Test
-    fun testResendMessageOffline() {
+    fun retryOfflineStillDispatchesToTdlib() {
         val manager = TelegramManager(createMockContext())
-        // Default connectionState is "Offline"
-
-        val chatId = 2L
-        manager.sendMessage(chatId, "Offline message")
-
-        val outboundMsg = manager.messages.value[chatId]?.last()
-        assertNotNull(outboundMsg)
-        val msgId = outboundMsg!!.id
-
-        manager.updateMessageStatus(chatId, msgId, MessageStatus.FAILED)
-
-        // Trigger resend when offline
-        manager.resendMessage(chatId, msgId)
-
-        val finalStatus = manager.messages.value[chatId]?.find { it.id == msgId }?.status
-        assertEquals(MessageStatus.FAILED, finalStatus)
+        val client = mock(org.drinkless.tdlib.Client::class.java)
+        manager.setTdClientForTesting(client)
+        manager.resendMessage(2L, 101L)
+        val captor = org.mockito.ArgumentCaptor.forClass(org.drinkless.tdlib.TdApi.Function::class.java)
+        org.mockito.Mockito.verify(client).send(captor.capture(), org.mockito.Mockito.any())
+        val request = captor.value as org.drinkless.tdlib.TdApi.ResendMessages
+        assertEquals(2L, request.chatId)
+        org.junit.Assert.assertArrayEquals(longArrayOf(101L), request.messageIds)
+        org.junit.Assert.assertTrue(manager.messages.value.isEmpty())
     }
 }
