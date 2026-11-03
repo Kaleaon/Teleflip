@@ -118,6 +118,13 @@ class MediaViewerDialog(
         btnFastForward?.contentDescription = "Fast forward 5 seconds"
         btnSpeed?.contentDescription = "Change playback speed"
 
+        findViewById<View>(R.id.btn_zoom_in)?.setOnClickListener { cycleZoomIn() }
+        findViewById<View>(R.id.btn_zoom_out)?.setOnClickListener { zoomOut() }
+        findViewById<View>(R.id.btn_pan_left)?.setOnClickListener { panBy(panStepPx, 0f) }
+        findViewById<View>(R.id.btn_pan_right)?.setOnClickListener { panBy(-panStepPx, 0f) }
+        findViewById<View>(R.id.btn_reset)?.setOnClickListener { resetZoomAndPan() }
+        findViewById<View>(R.id.btn_save)?.setOnClickListener { onSaveMedia(message) }
+
         renderMedia()
         dialogScope.launch {
             messageUpdates?.collect { chats ->
