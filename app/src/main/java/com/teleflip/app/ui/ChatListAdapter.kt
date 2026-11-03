@@ -76,7 +76,9 @@ class ChatListAdapter(
                                             }
                                         }
 
-                                        override fun onChildViewDetachedFromWindow(view: View) {}
+                                        override fun onChildViewDetachedFromWindow(view: View) {
+                                            // no-op
+                                        }
                                     }
                                 rv.addOnChildAttachStateChangeListener(listener)
                             }
