@@ -25,23 +25,23 @@
 package org.telegram.PhoneFormat;
 
 import java.util.ArrayList;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class RuleSet {
     public int matchLen;
     public ArrayList<PhoneRule> rules = new ArrayList<PhoneRule>();
-    public static Pattern pattern = Pattern.compile("[0-9]+");
 
     String format(String str, String intlPrefix, String trunkPrefix, boolean prefixRequired) {
         if (str.length() >= matchLen) {
-            String begin = str.substring(0, matchLen);
-
             int val = 0;
-            Matcher matcher = pattern.matcher(begin);
-            if (matcher.find()) {
-                String num = matcher.group(0);
-                val = Integer.parseInt(num);
+            int i = 0;
+            while (i < matchLen && (str.charAt(i) < '0' || str.charAt(i) > '9')) {
+                i++;
+            }
+            if (i < matchLen) {
+                while (i < matchLen && str.charAt(i) >= '0' && str.charAt(i) <= '9') {
+                    val = val * 10 + (str.charAt(i) - '0');
+                    i++;
+                }
             }
 
             for (PhoneRule rule : rules) {
