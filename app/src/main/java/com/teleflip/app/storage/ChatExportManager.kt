@@ -98,7 +98,7 @@ object ChatExportManager {
                             MediaType.PHOTO -> options.includePhotos
                             MediaType.ANIMATION -> options.includeGifs
                             MediaType.VIDEO -> options.includeVideos
-                            MediaType.VOICE -> options.includeVoice
+                            MediaType.VOICE, MediaType.AUDIO -> options.includeVoice
                             MediaType.DOCUMENT -> options.includeDocuments
                             else -> false
                         }
@@ -128,7 +128,7 @@ object ChatExportManager {
                             MediaType.PHOTO -> dirImages
                             MediaType.ANIMATION -> dirGifs
                             MediaType.VIDEO -> dirVideos
-                            MediaType.VOICE -> dirAudio
+                            MediaType.VOICE, MediaType.AUDIO -> dirAudio
                             MediaType.DOCUMENT -> dirFiles
                             else -> null
                         } ?: continue
@@ -147,7 +147,7 @@ object ChatExportManager {
                                         MediaType.PHOTO -> "jpg"
                                         MediaType.ANIMATION -> "gif"
                                         MediaType.VIDEO -> "mp4"
-                                        MediaType.VOICE -> "ogg"
+                                        MediaType.VOICE, MediaType.AUDIO -> "ogg"
                                         else -> "dat"
                                     }
                                 }
@@ -386,7 +386,7 @@ object ChatExportManager {
                     MediaType.VIDEO -> {
                         writer.write("""                <video class="media-video" controls src="$relativeMedia"></video>""" + "\n")
                     }
-                    MediaType.VOICE -> {
+                    MediaType.VOICE, MediaType.AUDIO -> {
                         writer.write("""                <audio class="media-audio" controls src="$relativeMedia"></audio>""" + "\n")
                     }
                     MediaType.DOCUMENT -> {
