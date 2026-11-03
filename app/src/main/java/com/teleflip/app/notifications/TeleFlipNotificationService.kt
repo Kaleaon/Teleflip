@@ -34,11 +34,7 @@ class TeleFlipNotificationService : Service() {
             try {
                 val intent = Intent(context, TeleFlipNotificationService::class.java)
                 if (enabled) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(intent)
-                    } else {
-                        context.startService(intent)
-                    }
+                    context.startForegroundService(intent)
                 } else {
                     context.stopService(intent)
                 }
@@ -53,12 +49,7 @@ class TeleFlipNotificationService : Service() {
         try {
             NotificationHelper.ensureChannels(this)
             val openIntent = Intent(this, MainActivity::class.java)
-            val pendingFlags =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                } else {
-                    PendingIntent.FLAG_UPDATE_CURRENT
-                }
+            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val pendingIntent = PendingIntent.getActivity(this, 0, openIntent, pendingFlags)
 
             val notification =
@@ -112,11 +103,7 @@ class TeleFlipNotificationService : Service() {
                         applicationContext,
                         1,
                         restartIntent,
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
-                        } else {
-                            PendingIntent.FLAG_ONE_SHOT
-                        },
+                        PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
                     )
                 val alarmService = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
                 alarmService?.set(
@@ -148,36 +135,32 @@ class TeleFlipNotificationService : Service() {
             val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
             connectivityManager = cm
             updateCurrentNetworkType(cm)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                val callback =
-                    object : ConnectivityManager.NetworkCallback() {
-                        override fun onAvailable(network: Network) {
-                            updateCurrentNetworkType(cm)
-                        }
-
-                        override fun onLost(network: Network) {
-                            updateCurrentNetworkType(cm)
-                        }
-
-                        override fun onCapabilitiesChanged(
-                            network: Network,
-                            networkCapabilities: NetworkCapabilities,
-                        ) {
-                            updateCurrentNetworkType(cm)
-                        }
+            val callback =
+                object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        updateCurrentNetworkType(cm)
                     }
-                networkCallback = callback
-                cm.registerDefaultNetworkCallback(callback)
-            }
+
+                    override fun onLost(network: Network) {
+                        updateCurrentNetworkType(cm)
+                    }
+
+                    override fun onCapabilitiesChanged(
+                        network: Network,
+                        networkCapabilities: NetworkCapabilities,
+                    ) {
+                        updateCurrentNetworkType(cm)
+                    }
+                }
+            networkCallback = callback
+            cm.registerDefaultNetworkCallback(callback)
         } catch (_: Throwable) {
         }
     }
 
     private fun unregisterNetworkCallback() {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                networkCallback?.let { connectivityManager?.unregisterNetworkCallback(it) }
-            }
+            networkCallback?.let { connectivityManager?.unregisterNetworkCallback(it) }
         } catch (_: Throwable) {
         }
         networkCallback = null
@@ -193,38 +176,22 @@ class TeleFlipNotificationService : Service() {
     }
 
     private fun getTdNetworkType(cm: ConnectivityManager): TdApi.NetworkType {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val activeNetwork = cm.activeNetwork ?: return TdApi.NetworkTypeNone()
-            val caps = cm.getNetworkCapabilities(activeNetwork) ?: return TdApi.NetworkTypeNone()
-            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-                return TdApi.NetworkTypeNone()
-            }
-            when {
-                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> TdApi.NetworkTypeWiFi()
-                caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
-                    val tm = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
-                    if (tm?.isNetworkRoaming == true) {
-                        TdApi.NetworkTypeMobileRoaming()
-                    } else {
-                        TdApi.NetworkTypeMobile()
-                    }
+        val activeNetwork = cm.activeNetwork ?: return TdApi.NetworkTypeNone()
+        val caps = cm.getNetworkCapabilities(activeNetwork) ?: return TdApi.NetworkTypeNone()
+        if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+            return TdApi.NetworkTypeNone()
+        }
+        return when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> TdApi.NetworkTypeWiFi()
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
+                val tm = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+                if (tm?.isNetworkRoaming == true) {
+                    TdApi.NetworkTypeMobileRoaming()
+                } else {
+                    TdApi.NetworkTypeMobile()
                 }
-                else -> TdApi.NetworkTypeOther()
             }
-        } else {
-            @Suppress("DEPRECATION")
-            val info = cm.activeNetworkInfo
-            if (info == null || !info.isConnected) {
-                return TdApi.NetworkTypeNone()
-            }
-            @Suppress("DEPRECATION")
-            when (info.type) {
-                ConnectivityManager.TYPE_WIFI -> TdApi.NetworkTypeWiFi()
-                ConnectivityManager.TYPE_MOBILE -> {
-                    if (info.isRoaming) TdApi.NetworkTypeMobileRoaming() else TdApi.NetworkTypeMobile()
-                }
-                else -> TdApi.NetworkTypeOther()
-            }
+            else -> TdApi.NetworkTypeOther()
         }
     }
 }
