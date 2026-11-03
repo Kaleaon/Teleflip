@@ -44,7 +44,10 @@ abstract class BaseDialog(
         initSoftkeyManager()
     }
 
-    override fun setContentView(view: View, params: ViewGroup.LayoutParams?) {
+    override fun setContentView(
+        view: View,
+        params: ViewGroup.LayoutParams?,
+    ) {
         super.setContentView(view, params)
         initSoftkeyManager()
     }

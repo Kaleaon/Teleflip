@@ -511,14 +511,27 @@ class MainActivity : AppCompatActivity() {
                     val isListFocused = wasEmpty || currentFocusedVh != null || !isTabViewFocused()
                     val anchorChatId = focusedChatId
                     val anchorTop = currentFocusedVh?.itemView?.top
+                    // If the user is sitting at the top of the list, stay at the top so
+                    // chats bumped by new messages are immediately visible.
+                    val wasAtTop =
+                        wasEmpty ||
+                            currentFocusedVh?.bindingAdapterPosition == 0 ||
+                            (anchorChatId != null && chatListAdapter?.getPositionForChatId(anchorChatId) == 0)
                     chatListAdapter?.submitList(filtered) {
                         if (currentScreen == Screen.CHAT_LIST && filtered.isNotEmpty() && isListFocused && !isTabViewFocused()) {
                             val targetPos =
-                                anchorChatId?.let { id ->
-                                    chatListAdapter?.getPositionForChatId(id)?.takeIf { it >= 0 }
-                                } ?: 0
+                                if (wasAtTop) {
+                                    0
+                                } else {
+                                    anchorChatId?.let { id ->
+                                        chatListAdapter?.getPositionForChatId(id)?.takeIf { it >= 0 }
+                                    } ?: 0
+                                }
                             val lm = rv?.layoutManager as? LinearLayoutManager
-                            if (anchorTop != null && targetPos > 0) {
+                            if (wasAtTop) {
+                                lm?.scrollToPositionWithOffset(0, 0)
+                                focusedChatId = filtered.firstOrNull()?.id
+                            } else if (anchorTop != null && targetPos > 0) {
                                 lm?.scrollToPositionWithOffset(targetPos, anchorTop)
                             }
                             rv?.post {
@@ -1253,6 +1266,11 @@ class MainActivity : AppCompatActivity() {
         val options = mutableListOf<MenuOption>()
 
         options.add(
+            MenuOption(options.size + 1, "⚙️ Settings (shortcut: 0)") {
+                showSettingsScreen()
+            },
+        )
+        options.add(
             MenuOption(options.size + 1, "🔍 Search (Chats, Contacts, Messages)") {
                 showSearchDialog()
             },
@@ -1329,11 +1347,6 @@ class MainActivity : AppCompatActivity() {
         options.add(
             MenuOption(options.size + 1, "🩺 Diagnostics & Error Log") {
                 com.teleflip.app.ui.DiagnosticsDialog(this).show()
-            },
-        )
-        options.add(
-            MenuOption(options.size + 1, "⚙️ Settings & API") {
-                showSettingsScreen()
             },
         )
         options.add(
@@ -1504,12 +1517,34 @@ class MainActivity : AppCompatActivity() {
         layoutCompose = view.findViewById(R.id.layout_compose)
         tvRecordTimer = view.findViewById(R.id.tv_record_timer)
         layoutReplyEditBar = view.findViewById(R.id.layout_reply_edit_bar)
+        layoutReplyEditBar?.isFocusable = true
+        layoutReplyEditBar?.isClickable = true
+        layoutReplyEditBar?.setOnClickListener {
+            val targetId = activeReplyMessage?.id ?: activeEditMessage?.id
+            if (targetId != null) {
+                val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                if (pos >= 0) {
+                    focusMessageAt(pos)
+                } else {
+                    showToast("Quoted message not found")
+                }
+            }
+        }
         tvReplyEditPreview = view.findViewById(R.id.tv_reply_edit_preview)
         layoutPinnedBanner = view.findViewById(R.id.layout_pinned_banner)
-        layoutPinnedBanner?.isFocusable = false
+        layoutPinnedBanner?.isFocusable = true
+        layoutPinnedBanner?.isClickable = true
         tvPinnedBannerText = view.findViewById(R.id.tv_pinned_banner_text)
         view.findViewById<View>(R.id.btn_cancel_reply_edit)?.setOnClickListener {
             clearReplyOrEditMode()
+        }
+        val btnJumpToBottom = view.findViewById<Button>(R.id.btn_jump_to_bottom)
+        btnJumpToBottom?.setOnClickListener {
+            val count = messageAdapter?.itemCount ?: 0
+            if (count > 0) {
+                rvMessages?.smoothScrollToPosition(count - 1)
+                focusMessageAt(count - 1)
+            }
         }
         activeReplyMessage = null
         activeEditMessage = null
@@ -1528,6 +1563,15 @@ class MainActivity : AppCompatActivity() {
                 },
                 customEmojiResolver = { key ->
                     telegramManager.getCustomEmojiFilePath(key)
+                },
+                onQuoteClick = { quotedMessageId ->
+                    val pos = messageAdapter?.getPositionForMessageId(quotedMessageId) ?: -1
+                    if (pos >= 0) {
+                        rvMessages?.smoothScrollToPosition(pos)
+                        focusMessageAt(pos)
+                    } else {
+                        showToast("Quoted message not found")
+                    }
                 },
             )
         rvMessages?.adapter = messageAdapter
@@ -1568,8 +1612,16 @@ class MainActivity : AppCompatActivity() {
                     dx: Int,
                     dy: Int,
                 ) {
+                    val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                    val lastVisible = lm.findLastVisibleItemPosition()
+                    val totalCount = lm.itemCount
+                    if (totalCount > 0 && lastVisible < totalCount - 2) {
+                        btnJumpToBottom?.visibility = View.VISIBLE
+                    } else {
+                        btnJumpToBottom?.visibility = View.GONE
+                    }
+
                     if (dy < 0) {
-                        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
                         val firstVisible = lm.findFirstVisibleItemPosition()
                         if (firstVisible <= 1) {
                             val msgs = telegramManager.messages.value[chat.id] ?: emptyList()
@@ -2213,9 +2265,12 @@ class MainActivity : AppCompatActivity() {
                 val pos = messageAdapter?.getPositionForMessageId(pinnedMsg.id) ?: -1
                 if (pos >= 0) {
                     focusMessageAt(pos)
+                } else {
+                    showToast("Pinned message not found")
                 }
             }
-            layoutPinnedBanner?.isFocusable = false
+            layoutPinnedBanner?.isFocusable = true
+            layoutPinnedBanner?.isClickable = true
         } else {
             layoutPinnedBanner?.visibility = View.GONE
         }
@@ -3143,6 +3198,7 @@ class MainActivity : AppCompatActivity() {
         updatePasscodeDotsDisplay()
 
         val btnForgot = view.findViewById<Button>(R.id.btn_passcode_forgot)
+        btnForgot.isFocusable = false
         btnForgot.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Forgot Passcode?")
@@ -5212,6 +5268,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun cleanupInCallAudio() {
+        if (::telegramManager.isInitialized) {
+            telegramManager.stopDialTone()
+        }
         stopCallTimer()
         callDurationSec = 0
     }
@@ -5549,8 +5608,10 @@ class MainActivity : AppCompatActivity() {
             if (SoftkeyUtils.isCenterKey(keyCode)) {
                 if (passcodeEntry.length == PASSCODE_PIN_LENGTH) {
                     attemptPasscodeUnlock()
-                    return true
+                } else {
+                    softkeyManager.handleKeyEvent(keyCode, event)
                 }
+                return true
             }
         }
 
@@ -5719,8 +5780,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // In Chat List: Keypad numbers 1-9 directly open chat 1-9!
+        // In Chat List: Keypad 0 opens Settings, numbers 1-9 directly open chat 1-9!
         if (currentScreen == Screen.CHAT_LIST && event.action == KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_0) {
+                showSettingsScreen()
+                return true
+            }
             if (keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9) {
                 val index = keyCode - KeyEvent.KEYCODE_1
                 val target = chatListAdapter?.getItemAt(index)

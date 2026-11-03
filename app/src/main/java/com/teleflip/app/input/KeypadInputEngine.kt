@@ -66,6 +66,8 @@ class KeypadInputEngine(
             View.OnFocusChangeListener { v, hasFocus ->
                 if (!hasFocus) {
                     commitCurrentChar()
+                } else {
+                    updateModeIndicator()
                 }
                 externalFocusListener?.onFocusChange(v, hasFocus)
             }
