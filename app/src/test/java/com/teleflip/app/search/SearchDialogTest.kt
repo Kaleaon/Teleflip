@@ -182,7 +182,11 @@ class SearchDialogTest {
 
         val dpadRightDown = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT, 0)
         dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, dpadRightDown)
-        assertEquals("DPAD_RIGHT should switch tab to CONTACTS when input has focus and no multi-tap active", SearchDialog.SearchTab.CONTACTS, dialog.currentTab)
+        assertEquals(
+            "DPAD_RIGHT should switch tab to CONTACTS when input has focus and no multi-tap active",
+            SearchDialog.SearchTab.CONTACTS,
+            dialog.currentTab,
+        )
 
         dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, dpadRightDown)
         assertEquals("DPAD_RIGHT should switch tab to MESSAGES", SearchDialog.SearchTab.MESSAGES, dialog.currentTab)
