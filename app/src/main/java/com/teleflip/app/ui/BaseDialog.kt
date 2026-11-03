@@ -3,7 +3,6 @@ package com.teleflip.app.ui
 import android.app.Dialog
 import android.content.Context
 import android.content.ContextWrapper
-import android.view.KeyEvent
 import android.view.View
 import android.widget.TextView
 import com.teleflip.app.MainActivity
@@ -20,10 +19,12 @@ abstract class BaseDialog(
     context: Context,
     themeResId: Int = R.style.Theme_TeleFlip,
 ) : Dialog(context, themeResId) {
-
     protected open fun getErrorTextView(): TextView? = null
 
-    fun showDialogError(message: String, targetView: View? = null) {
+    fun showDialogError(
+        message: String,
+        targetView: View? = null,
+    ) {
         val errorTv = getErrorTextView()
         if (errorTv != null) {
             errorTv.text = message
@@ -57,9 +58,6 @@ abstract class BaseDialog(
     }
 
     protected fun isBackOrRightSoftKey(keyCode: Int): Boolean {
-        return keyCode == KeyEvent.KEYCODE_BACK ||
-            keyCode == KeyEvent.KEYCODE_SOFT_RIGHT ||
-            keyCode == 229 || keyCode == 230 ||
-            keyCode == 61 || keyCode == 158
+        return SoftkeyUtils.isBackOrSoftRightKey(keyCode)
     }
 }

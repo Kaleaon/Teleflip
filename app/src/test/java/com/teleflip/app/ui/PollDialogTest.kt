@@ -10,7 +10,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.teleflip.app.R
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -64,10 +63,14 @@ class PollDialogTest {
     fun testPollSubmission_validInput_clearsErrorAndSubmits() {
         var createdQuestion = ""
         var createdOptions = emptyList<String>()
-        val dialog = PollDialog(context, onCreatePoll = { q, opts, _ ->
-            createdQuestion = q
-            createdOptions = opts
-        })
+        val dialog =
+            PollDialog(
+                context,
+                onCreatePoll = { q, opts, _ ->
+                    createdQuestion = q
+                    createdOptions = opts
+                },
+            )
         dialog.show()
 
         val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
@@ -86,7 +89,7 @@ class PollDialogTest {
     }
 
     @Test
-    fun testOnKeyDown_dpadRightNotConsumedAsInputKey() {
+    fun testOnKeyDown_dpadRightConsumedAsInputKeyWhenEditTextFocused() {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
@@ -96,7 +99,46 @@ class PollDialogTest {
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)
         val handled = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, event)
 
-        assertFalse("KEYCODE_DPAD_RIGHT should not be consumed as input key in PollDialog", handled)
+        assertTrue("KEYCODE_DPAD_RIGHT should be consumed as input key in PollDialog when EditText is focused", handled)
+    }
+
+    @Test
+    fun testDpadRightCommitsCharacterInPollDialog() {
+        val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
+        dialog.show()
+
+        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        etQuestion.requestFocus()
+
+        val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
+        dialog.onKeyDown(KeyEvent.KEYCODE_2, event2)
+        assertEquals("A", etQuestion.text.toString())
+
+        val eventRight = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)
+        val handled = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, eventRight)
+        assertTrue("KEYCODE_DPAD_RIGHT should be handled as input key", handled)
+
+        // Key '2' again should now append 'a' rather than cycling 'A' to 'b'
+        dialog.onKeyDown(KeyEvent.KEYCODE_2, event2)
+        assertEquals("Aa", etQuestion.text.toString())
+    }
+
+    @Test
+    fun testDismissCommitsCharacterInPollDialog() {
+        val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
+        dialog.show()
+
+        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        etQuestion.requestFocus()
+
+        val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
+        dialog.onKeyDown(KeyEvent.KEYCODE_2, event2)
+        assertEquals("A", etQuestion.text.toString())
+
+        val backEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)
+        dialog.onKeyDown(KeyEvent.KEYCODE_BACK, backEvent)
+
+        assertEquals("A", etQuestion.text.toString())
     }
 
     @Test

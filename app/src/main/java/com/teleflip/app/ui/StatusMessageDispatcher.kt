@@ -7,8 +7,11 @@ import android.widget.Toast
 import com.google.android.material.snackbar.Snackbar
 
 object StatusMessageDispatcher {
-
-    fun showStatus(activity: Activity, message: String, isError: Boolean = false) {
+    fun showStatus(
+        activity: Activity,
+        message: String,
+        isError: Boolean = false,
+    ) {
         val rootView = activity.findViewById<View>(android.R.id.content) ?: activity.window?.decorView
         if (rootView != null) {
             showStatus(rootView, message, isError)
@@ -17,7 +20,11 @@ object StatusMessageDispatcher {
         }
     }
 
-    fun showStatus(context: Context, message: String, isError: Boolean = false) {
+    fun showStatus(
+        context: Context,
+        message: String,
+        isError: Boolean = false,
+    ) {
         val activity = context.findMainActivity()
         if (activity != null) {
             showStatus(activity, message, isError)
@@ -26,7 +33,11 @@ object StatusMessageDispatcher {
         }
     }
 
-    fun showStatus(view: View, message: String, isError: Boolean = false) {
+    fun showStatus(
+        view: View,
+        message: String,
+        isError: Boolean = false,
+    ) {
         // Ensure screen readers immediately announce status updates
         view.announceForAccessibility(message)
 
