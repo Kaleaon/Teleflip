@@ -336,7 +336,13 @@ class SearchDialog(
         dialogScope.cancel()
     }
 
+    override fun onBackPressed() {
+        keypadEngine?.commitCurrentChar()
+        dismiss()
+    }
+
     override fun dismiss() {
+        keypadEngine?.commitCurrentChar()
         searchJob?.cancel()
         dialogScope.cancel()
         super.dismiss()
