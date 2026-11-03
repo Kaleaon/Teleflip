@@ -125,32 +125,35 @@ object NotificationHelper {
             val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val pendingIntent = PendingIntent.getActivity(context, chatId.toInt(), openIntent, pendingFlags)
 
-            val channelId = if (isSoundMuted) {
-                CHANNEL_MESSAGES_SILENT
-            } else if (!customSoundUri.isNullOrBlank()) {
-                val perChatChannelId = "${CHANNEL_CHAT_PREFIX}${chatId}"
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val uri = Uri.parse(customSoundUri)
-                    val audioAttrs = AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                        .build()
-                    val chatChannel = NotificationChannel(
-                        perChatChannelId,
-                        "$chatTitle Notifications",
-                        NotificationManager.IMPORTANCE_HIGH,
-                    ).apply {
-                        description = "Custom notifications for $chatTitle"
-                        setSound(uri, audioAttrs)
-                        enableVibration(true)
-                        enableLights(true)
+            val channelId =
+                if (isSoundMuted) {
+                    CHANNEL_MESSAGES_SILENT
+                } else if (!customSoundUri.isNullOrBlank()) {
+                    val perChatChannelId = "${CHANNEL_CHAT_PREFIX}$chatId"
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val uri = Uri.parse(customSoundUri)
+                        val audioAttrs =
+                            AudioAttributes.Builder()
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                                .build()
+                        val chatChannel =
+                            NotificationChannel(
+                                perChatChannelId,
+                                "$chatTitle Notifications",
+                                NotificationManager.IMPORTANCE_HIGH,
+                            ).apply {
+                                description = "Custom notifications for $chatTitle"
+                                setSound(uri, audioAttrs)
+                                enableVibration(true)
+                                enableLights(true)
+                            }
+                        nm.createNotificationChannel(chatChannel)
                     }
-                    nm.createNotificationChannel(chatChannel)
+                    perChatChannelId
+                } else {
+                    CHANNEL_MESSAGES
                 }
-                perChatChannelId
-            } else {
-                CHANNEL_MESSAGES
-            }
 
             val contentTitle = if (senderName.isNotBlank() && senderName != chatTitle) "$chatTitle ($senderName)" else chatTitle
             val builder =

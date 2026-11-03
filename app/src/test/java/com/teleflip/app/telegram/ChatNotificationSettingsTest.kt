@@ -10,7 +10,6 @@ import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -91,16 +90,17 @@ class ChatNotificationSettingsTest {
         val manager = TelegramManager(mockContext)
         manager.setTdClientForTesting(mockClient)
 
-        val chat = ChatModel(
-            id = 101L,
-            title = "Busy Group",
-            lastMessage = "Hi",
-            time = "12:00",
-            unreadCount = 0,
-            chatType = ChatType.GROUP,
-            avatarLetters = "BG",
-            isMuted = false,
-        )
+        val chat =
+            ChatModel(
+                id = 101L,
+                title = "Busy Group",
+                lastMessage = "Hi",
+                time = "12:00",
+                unreadCount = 0,
+                chatType = ChatType.GROUP,
+                avatarLetters = "BG",
+                isMuted = false,
+            )
         manager.setChatsForTesting(listOf(chat))
 
         // Mute sound while keeping muteFor = 2700s (45 minutes)
@@ -145,25 +145,27 @@ class ChatNotificationSettingsTest {
     @Test
     fun testCloudUpdate_soundMutedFromTDLib_updatesSoundMutePersistence() {
         val manager = TelegramManager(mockContext)
-        val chat = ChatModel(
-            id = 303L,
-            title = "Work Chat",
-            lastMessage = "Ping",
-            time = "13:00",
-            unreadCount = 0,
-            chatType = ChatType.DIRECT,
-            avatarLetters = "WC",
-            isMuted = false,
-        )
+        val chat =
+            ChatModel(
+                id = 303L,
+                title = "Work Chat",
+                lastMessage = "Ping",
+                time = "13:00",
+                unreadCount = 0,
+                chatType = ChatType.DIRECT,
+                avatarLetters = "WC",
+                isMuted = false,
+            )
         manager.setChatsForTesting(listOf(chat))
 
         // TDLib sends notification settings with soundId = 0
-        val mutedSoundSettings = TdApi.ChatNotificationSettings().apply {
-            useDefaultMuteFor = false
-            muteFor = 0
-            useDefaultSound = false
-            soundId = 0L
-        }
+        val mutedSoundSettings =
+            TdApi.ChatNotificationSettings().apply {
+                useDefaultMuteFor = false
+                muteFor = 0
+                useDefaultSound = false
+                soundId = 0L
+            }
 
         manager.handleChatNotificationSettingsUpdated(303L, mutedSoundSettings)
 

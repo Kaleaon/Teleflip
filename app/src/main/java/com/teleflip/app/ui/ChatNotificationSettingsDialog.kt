@@ -38,7 +38,6 @@ class ChatNotificationSettingsDialog(
     private val timeoutMs: Long = 500L,
     private val onSettingsChanged: ((isMuted: Boolean) -> Unit)? = null,
 ) : BaseDialog(context) {
-
     private var selectedMode = MuteDurationMode.UNMUTE
     private var selectedUnit = CustomTimeUnit.MINUTES
     private var isSoundMuted = false
@@ -46,12 +45,13 @@ class ChatNotificationSettingsDialog(
     private var customSoundUri: String? = null
     private var engine: KeypadInputEngine? = null
 
-    private val availableTones = listOf(
-        "Default" to null,
-        "Beep" to "content://media/internal/audio/media/beep",
-        "Chime" to "content://media/internal/audio/media/chime",
-        "Whistle" to "content://media/internal/audio/media/whistle",
-    )
+    private val availableTones =
+        listOf(
+            "Default" to null,
+            "Beep" to "content://media/internal/audio/media/beep",
+            "Chime" to "content://media/internal/audio/media/chime",
+            "Whistle" to "content://media/internal/audio/media/whistle",
+        )
 
     companion object {
         const val SECONDS_PER_MINUTE = 60L
@@ -59,19 +59,24 @@ class ChatNotificationSettingsDialog(
         const val SECONDS_PER_DAY = 86400L
         const val MUTE_FOREVER_SEC = 2147483647
 
-        fun calculateCustomMuteDurationSeconds(rawValue: String, unit: CustomTimeUnit): Int {
+        fun calculateCustomMuteDurationSeconds(
+            rawValue: String,
+            unit: CustomTimeUnit,
+        ): Int {
             val value = rawValue.trim().toLongOrNull() ?: 0L
             if (value <= 0L) return 0
-            val multiplier = when (unit) {
-                CustomTimeUnit.MINUTES -> SECONDS_PER_MINUTE
-                CustomTimeUnit.HOURS -> SECONDS_PER_HOUR
-                CustomTimeUnit.DAYS -> SECONDS_PER_DAY
-            }
-            val totalSeconds = try {
-                Math.multiplyExact(value, multiplier)
-            } catch (_: ArithmeticException) {
-                Long.MAX_VALUE
-            }
+            val multiplier =
+                when (unit) {
+                    CustomTimeUnit.MINUTES -> SECONDS_PER_MINUTE
+                    CustomTimeUnit.HOURS -> SECONDS_PER_HOUR
+                    CustomTimeUnit.DAYS -> SECONDS_PER_DAY
+                }
+            val totalSeconds =
+                try {
+                    Math.multiplyExact(value, multiplier)
+                } catch (_: ArithmeticException) {
+                    Long.MAX_VALUE
+                }
             return if (totalSeconds > Int.MAX_VALUE) Int.MAX_VALUE else totalSeconds.toInt()
         }
     }
@@ -119,28 +124,30 @@ class ChatNotificationSettingsDialog(
         selectedMode = if (isMutedCurrently) MuteDurationMode.FOREVER else MuteDurationMode.UNMUTE
 
         if (etCustomValue != null && tvMode != null) {
-            engine = KeypadInputEngine(
-                editText = etCustomValue,
-                modeIndicator = tvMode,
-                timeoutMs = timeoutMs,
-                onSymbolRequested = {
-                    SymbolsDialog(context) { sym -> engine?.insertSymbol(sym) }.show()
-                },
-            ).apply {
-                setMode(InputMode.NUMERIC)
-            }
+            engine =
+                KeypadInputEngine(
+                    editText = etCustomValue,
+                    modeIndicator = tvMode,
+                    timeoutMs = timeoutMs,
+                    onSymbolRequested = {
+                        SymbolsDialog(context) { sym -> engine?.insertSymbol(sym) }.show()
+                    },
+                ).apply {
+                    setMode(InputMode.NUMERIC)
+                }
         }
 
         fun updatePresetSelection(mode: MuteDurationMode) {
             selectedMode = mode
-            val buttons = listOf(
-                MuteDurationMode.UNMUTE to btnUnmute,
-                MuteDurationMode.HOUR_1 to btn1h,
-                MuteDurationMode.HOURS_8 to btn8h,
-                MuteDurationMode.DAYS_2 to btn2d,
-                MuteDurationMode.FOREVER to btnForever,
-                MuteDurationMode.CUSTOM to btnCustom,
-            )
+            val buttons =
+                listOf(
+                    MuteDurationMode.UNMUTE to btnUnmute,
+                    MuteDurationMode.HOUR_1 to btn1h,
+                    MuteDurationMode.HOURS_8 to btn8h,
+                    MuteDurationMode.DAYS_2 to btn2d,
+                    MuteDurationMode.FOREVER to btnForever,
+                    MuteDurationMode.CUSTOM to btnCustom,
+                )
             buttons.forEach { (m, btn) ->
                 if (m == selectedMode) {
                     btn?.setBackgroundResource(R.drawable.bg_button_selector)
@@ -205,17 +212,18 @@ class ChatNotificationSettingsDialog(
 
         btnSave?.setOnClickListener {
             engine?.commitCurrentChar()
-            val muteForSeconds = when (selectedMode) {
-                MuteDurationMode.UNMUTE -> 0
-                MuteDurationMode.HOUR_1 -> 3600
-                MuteDurationMode.HOURS_8 -> 28800
-                MuteDurationMode.DAYS_2 -> 172800
-                MuteDurationMode.FOREVER -> MUTE_FOREVER_SEC
-                MuteDurationMode.CUSTOM -> {
-                    val rawText = etCustomValue?.text?.toString().orEmpty()
-                    calculateCustomMuteDurationSeconds(rawText, selectedUnit)
+            val muteForSeconds =
+                when (selectedMode) {
+                    MuteDurationMode.UNMUTE -> 0
+                    MuteDurationMode.HOUR_1 -> 3600
+                    MuteDurationMode.HOURS_8 -> 28800
+                    MuteDurationMode.DAYS_2 -> 172800
+                    MuteDurationMode.FOREVER -> MUTE_FOREVER_SEC
+                    MuteDurationMode.CUSTOM -> {
+                        val rawText = etCustomValue?.text?.toString().orEmpty()
+                        calculateCustomMuteDurationSeconds(rawText, selectedUnit)
+                    }
                 }
-            }
 
             telegramManager.setChatNotificationSettings(
                 chatId = chatId,
@@ -242,7 +250,10 @@ class ChatNotificationSettingsDialog(
         dismiss()
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         if (isBackOrRightSoftKey(keyCode)) {
             engine?.commitCurrentChar()
             dismiss()
