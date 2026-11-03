@@ -33,6 +33,7 @@
     <ID>CyclomaticComplexMethod:ChatExportEngine.kt$ChatExportEngine$@OptIn(ExperimentalCoroutinesApi::class) fun exportChatHistory( context: Context, scope: CoroutineScope, telegramManager: TelegramManager, chatId: Long, chatTitle: String, format: ExportFormat, mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate, onProgress: (completedCount: Int) -&gt; Unit, onComplete: (Result&lt;List&lt;File&gt;&gt;) -&gt; Unit, ): Job</ID>
     <ID>CyclomaticComplexMethod:ChatExportEngine.kt$ChatExportEngine$fun parseMessage( msg: TdApi.Message, senderName: String, dateFormat: SimpleDateFormat, ): ExportMessage</ID>
     <ID>CyclomaticComplexMethod:ChatExportManager.kt$ChatExportManager$suspend fun exportChat( context: Context, chatId: Long, chatTitle: String, messages: List&lt;MessageModel&gt;, options: ChatExportOptions, fileDownloader: (suspend (fileId: Int) -&gt; String?)? = null, onProgress: ((ChatExportProgress) -&gt; Unit)? = null, ): Result&lt;File&gt;</ID>
+    <ID>CyclomaticComplexMethod:ChatExportProgressDialog.kt$ChatExportProgressDialog$fun updateProgress(progress: ChatExportProgress)</ID>
     <ID>CyclomaticComplexMethod:ChatListAdapter.kt$ChatListAdapter.ChatViewHolder$fun bind( chat: ChatModel, position: Int, )</ID>
     <ID>CyclomaticComplexMethod:KeypadInputEngine.kt$KeypadInputEngine$fun handleKeyEvent( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:LocationHelper.kt$LocationHelper$@SuppressLint("MissingPermission") fun fetchCurrentLocation( onSuccess: (LocationInfo) -&gt; Unit, onError: (String) -&gt; Unit, )</ID>
@@ -84,6 +85,7 @@
     <ID>EmptyCatchBlock:MediaViewerDialog.kt$MediaViewerDialog${ }</ID>
     <ID>EmptyCatchBlock:NotificationHelper.kt$NotificationHelper${ }</ID>
     <ID>EmptyCatchBlock:ProxyStorage.kt$ProxyStorage${ }</ID>
+    <ID>EmptyCatchBlock:StickerEffectDecorator.kt$StickerEffectDecorator${ }</ID>
     <ID>EmptyCatchBlock:StorageManager.kt$StorageManager${ }</ID>
     <ID>EmptyCatchBlock:TeleFlipNotificationService.kt$TeleFlipNotificationService${ }</ID>
     <ID>EmptyCatchBlock:TeleFlipNotificationService.kt$TeleFlipNotificationService.Companion${ }</ID>
@@ -97,6 +99,7 @@
     <ID>ImplicitDefaultLocale:MainActivity.kt$MainActivity$String.format("%02d:%02d", min, sec)</ID>
     <ID>ImplicitDefaultLocale:MessageAdapter.kt$MessageAdapter.MessageViewHolder$String.format("%.4f, %.4f", message.latitude, message.longitude)</ID>
     <ID>InstanceOfCheckForException:ChatExportEngine.kt$ChatExportEngine$e is CancellationException</ID>
+    <ID>InstanceOfCheckForException:MainActivity.kt$MainActivity$e !is kotlinx.coroutines.CancellationException</ID>
     <ID>InstanceOfCheckForException:MainActivity.kt$MainActivity$error is kotlinx.coroutines.CancellationException</ID>
     <ID>LargeClass:MainActivity.kt$MainActivity : AppCompatActivity</ID>
     <ID>LargeClass:TelegramFeatureMenus.kt$TelegramFeatureMenus</ID>
@@ -202,6 +205,7 @@
     <ID>MagicNumber:SoftkeyUtils.kt$SoftkeyUtils$230</ID>
     <ID>MagicNumber:SoftkeyUtils.kt$SoftkeyUtils$60</ID>
     <ID>MagicNumber:SoftkeyUtils.kt$SoftkeyUtils$61</ID>
+    <ID>MagicNumber:StickerEffectDecorator.kt$StickerEffectDecorator$16</ID>
     <ID>MagicNumber:TeleFlipApp.kt$TeleFlipApp$28</ID>
     <ID>MagicNumber:TeleFlipNotificationService.kt$TeleFlipNotificationService$1000L</ID>
     <ID>MagicNumber:TelegramFeatureMenus.kt$TelegramFeatureMenus$100</ID>
@@ -396,6 +400,7 @@
     <ID>TooManyFunctions:ProxyStorage.kt$ProxyStorage</ID>
     <ID>TooManyFunctions:StorageManager.kt$StorageManager</ID>
     <ID>TooManyFunctions:TelegramManager.kt$TelegramManager : ResultHandler</ID>
+    <ID>UnusedImports:PollDialogTest.kt$import org.junit.Assert.assertFalse</ID>
     <ID>UnusedParameter:TelegramManager.kt$TelegramManager$replyToPreview: String = ""</ID>
     <ID>UnusedPrivateProperty:AdbReporter.kt$AdbReporter$signal</ID>
     <ID>UnusedPrivateProperty:ChatExportDialog.kt$ChatExportDialog$private val chatId: Long</ID>
