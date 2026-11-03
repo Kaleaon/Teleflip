@@ -30,9 +30,10 @@ class SymbolsDialogTest {
     @Test
     fun testDirectNumericShortcutSelection() {
         var selectedSymbol: String? = null
-        val dialog = SymbolsDialog(context) { symbol ->
-            selectedSymbol = symbol
-        }
+        val dialog =
+            SymbolsDialog(context) { symbol ->
+                selectedSymbol = symbol
+            }
         dialog.show()
         ShadowLooper.idleMainLooper()
 
@@ -48,9 +49,10 @@ class SymbolsDialogTest {
     @Test
     fun testNumericShortcutOnSecondPage() {
         var selectedSymbol: String? = null
-        val dialog = SymbolsDialog(context) { symbol ->
-            selectedSymbol = symbol
-        }
+        val dialog =
+            SymbolsDialog(context) { symbol ->
+                selectedSymbol = symbol
+            }
         dialog.show()
         ShadowLooper.idleMainLooper()
 
