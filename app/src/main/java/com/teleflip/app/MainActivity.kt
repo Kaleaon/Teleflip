@@ -154,6 +154,7 @@ class MainActivity : AppCompatActivity() {
     private var chatListAdapter: ChatListAdapter? = null
     private var rvChats: RecyclerView? = null
     private var tabDebounceJob: kotlinx.coroutines.Job? = null
+    private var focusedChatId: Long? = null
 
     // Conversation State
     private var messageAdapter: MessageAdapter? = null
@@ -164,6 +165,9 @@ class MainActivity : AppCompatActivity() {
     private var activeReplyMessage: MessageModel? = null
     private var activeEditMessage: MessageModel? = null
     private var layoutReplyEditBar: View? = null
+    private var focusedMessageId: Long? = null
+    private var initialConversationScrollDone: Boolean = false
+    private var lastAutoLoadedOldestMsgId: Long = 0L
     private var tvReplyEditPreview: TextView? = null
     private var layoutPinnedBanner: View? = null
     private var tvPinnedBannerText: TextView? = null
@@ -337,6 +341,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) return
+        if (currentScreen == Screen.CHAT_LIST && !isTabViewFocused()) {
+            val rv = rvChats ?: return
+            val hasItemFocus = currentFocus?.let { rv.findContainingViewHolder(it) } != null
+            if (!hasItemFocus) {
+                val count = chatListAdapter?.itemCount ?: 0
+                if (count > 0) {
+                    val targetPos =
+                        focusedChatId?.let { id ->
+                            chatListAdapter?.getPositionForChatId(id)?.takeIf { it in 0 until count }
+                        } ?: 0
+                    focusChatAt(targetPos)
+                }
+            }
+        } else if (currentScreen == Screen.CONVERSATION) {
+            val rv = rvMessages
+            val hasMsgFocus = currentFocus?.let { rv?.findContainingViewHolder(it) } != null
+            if (!hasMsgFocus && etComposeInput?.hasFocus() != true) {
+                val msgId = focusedMessageId
+                val pos = msgId?.let { messageAdapter?.getPositionForMessageId(it) } ?: -1
+                if (pos >= 0) {
+                    focusMessageAt(pos)
+                } else {
+                    etComposeInput?.requestFocus()
+                }
+            }
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -472,7 +507,45 @@ class MainActivity : AppCompatActivity() {
                 if (currentScreen == Screen.CHAT_LIST) {
                     val filtered = filterChatsForCurrentTab(chats)
                     val wasEmpty = (chatListAdapter?.itemCount ?: 0) == 0
-                    chatListAdapter?.submitList(filtered)
+                    val rv = rvChats
+                    val currentFocusedVh = currentFocus?.let { rv?.findContainingViewHolder(it) }
+                    val isListFocused = wasEmpty || currentFocusedVh != null || !isTabViewFocused()
+                    val anchorChatId = focusedChatId
+                    val anchorTop = currentFocusedVh?.itemView?.top
+                    // If the user is sitting at the top of the list, stay at the top so
+                    // chats bumped by new messages are immediately visible.
+                    val wasAtTop =
+                        wasEmpty ||
+                            currentFocusedVh?.bindingAdapterPosition == 0 ||
+                            (anchorChatId != null && chatListAdapter?.getPositionForChatId(anchorChatId) == 0)
+                    chatListAdapter?.submitList(filtered) {
+                        if (currentScreen == Screen.CHAT_LIST && filtered.isNotEmpty() && isListFocused && !isTabViewFocused()) {
+                            val targetPos =
+                                if (wasAtTop) {
+                                    0
+                                } else {
+                                    anchorChatId?.let { id ->
+                                        chatListAdapter?.getPositionForChatId(id)?.takeIf { it >= 0 }
+                                    } ?: 0
+                                }
+                            val lm = rv?.layoutManager as? LinearLayoutManager
+                            if (wasAtTop) {
+                                lm?.scrollToPositionWithOffset(0, 0)
+                                focusedChatId = filtered.firstOrNull()?.id
+                            } else if (anchorTop != null && targetPos > 0) {
+                                lm?.scrollToPositionWithOffset(targetPos, anchorTop)
+                            }
+                            rv?.post {
+                                if (currentScreen == Screen.CHAT_LIST && !isTabViewFocused()) {
+                                    rv.findViewHolderForAdapterPosition(targetPos)?.itemView?.let { itemView ->
+                                        if (!itemView.hasFocus()) {
+                                            itemView.requestFocus()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     val emptyView = findViewById<View>(R.id.layout_empty_state)
                     val progressView = findViewById<View>(R.id.progress_chats)
 
@@ -482,7 +555,11 @@ class MainActivity : AppCompatActivity() {
                         emptyView?.visibility = View.GONE
                         if (wasEmpty && !isTabViewFocused()) {
                             rvChats?.post {
-                                rvChats?.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                                val targetPos =
+                                    focusedChatId?.let { id ->
+                                        chatListAdapter?.getPositionForChatId(id)?.takeIf { it >= 0 }
+                                    } ?: 0
+                                rvChats?.findViewHolderForAdapterPosition(targetPos)?.itemView?.requestFocus()
                             }
                         }
                     } else {
@@ -511,26 +588,77 @@ class MainActivity : AppCompatActivity() {
                             } else {
                                 rawList
                             }
-                        messageAdapter?.submitList(list)
+                        val rv = rvMessages
+                        val lm = rv?.layoutManager as? LinearLayoutManager
+                        val previousCount = messageAdapter?.itemCount ?: 0
+                        val previousLastId = if (previousCount > 0) messageAdapter?.getItemAt(previousCount - 1)?.id else null
+                        val currentFocusedVh = currentFocus?.let { rv?.findContainingViewHolder(it) }
+                        val isBrowsingMessages = currentFocusedVh != null || (etComposeInput?.hasFocus() != true && focusedMessageId != null)
+                        val anchorMsgId =
+                            focusedMessageId ?: currentFocusedVh?.adapterPosition?.takeIf { it != RecyclerView.NO_POSITION }?.let {
+                                messageAdapter?.getItemAt(it)?.id
+                            }
+                        val anchorOldPos = anchorMsgId?.let { messageAdapter?.getPositionForMessageId(it) } ?: -1
+                        val anchorTopOffset = currentFocusedVh?.itemView?.top
+
+                        messageAdapter?.submitList(list) {
+                            if (currentScreen != Screen.CONVERSATION || activeChat?.id != chat.id) return@submitList
+                            val liveFocusedVh = currentFocus?.let { rv?.findContainingViewHolder(it) }
+                            val liveBrowsing =
+                                isBrowsingMessages ||
+                                    liveFocusedVh != null ||
+                                    (etComposeInput?.hasFocus() != true && focusedMessageId != null)
+                            val liveAnchorId = focusedMessageId ?: anchorMsgId
+                            val targetId = pendingTargetMessageId
+                            if (targetId != null) {
+                                val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                                if (pos != -1) {
+                                    rv?.scrollToPosition(pos)
+                                    rv?.post {
+                                        rv.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+                                    }
+                                    pendingTargetMessageId = null
+                                    initialConversationScrollDone = true
+                                } else if (!initialConversationScrollDone && list.isNotEmpty()) {
+                                    rv?.scrollToPosition(list.size - 1)
+                                    initialConversationScrollDone = true
+                                }
+                            } else if (liveBrowsing && liveAnchorId != null) {
+                                val newPos = messageAdapter?.getPositionForMessageId(liveAnchorId) ?: -1
+                                if (newPos != -1) {
+                                    val targetTop = liveFocusedVh?.itemView?.top ?: anchorTopOffset
+                                    if (targetTop != null && newPos != anchorOldPos) {
+                                        lm?.scrollToPositionWithOffset(newPos, targetTop)
+                                    }
+                                    rv?.post {
+                                        val vh = rv.findViewHolderForAdapterPosition(newPos)
+                                        if (vh != null && !vh.itemView.hasFocus() && etComposeInput?.hasFocus() != true) {
+                                            vh.itemView.requestFocus()
+                                        }
+                                    }
+                                }
+                            } else if (!initialConversationScrollDone && list.isNotEmpty()) {
+                                rv?.scrollToPosition(list.size - 1)
+                                initialConversationScrollDone = true
+                            } else if (!liveBrowsing && list.size > previousCount && list.isNotEmpty()) {
+                                val newLastId = list.last().id
+                                val lastVisible = lm?.findLastVisibleItemPosition() ?: -1
+                                if (previousCount <= 1 || (newLastId != previousLastId && lastVisible >= previousCount - 3)) {
+                                    rv?.scrollToPosition(list.size - 1)
+                                }
+                            }
+                        }
                         updatePinnedMessageBanner(chat, list)
                         val unread = list.filter { !it.isOutbound }.map { it.id }.toLongArray()
                         if (unread.isNotEmpty()) {
                             telegramManager.markMessagesAsRead(chat.id, unread)
                         }
-                        val targetId = pendingTargetMessageId
-                        if (targetId != null) {
-                            val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
-                            if (pos != -1) {
-                                rvMessages?.scrollToPosition(pos)
-                                rvMessages?.post {
-                                    rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
-                                }
-                                pendingTargetMessageId = null
-                            } else if (list.isNotEmpty()) {
-                                rvMessages?.scrollToPosition(list.size - 1)
+                        if (list.size in 1..9) {
+                            val oldestId = list.first().id
+                            if (oldestId != 0L && oldestId != lastAutoLoadedOldestMsgId) {
+                                lastAutoLoadedOldestMsgId = oldestId
+                                telegramManager.loadMessages(chat.id, fromMessageId = oldestId)
                             }
-                        } else if (list.isNotEmpty()) {
-                            rvMessages?.scrollToPosition(list.size - 1)
                         }
                     }
                 }
@@ -603,10 +731,17 @@ class MainActivity : AppCompatActivity() {
 
         rvChats = view.findViewById(R.id.rv_chats)
         rvChats?.layoutManager = LinearLayoutManager(this)
+        rvChats?.itemAnimator = null
         chatListAdapter =
-            ChatListAdapter { chat ->
-                openConversation(chat)
-            }
+            ChatListAdapter(
+                onChatSelected = { chat ->
+                    focusedChatId = chat.id
+                    openConversation(chat)
+                },
+                onChatFocused = { chat ->
+                    focusedChatId = chat.id
+                },
+            )
         rvChats?.adapter = chatListAdapter
 
         // Lazy loading / pagination on scroll
@@ -658,15 +793,24 @@ class MainActivity : AppCompatActivity() {
             onRight = { finish() },
         )
 
+        applyChatFilterAndDebounce(
+            currentChatTypeFilter,
+            archivedMode = isArchivedTabSelected,
+            foldersMode = isFoldersTabSelected,
+        )
+
         rvChats?.post {
-            if ((chatListAdapter?.itemCount ?: 0) > 0) {
-                rvChats?.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+            val count = chatListAdapter?.itemCount ?: 0
+            if (count > 0) {
+                val targetPos =
+                    focusedChatId?.let { id ->
+                        chatListAdapter?.getPositionForChatId(id)?.takeIf { it in 0 until count }
+                    } ?: 0
+                focusChatAt(targetPos)
             } else {
                 view.findViewById<View>(R.id.tab_all)?.requestFocus()
             }
         }
-
-        applyChatFilterAndDebounce(currentChatTypeFilter)
         updateActiveCallOverlay()
     }
 
@@ -745,6 +889,30 @@ class MainActivity : AppCompatActivity() {
         }
 
         tabFolders?.text = if (!activeFolderFilter.isNullOrBlank()) "📁 $activeFolderFilter" else "📁 Folders"
+
+        val activeTabView: View? =
+            when {
+                archivedMode -> tabArchived
+                foldersMode && !activeFolderFilter.isNullOrBlank() ->
+                    layoutTabs?.let { layout ->
+                        (0 until layout.childCount)
+                            .map { layout.getChildAt(it) }
+                            .firstOrNull { it.isSelected }
+                    } ?: tabFolders
+                foldersMode -> tabFolders
+                filter == ChatType.BOT -> tabBots
+                filter == ChatType.CHANNEL -> tabChannels
+                filter == ChatType.GROUP -> tabGroups
+                filter == ChatType.DIRECT -> tabDirect
+                else -> tabAll
+            }
+        val scrollTabs = findViewById<android.widget.HorizontalScrollView>(R.id.scroll_tabs)
+        if (scrollTabs != null && activeTabView != null) {
+            scrollTabs.post {
+                val targetScrollX = (activeTabView.left + activeTabView.right - scrollTabs.width) / 2
+                scrollTabs.smoothScrollTo(targetScrollX.coerceAtLeast(0), 0)
+            }
+        }
 
         val allChats = telegramManager.chats.value
         val filtered = filterChatsForCurrentTab(allChats)
@@ -1099,6 +1267,11 @@ class MainActivity : AppCompatActivity() {
         val options = mutableListOf<MenuOption>()
 
         options.add(
+            MenuOption(options.size + 1, "⚙️ Settings (shortcut: 0)") {
+                showSettingsScreen()
+            },
+        )
+        options.add(
             MenuOption(options.size + 1, "🔍 Search (Chats, Contacts, Messages)") {
                 showSearchDialog()
             },
@@ -1175,11 +1348,6 @@ class MainActivity : AppCompatActivity() {
         options.add(
             MenuOption(options.size + 1, "🩺 Diagnostics & Error Log") {
                 com.teleflip.app.ui.DiagnosticsDialog(this).show()
-            },
-        )
-        options.add(
-            MenuOption(options.size + 1, "⚙️ Settings & API") {
-                showSettingsScreen()
             },
         )
         options.add(
@@ -1315,25 +1483,69 @@ class MainActivity : AppCompatActivity() {
 
         val openProfileListener = View.OnClickListener { showProfileScreen(chat) }
         tvConvTitle.setOnClickListener(openProfileListener)
+        tvConvTitle.isFocusable = false
         ivConvAvatar?.setOnClickListener(openProfileListener)
+        ivConvAvatar?.isFocusable = false
         tvConvAvatar?.setOnClickListener(openProfileListener)
+        tvConvAvatar?.isFocusable = false
+
+        focusedMessageId = null
+        initialConversationScrollDone = false
+        lastAutoLoadedOldestMsgId = 0L
 
         rvMessages = view.findViewById(R.id.rv_messages)
         val layoutManager =
-            LinearLayoutManager(this).apply {
-                stackFromEnd = true
+            object : LinearLayoutManager(this) {
+                init {
+                    stackFromEnd = true
+                }
+
+                override fun onRequestChildFocus(
+                    parent: RecyclerView,
+                    state: RecyclerView.State,
+                    child: View,
+                    focused: View?,
+                ): Boolean {
+                    // Prevent RecyclerView from performing unexpected jump-scrolls on tall messages
+                    // when focus is managed deterministically via D-Pad in dispatchKeyEvent.
+                    return true
+                }
             }
         rvMessages?.layoutManager = layoutManager
+        rvMessages?.itemAnimator = null
 
         layoutVoiceRecording = view.findViewById(R.id.layout_voice_recording)
         layoutCompose = view.findViewById(R.id.layout_compose)
         tvRecordTimer = view.findViewById(R.id.tv_record_timer)
         layoutReplyEditBar = view.findViewById(R.id.layout_reply_edit_bar)
+        layoutReplyEditBar?.isFocusable = true
+        layoutReplyEditBar?.isClickable = true
+        layoutReplyEditBar?.setOnClickListener {
+            val targetId = activeReplyMessage?.id ?: activeEditMessage?.id
+            if (targetId != null) {
+                val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                if (pos >= 0) {
+                    focusMessageAt(pos)
+                } else {
+                    showToast("Quoted message not found")
+                }
+            }
+        }
         tvReplyEditPreview = view.findViewById(R.id.tv_reply_edit_preview)
         layoutPinnedBanner = view.findViewById(R.id.layout_pinned_banner)
+        layoutPinnedBanner?.isFocusable = true
+        layoutPinnedBanner?.isClickable = true
         tvPinnedBannerText = view.findViewById(R.id.tv_pinned_banner_text)
         view.findViewById<View>(R.id.btn_cancel_reply_edit)?.setOnClickListener {
             clearReplyOrEditMode()
+        }
+        val btnJumpToBottom = view.findViewById<Button>(R.id.btn_jump_to_bottom)
+        btnJumpToBottom?.setOnClickListener {
+            val count = messageAdapter?.itemCount ?: 0
+            if (count > 0) {
+                rvMessages?.smoothScrollToPosition(count - 1)
+                focusMessageAt(count - 1)
+            }
         }
         activeReplyMessage = null
         activeEditMessage = null
@@ -1341,6 +1553,7 @@ class MainActivity : AppCompatActivity() {
         messageAdapter =
             MessageAdapter(
                 onMessageFocused = { focusedMsg ->
+                    focusedMessageId = focusedMsg.id
                     updateSoftkeysForFocusedMessage(chat, focusedMsg)
                 },
                 onMessageAction = { clickedMsg ->
@@ -1351,6 +1564,15 @@ class MainActivity : AppCompatActivity() {
                 },
                 customEmojiResolver = { key ->
                     telegramManager.getCustomEmojiFilePath(key)
+                },
+                onQuoteClick = { quotedMessageId ->
+                    val pos = messageAdapter?.getPositionForMessageId(quotedMessageId) ?: -1
+                    if (pos >= 0) {
+                        rvMessages?.smoothScrollToPosition(pos)
+                        focusMessageAt(pos)
+                    } else {
+                        showToast("Quoted message not found")
+                    }
                 },
             )
         rvMessages?.adapter = messageAdapter
@@ -1370,11 +1592,14 @@ class MainActivity : AppCompatActivity() {
                     rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
                 }
                 pendingTargetMessageId = null
+                initialConversationScrollDone = true
             } else if (currentMsgs.isNotEmpty()) {
                 rvMessages?.scrollToPosition(currentMsgs.size - 1)
+                initialConversationScrollDone = true
             }
         } else if (currentMsgs.isNotEmpty()) {
             rvMessages?.scrollToPosition(currentMsgs.size - 1)
+            initialConversationScrollDone = true
         }
 
         // Fetch live chat history from TDLib
@@ -1388,8 +1613,16 @@ class MainActivity : AppCompatActivity() {
                     dx: Int,
                     dy: Int,
                 ) {
+                    val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                    val lastVisible = lm.findLastVisibleItemPosition()
+                    val totalCount = lm.itemCount
+                    if (totalCount > 0 && lastVisible < totalCount - 2) {
+                        btnJumpToBottom?.visibility = View.VISIBLE
+                    } else {
+                        btnJumpToBottom?.visibility = View.GONE
+                    }
+
                     if (dy < 0) {
-                        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
                         val firstVisible = lm.findFirstVisibleItemPosition()
                         if (firstVisible <= 1) {
                             val msgs = telegramManager.messages.value[chat.id] ?: emptyList()
@@ -1490,6 +1723,9 @@ class MainActivity : AppCompatActivity() {
         )
 
         etComposeInput?.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                focusedMessageId = null
+            }
             if (hasFocus && !voiceRecorder.isRecording()) {
                 softkeyManager.update(
                     left = "Attach",
@@ -2029,12 +2265,13 @@ class MainActivity : AppCompatActivity() {
             layoutPinnedBanner?.setOnClickListener {
                 val pos = messageAdapter?.getPositionForMessageId(pinnedMsg.id) ?: -1
                 if (pos >= 0) {
-                    rvMessages?.scrollToPosition(pos)
-                    rvMessages?.post {
-                        rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
-                    }
+                    focusMessageAt(pos)
+                } else {
+                    showToast("Pinned message not found")
                 }
             }
+            layoutPinnedBanner?.isFocusable = true
+            layoutPinnedBanner?.isClickable = true
         } else {
             layoutPinnedBanner?.visibility = View.GONE
         }
@@ -2962,6 +3199,7 @@ class MainActivity : AppCompatActivity() {
         updatePasscodeDotsDisplay()
 
         val btnForgot = view.findViewById<Button>(R.id.btn_passcode_forgot)
+        btnForgot.isFocusable = false
         btnForgot.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Forgot Passcode?")
@@ -4782,7 +5020,7 @@ class MainActivity : AppCompatActivity() {
             },
         )
 
-        etId.requestFocus()
+        btnEditProfile?.requestFocus() ?: view.requestFocus()
         updateActiveCallOverlay()
     }
 
@@ -4995,6 +5233,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun cleanupInCallAudio() {
+        if (::telegramManager.isInitialized) {
+            telegramManager.stopDialTone()
+        }
         stopCallTimer()
         callDurationSec = 0
     }
@@ -5332,8 +5573,10 @@ class MainActivity : AppCompatActivity() {
             if (SoftkeyUtils.isCenterKey(keyCode)) {
                 if (passcodeEntry.length == PASSCODE_PIN_LENGTH) {
                     attemptPasscodeUnlock()
-                    return true
+                } else {
+                    softkeyManager.handleKeyEvent(keyCode, event)
                 }
+                return true
             }
         }
 
@@ -5398,30 +5641,70 @@ class MainActivity : AppCompatActivity() {
 
         // In Conversation: D-Pad navigation between message list and compose input
         if (currentScreen == Screen.CONVERSATION && event.action == KeyEvent.ACTION_DOWN) {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP && etComposeInput?.hasFocus() == true) {
-                val cursor = etComposeInput?.selectionStart ?: 0
-                val isAtTopLine = (etComposeInput?.layout?.getLineForOffset(cursor) ?: 0) == 0
-                if (isAtTopLine) {
-                    val count = messageAdapter?.itemCount ?: 0
-                    if (count > 0) {
-                        val targetPos = count - 1
-                        rvMessages?.scrollToPosition(targetPos)
-                        rvMessages?.post {
-                            rvMessages?.findViewHolderForAdapterPosition(targetPos)?.itemView?.requestFocus()
-                        }
+            val count = messageAdapter?.itemCount ?: 0
+            val focused = currentFocus
+            val vh = focused?.let { rvMessages?.findContainingViewHolder(it) }
+
+            if (etComposeInput?.hasFocus() == true) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    val cursor = etComposeInput?.selectionStart ?: 0
+                    val isAtTopLine = (etComposeInput?.layout?.getLineForOffset(cursor) ?: 0) == 0
+                    if (isAtTopLine && count > 0) {
+                        focusMessageAt(count - 1, fromDirection = -1)
                         return true
                     }
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    // Keep focus in compose input instead of falling out
+                    return true
                 }
-            } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                val lastPos = (messageAdapter?.itemCount ?: 0) - 1
-                if (lastPos >= 0) {
-                    val focused = currentFocus
-                    if (focused != null) {
-                        val vh = rvMessages?.findContainingViewHolder(focused)
-                        if (vh != null && vh.adapterPosition == lastPos) {
-                            etComposeInput?.requestFocus()
-                            return true
+            } else if (vh != null) {
+                val rv = rvMessages!!
+                val pos = vh.adapterPosition
+                val portTop = rv.paddingTop
+                val portBottom = rv.height - rv.paddingBottom
+                val portHeight = (portBottom - portTop).coerceAtLeast(1)
+
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    if (vh.itemView.top < portTop) {
+                        val delta = maxOf(vh.itemView.top - portTop, -(portHeight * 2 / 3))
+                        rv.scrollBy(0, delta)
+                        return true
+                    }
+                    if (pos > 0) {
+                        if (pos - 1 <= 3) {
+                            activeChat?.let { c ->
+                                val msgs = telegramManager.messages.value[c.id] ?: emptyList()
+                                if (msgs.isNotEmpty()) {
+                                    telegramManager.loadMessages(c.id, fromMessageId = msgs.first().id)
+                                }
+                            }
                         }
+                        focusMessageAt(pos - 1, fromDirection = -1)
+                        return true
+                    } else {
+                        // Already at top-most loaded message; trigger history load and keep focus inside list
+                        activeChat?.let { c ->
+                            val msgs = telegramManager.messages.value[c.id] ?: emptyList()
+                            if (msgs.isNotEmpty()) {
+                                telegramManager.loadMessages(c.id, fromMessageId = msgs.first().id)
+                            }
+                        }
+                        vh.itemView.requestFocus()
+                        return true
+                    }
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    if (vh.itemView.bottom > portBottom) {
+                        val delta = minOf(vh.itemView.bottom - portBottom, portHeight * 2 / 3)
+                        rv.scrollBy(0, delta)
+                        return true
+                    }
+                    if (pos in 0 until (count - 1)) {
+                        focusMessageAt(pos + 1, fromDirection = 1)
+                        return true
+                    } else {
+                        focusedMessageId = null
+                        etComposeInput?.requestFocus()
+                        return true
                     }
                 }
             }
@@ -5462,8 +5745,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // In Chat List: Keypad numbers 1-9 directly open chat 1-9!
+        // In Chat List: Keypad 0 opens Settings, numbers 1-9 directly open chat 1-9!
         if (currentScreen == Screen.CHAT_LIST && event.action == KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_0) {
+                showSettingsScreen()
+                return true
+            }
             if (keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9) {
                 val index = keyCode - KeyEvent.KEYCODE_1
                 val target = chatListAdapter?.getItemAt(index)
@@ -5474,24 +5761,20 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (isTabViewFocused()) {
-                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    // Suppress cycleTabs to avoid double key activation when tab TextView holds focus
-                    return super.dispatchKeyEvent(event)
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    cycleTabs(-1)
+                    focusSelectedTabView()
+                    return true
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    cycleTabs(1)
+                    focusSelectedTabView()
+                    return true
                 }
                 if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                     val itemCount = chatListAdapter?.itemCount ?: 0
                     if (itemCount > 0) {
-                        rvChats?.scrollToPosition(0)
-                        rvChats?.post {
-                            val vh = rvChats?.findViewHolderForAdapterPosition(0)
-                            if (vh != null) {
-                                vh.itemView.requestFocus()
-                            } else {
-                                rvChats?.requestFocus()
-                            }
-                        }
-                    } else {
-                        findViewById<View>(R.id.tv_softkey_left)?.requestFocus()
+                        focusChatAt(0)
                     }
                     return true
                 }
@@ -5505,23 +5788,35 @@ class MainActivity : AppCompatActivity() {
                     cycleTabs(1)
                     return true
                 }
+                val vh = currentFocus?.let { rvChats?.findContainingViewHolder(it) }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    val total = chatListAdapter?.itemCount ?: 0
+                    if (vh != null) {
+                        val pos = vh.adapterPosition
+                        if (pos in 0 until (total - 1)) {
+                            if (pos + 1 >= total - 4 && total >= 10) {
+                                telegramManager.loadMoreChats()
+                            }
+                            focusChatAt(pos + 1)
+                            return true
+                        } else if (pos >= total - 1) {
+                            telegramManager.loadMoreChats()
+                            vh.itemView.requestFocus()
+                            return true
+                        }
+                    } else if (total > 0) {
+                        focusChatAt(0)
+                        return true
+                    }
+                }
                 if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                    val focusedView = currentFocus
-                    val rv = rvChats
-                    if (focusedView != null && rv != null) {
-                        val itemView = rv.findContainingItemView(focusedView)
-                        if (itemView != null && rv.getChildAdapterPosition(itemView) == 0) {
-                            val targetTabId =
-                                when {
-                                    isArchivedTabSelected -> R.id.tab_archived
-                                    isFoldersTabSelected -> R.id.tab_folders
-                                    currentChatTypeFilter == ChatType.DIRECT -> R.id.tab_direct
-                                    currentChatTypeFilter == ChatType.GROUP -> R.id.tab_groups
-                                    currentChatTypeFilter == ChatType.CHANNEL -> R.id.tab_channels
-                                    currentChatTypeFilter == ChatType.BOT -> R.id.tab_bots
-                                    else -> R.id.tab_all
-                                }
-                            findViewById<View>(targetTabId)?.requestFocus()
+                    if (vh != null) {
+                        val pos = vh.adapterPosition
+                        if (pos > 0) {
+                            focusChatAt(pos - 1)
+                            return true
+                        } else if (pos == 0) {
+                            focusSelectedTabView()
                             return true
                         }
                     }
@@ -5530,6 +5825,115 @@ class MainActivity : AppCompatActivity() {
         }
 
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun focusSelectedTabView() {
+        val targetTabId =
+            when {
+                isArchivedTabSelected -> R.id.tab_archived
+                isFoldersTabSelected -> R.id.tab_folders
+                currentChatTypeFilter == ChatType.DIRECT -> R.id.tab_direct
+                currentChatTypeFilter == ChatType.GROUP -> R.id.tab_groups
+                currentChatTypeFilter == ChatType.CHANNEL -> R.id.tab_channels
+                currentChatTypeFilter == ChatType.BOT -> R.id.tab_bots
+                else -> R.id.tab_all
+            }
+        findViewById<View>(targetTabId)?.requestFocus()
+    }
+
+    private fun focusChatAt(position: Int) {
+        val rv = rvChats ?: return
+        val total = chatListAdapter?.itemCount ?: 0
+        if (position !in 0 until total) return
+        focusedChatId = chatListAdapter?.getItemAt(position)?.id
+        val existingVh = rv.findViewHolderForAdapterPosition(position)
+        if (existingVh != null) {
+            val portTop = rv.paddingTop
+            val portBottom = rv.height - rv.paddingBottom
+            if (existingVh.itemView.top < portTop) {
+                rv.scrollBy(0, existingVh.itemView.top - portTop)
+            } else if (existingVh.itemView.bottom > portBottom) {
+                rv.scrollBy(0, existingVh.itemView.bottom - portBottom)
+            }
+            existingVh.itemView.requestFocus()
+        } else {
+            rv.scrollToPosition(position)
+            rv.post {
+                val vh = rv.findViewHolderForAdapterPosition(position)
+                if (vh != null) {
+                    vh.itemView.requestFocus()
+                } else {
+                    rv.scrollToPosition(position)
+                    rv.post {
+                        rv.findViewHolderForAdapterPosition(position)?.itemView?.requestFocus()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun focusMessageAt(
+        position: Int,
+        fromDirection: Int = 0,
+    ) {
+        val rv = rvMessages ?: return
+        val count = messageAdapter?.itemCount ?: 0
+        if (position !in 0 until count) return
+        focusedMessageId = messageAdapter?.getItemAt(position)?.id
+        val portTop = rv.paddingTop
+        val portBottom = rv.height - rv.paddingBottom
+        val portHeight = (portBottom - portTop).coerceAtLeast(1)
+        val existingVh = rv.findViewHolderForAdapterPosition(position)
+        if (existingVh != null) {
+            val viewTop = existingVh.itemView.top
+            val viewBottom = existingVh.itemView.bottom
+            val viewHeight = viewBottom - viewTop
+            if (viewHeight > portHeight) {
+                if (fromDirection < 0) {
+                    if (viewBottom > portBottom || viewTop > portTop) {
+                        rv.scrollBy(0, viewBottom - portBottom)
+                    }
+                } else {
+                    if (viewTop < portTop || viewBottom < portBottom) {
+                        rv.scrollBy(0, viewTop - portTop)
+                    }
+                }
+            } else {
+                if (viewTop < portTop) {
+                    rv.scrollBy(0, viewTop - portTop)
+                } else if (viewBottom > portBottom) {
+                    rv.scrollBy(0, viewBottom - portBottom)
+                }
+            }
+            existingVh.itemView.requestFocus()
+        } else {
+            rv.scrollToPosition(position)
+            rv.post {
+                val vh = rv.findViewHolderForAdapterPosition(position)
+                if (vh != null) {
+                    val viewTop = vh.itemView.top
+                    val viewBottom = vh.itemView.bottom
+                    val viewHeight = viewBottom - viewTop
+                    if (viewHeight > portHeight) {
+                        if (fromDirection < 0) {
+                            rv.scrollBy(0, viewBottom - portBottom)
+                        } else {
+                            rv.scrollBy(0, viewTop - portTop)
+                        }
+                    } else if (viewTop < portTop) {
+                        rv.scrollBy(0, viewTop - portTop)
+                    } else if (viewBottom > portBottom) {
+                        rv.scrollBy(0, viewBottom - portBottom)
+                    }
+                    vh.itemView.requestFocus()
+                } else {
+                    rv.scrollToPosition(position)
+                    rv.post {
+                        rv.findViewHolderForAdapterPosition(position)?.itemView?.requestFocus()
+                    }
+                }
+            }
+        }
     }
 
     private fun cycleTabs(direction: Int) {
