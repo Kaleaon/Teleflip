@@ -96,9 +96,10 @@ class TelegramPaidMediaTest {
     fun testTdApiUnlockedPaidMediaParsing() {
         val manager = TelegramManager(mockContext)
 
+        val actualFile = java.io.File.createTempFile("paid-photo", ".jpg").apply { deleteOnExit() }
         val localFile =
             TdApi.LocalFile().apply {
-                path = "/path/photo.jpg"
+                path = actualFile.absolutePath
                 isDownloadingCompleted = true
             }
         val fileObj =
@@ -137,7 +138,7 @@ class TelegramPaidMediaTest {
         assertEquals(10L, model.starCount)
         assertFalse(model.isPaidMediaLocked)
         assertEquals("Unlocked Photo", model.mediaCaption)
-        assertEquals("/path/photo.jpg", model.mediaFilePath)
+        assertEquals(actualFile.absolutePath, model.mediaFilePath)
     }
 
     @Test
@@ -151,5 +152,19 @@ class TelegramPaidMediaTest {
 
         // When tdClient is null/uninitialized, callback returns false safely
         assertEquals(false, resultSuccess)
+    }
+
+    @Test
+    fun openingContentIsNotMistakenForAPaidMediaPurchase() {
+        val manager = TelegramManager(mockContext)
+        val client = mock(org.drinkless.tdlib.Client::class.java)
+        manager.setTdClientForTesting(client)
+        org.mockito.Mockito.doAnswer { invocation ->
+            invocation.getArgument<org.drinkless.tdlib.Client.ResultHandler>(1).onResult(TdApi.Ok())
+            null
+        }.`when`(client).send(org.mockito.Mockito.any<TdApi.Function<*>>(), org.mockito.Mockito.any<org.drinkless.tdlib.Client.ResultHandler>())
+        var result: Boolean? = null
+        manager.unlockPaidMedia(100L, 200L) { result = it }
+        assertEquals(false, result)
     }
 }
