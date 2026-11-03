@@ -1,6 +1,7 @@
 package com.teleflip.app.ui
 
-import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.text.Spannable
 import android.text.SpannableStringBuilder
@@ -17,6 +18,9 @@ import androidx.core.view.ViewCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import coil.imageLoader
+import coil.request.Disposable
+import coil.request.ImageRequest
 import com.teleflip.app.R
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
@@ -30,9 +34,20 @@ class MessageAdapter(
     private val onMessageAction: ((MessageModel) -> Unit)? = null,
     private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
     private val customEmojiResolver: ((String) -> String?)? = null,
+    private val onQuoteClick: ((Long) -> Unit)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     companion object {
         const val PAYLOAD_PLAYBACK_STATE = "PAYLOAD_PLAYBACK_STATE"
+        private val REDUNDANT_MEDIA_TAGS =
+            setOf(
+                "📷 [Photo]",
+                "📹 [Video]",
+                "🎞️ [GIF]",
+                "🎤 [Voice Note]",
+                "🎵 [Audio]",
+                "📍 [Location]",
+                "📊 [Poll]",
+            )
     }
 
     private var playingMessageId: Long? = null
@@ -40,6 +55,13 @@ class MessageAdapter(
 
     override fun submitList(newItems: List<MessageModel>?) {
         super.submitList(if (newItems != null) ArrayList(newItems) else null)
+    }
+
+    override fun submitList(
+        newItems: List<MessageModel>?,
+        commitCallback: Runnable?,
+    ) {
+        super.submitList(if (newItems != null) ArrayList(newItems) else null, commitCallback)
     }
 
     fun setPlayingMessageId(
@@ -135,6 +157,13 @@ class MessageAdapter(
         private val tvTime: TextView = itemView.findViewById(R.id.tv_message_time)
         private val tvStatus: TextView = itemView.findViewById(R.id.tv_read_status)
 
+        private val reactionDisposables = mutableListOf<Disposable>()
+
+        fun clearReactionDisposables() {
+            reactionDisposables.forEach { it.dispose() }
+            reactionDisposables.clear()
+        }
+
         fun bindPlaybackState(message: MessageModel) {
             if (message.mediaType in setOf(MediaType.VOICE, MediaType.AUDIO)) {
                 tvMedia.visibility = View.VISIBLE
@@ -146,6 +175,7 @@ class MessageAdapter(
         }
 
         fun bind(message: MessageModel) {
+            clearReactionDisposables()
             val context = itemView.context
 
             if (message.isOutbound) {
@@ -190,6 +220,16 @@ class MessageAdapter(
                 tvReplyQuote?.visibility = View.GONE
             }
 
+            if (message.replyToMessageId != 0L) {
+                tvReplyQuote?.isFocusable = true
+                tvReplyQuote?.isClickable = true
+                tvReplyQuote?.setOnClickListener {
+                    onQuoteClick?.invoke(message.replyToMessageId)
+                }
+            } else {
+                tvReplyQuote?.setOnClickListener(null)
+            }
+
             // Media attachment preview
             when (message.mediaType) {
                 MediaType.VOICE, MediaType.AUDIO -> {
@@ -209,7 +249,9 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, stateDesc)
                     tvMedia.contentDescription =
                         ContentDescriptionFormatter.getVoiceMessageDescription(
-                            context, isPlaying, message.durationSeconds,
+                            context,
+                            isPlaying,
+                            message.durationSeconds,
                         )
                 }
                 MediaType.LOCATION -> {
@@ -234,8 +276,7 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    val emoji = message.stickerEmoji.ifBlank { message.mediaCaption }
-                    tvMedia.text = if (emoji.isNotBlank()) "🎨 [Sticker $emoji]" else "🎨 [Sticker]"
+                    tvMedia.text = StickerEffectDecorator.formatStickerHeader(message)
                 }
                 MediaType.VIDEO -> {
                     ViewCompat.setStateDescription(tvMedia, null)
@@ -289,10 +330,7 @@ class MessageAdapter(
             if (isVisualMedia) {
                 ivPhoto.contentDescription =
                     when (message.mediaType) {
-                        MediaType.STICKER -> {
-                            val emo = message.stickerEmoji.ifBlank { "Sticker" }
-                            "Sticker $emo"
-                        }
+                        MediaType.STICKER -> StickerEffectDecorator.formatStickerContentDescription(message)
                         MediaType.ANIMATION -> "GIF Animation"
                         MediaType.PAID_MEDIA -> {
                             if (message.isPaidMediaLocked) {
@@ -351,8 +389,21 @@ class MessageAdapter(
                 tvText.text = pollBody
                 tvText.visibility = View.VISIBLE
             } else {
-                tvText.text = MessageTextFormatter.format(message)
-                tvText.visibility = if (message.text.isNotBlank()) View.VISIBLE else View.GONE
+                val trimmedText = message.text.trim()
+                val isRedundantMediaText =
+                    message.mediaType != MediaType.NONE &&
+                        (
+                            trimmedText in REDUNDANT_MEDIA_TAGS ||
+                                (message.mediaType == MediaType.STICKER && trimmedText.startsWith("🎨 [Sticker")) ||
+                                (message.mediaType == MediaType.DOCUMENT && trimmedText == "📄 ${message.mediaCaption}".trim())
+                        )
+                if (isRedundantMediaText) {
+                    tvText.text = ""
+                    tvText.visibility = View.GONE
+                } else {
+                    tvText.text = MessageTextFormatter.format(message)
+                    tvText.visibility = if (message.text.isNotBlank()) View.VISIBLE else View.GONE
+                }
             }
 
             if (message.mediaType == MediaType.VOICE) {
@@ -360,6 +411,8 @@ class MessageAdapter(
                 btnTranscribe?.setOnClickListener {
                     onTranscribeClick?.invoke(message)
                 }
+                btnTranscribe?.isFocusable = true
+                btnTranscribe?.isFocusableInTouchMode = true
                 if (message.transcript.isNotBlank()) {
                     tvTranscript?.visibility = View.VISIBLE
                     tvTranscript?.text = "💬 ${message.transcript}"
@@ -381,36 +434,49 @@ class MessageAdapter(
                     if (idx > 0) ssb.append(" ")
 
                     if (reaction.startsWith("custom_emoji_")) {
+                        val sticker = TelegramManager.getCustomEmojiSticker(reaction)
+                        val fallbackSymbol = sticker?.emoji?.ifBlank { "✨" } ?: "✨"
+                        val startPos = ssb.length
+                        ssb.append(fallbackSymbol)
+                        val endPos = ssb.length
+
                         val filePath =
                             customEmojiResolver?.invoke(reaction)
                                 ?: TelegramManager.getCustomEmojiFilePath(reaction)
-                        var drawableAdded = false
+
                         if (!filePath.isNullOrBlank()) {
-                            try {
-                                val file = File(filePath)
-                                if (file.exists()) {
-                                    val bitmap = BitmapFactory.decodeFile(filePath)
-                                    if (bitmap != null) {
-                                        val drawable = BitmapDrawable(context.resources, bitmap)
-                                        drawable.setBounds(0, 0, targetSize, targetSize)
-                                        val startPos = ssb.length
-                                        ssb.append(" ")
-                                        ssb.setSpan(
-                                            ImageSpan(drawable, ImageSpan.ALIGN_BOTTOM),
-                                            startPos,
-                                            startPos + 1,
-                                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-                                        )
-                                        drawableAdded = true
-                                    }
-                                }
-                            } catch (_: Throwable) {
-                            }
-                        }
-                        if (!drawableAdded) {
-                            val sticker = TelegramManager.getCustomEmojiSticker(reaction)
-                            val fallbackSymbol = sticker?.emoji?.ifBlank { "✨" } ?: "✨"
-                            ssb.append(fallbackSymbol)
+                            val request =
+                                ImageRequest.Builder(context)
+                                    .data(File(filePath))
+                                    .target(
+                                        onSuccess = { drawable ->
+                                            val bitmap =
+                                                if (drawable is BitmapDrawable && drawable.bitmap != null) {
+                                                    drawable.bitmap
+                                                } else {
+                                                    val w = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else targetSize
+                                                    val h = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else targetSize
+                                                    val bm = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                                                    val canvas = Canvas(bm)
+                                                    drawable.setBounds(0, 0, canvas.width, canvas.height)
+                                                    drawable.draw(canvas)
+                                                    bm
+                                                }
+                                            val bitmapDrawable =
+                                                BitmapDrawable(context.resources, bitmap).apply {
+                                                    setBounds(0, 0, targetSize, targetSize)
+                                                }
+                                            val imageSpan = ImageSpan(bitmapDrawable, ImageSpan.ALIGN_BOTTOM)
+                                            if (startPos < ssb.length && endPos <= ssb.length) {
+                                                ssb.setSpan(imageSpan, startPos, endPos, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                                                tvReactions?.text = ssb
+                                            }
+                                        },
+                                    )
+                                    .build()
+
+                            val disposable = context.imageLoader.enqueue(request)
+                            reactionDisposables.add(disposable)
                         }
                     } else {
                         ssb.append(reaction)
@@ -429,6 +495,30 @@ class MessageAdapter(
                 }
             tvTime.text = "$metaPrefix${message.time}"
 
+            if (message.isOutbound) {
+                tvStatus.visibility = View.VISIBLE
+                when (message.status) {
+                    MessageStatus.SENDING -> {
+                        tvStatus.text = " 🕒"
+                        tvStatus.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+                    }
+                    MessageStatus.SENT -> {
+                        tvStatus.text = " ✓"
+                        tvStatus.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+                    }
+                    MessageStatus.READ -> {
+                        tvStatus.text = " ✓✓"
+                        tvStatus.setTextColor(ContextCompat.getColor(context, R.color.focus_highlight))
+                    }
+                    MessageStatus.FAILED -> {
+                        tvStatus.text = " ⚠️"
+                        tvStatus.setTextColor(ContextCompat.getColor(context, R.color.text_error))
+                    }
+                }
+            } else {
+                tvStatus.visibility = View.GONE
+            }
+
             itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     onMessageFocused?.invoke(message)
@@ -441,6 +531,7 @@ class MessageAdapter(
         }
 
         fun clearImage() {
+            clearReactionDisposables()
             ivPhoto.setImageDrawable(null)
         }
     }
