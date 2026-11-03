@@ -1517,12 +1517,34 @@ class MainActivity : AppCompatActivity() {
         layoutCompose = view.findViewById(R.id.layout_compose)
         tvRecordTimer = view.findViewById(R.id.tv_record_timer)
         layoutReplyEditBar = view.findViewById(R.id.layout_reply_edit_bar)
+        layoutReplyEditBar?.isFocusable = true
+        layoutReplyEditBar?.isClickable = true
+        layoutReplyEditBar?.setOnClickListener {
+            val targetId = activeReplyMessage?.id ?: activeEditMessage?.id
+            if (targetId != null) {
+                val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                if (pos >= 0) {
+                    focusMessageAt(pos)
+                } else {
+                    showToast("Quoted message not found")
+                }
+            }
+        }
         tvReplyEditPreview = view.findViewById(R.id.tv_reply_edit_preview)
         layoutPinnedBanner = view.findViewById(R.id.layout_pinned_banner)
-        layoutPinnedBanner?.isFocusable = false
+        layoutPinnedBanner?.isFocusable = true
+        layoutPinnedBanner?.isClickable = true
         tvPinnedBannerText = view.findViewById(R.id.tv_pinned_banner_text)
         view.findViewById<View>(R.id.btn_cancel_reply_edit)?.setOnClickListener {
             clearReplyOrEditMode()
+        }
+        val btnJumpToBottom = view.findViewById<Button>(R.id.btn_jump_to_bottom)
+        btnJumpToBottom?.setOnClickListener {
+            val count = messageAdapter?.itemCount ?: 0
+            if (count > 0) {
+                rvMessages?.smoothScrollToPosition(count - 1)
+                focusMessageAt(count - 1)
+            }
         }
         activeReplyMessage = null
         activeEditMessage = null
@@ -1541,6 +1563,15 @@ class MainActivity : AppCompatActivity() {
                 },
                 customEmojiResolver = { key ->
                     telegramManager.getCustomEmojiFilePath(key)
+                },
+                onQuoteClick = { quotedMessageId ->
+                    val pos = messageAdapter?.getPositionForMessageId(quotedMessageId) ?: -1
+                    if (pos >= 0) {
+                        rvMessages?.smoothScrollToPosition(pos)
+                        focusMessageAt(pos)
+                    } else {
+                        showToast("Quoted message not found")
+                    }
                 },
             )
         rvMessages?.adapter = messageAdapter
@@ -1581,8 +1612,16 @@ class MainActivity : AppCompatActivity() {
                     dx: Int,
                     dy: Int,
                 ) {
+                    val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                    val lastVisible = lm.findLastVisibleItemPosition()
+                    val totalCount = lm.itemCount
+                    if (totalCount > 0 && lastVisible < totalCount - 2) {
+                        btnJumpToBottom?.visibility = View.VISIBLE
+                    } else {
+                        btnJumpToBottom?.visibility = View.GONE
+                    }
+
                     if (dy < 0) {
-                        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
                         val firstVisible = lm.findFirstVisibleItemPosition()
                         if (firstVisible <= 1) {
                             val msgs = telegramManager.messages.value[chat.id] ?: emptyList()
@@ -2226,9 +2265,12 @@ class MainActivity : AppCompatActivity() {
                 val pos = messageAdapter?.getPositionForMessageId(pinnedMsg.id) ?: -1
                 if (pos >= 0) {
                     focusMessageAt(pos)
+                } else {
+                    showToast("Pinned message not found")
                 }
             }
-            layoutPinnedBanner?.isFocusable = false
+            layoutPinnedBanner?.isFocusable = true
+            layoutPinnedBanner?.isClickable = true
         } else {
             layoutPinnedBanner?.visibility = View.GONE
         }
