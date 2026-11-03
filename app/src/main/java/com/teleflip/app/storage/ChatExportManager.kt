@@ -456,44 +456,53 @@ object ChatExportManager {
     ) {
         val jsonFile = File(exportDir, "messages.json")
         val exportDate = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
-        val writer = OutputStreamWriter(FileOutputStream(jsonFile), StandardCharsets.UTF_8)
 
-        val sb = StringBuilder()
-        sb.append("{\n")
-        sb.append("  \"chatId\": ").append(chatId).append(",\n")
-        sb.append("  \"title\": \"").append(escapeJson(chatTitle)).append("\",\n")
-        sb.append("  \"exportDate\": \"").append(exportDate).append("\",\n")
-        sb.append("  \"messageCount\": ").append(messages.size).append(",\n")
-        sb.append("  \"messages\": [\n")
+        jsonFile.bufferedWriter(StandardCharsets.UTF_8).use { writer ->
+            writer.write("{\n")
+            writer.write("  \"chatId\": ")
+            writer.write(chatId.toString())
+            writer.write(",\n  \"title\": \"")
+            writer.write(escapeJson(chatTitle))
+            writer.write("\",\n  \"exportDate\": \"")
+            writer.write(exportDate)
+            writer.write("\",\n  \"messageCount\": ")
+            writer.write(messages.size.toString())
+            writer.write(",\n  \"messages\": [\n")
 
-        messages.forEachIndexed { index, msg ->
-            sb.append("    {\n")
-            sb.append("      \"id\": ").append(msg.id).append(",\n")
-            sb.append("      \"chatId\": ").append(msg.chatId).append(",\n")
-            sb.append("      \"senderName\": \"").append(escapeJson(msg.senderName)).append("\",\n")
-            sb.append("      \"isOutbound\": ").append(msg.isOutbound).append(",\n")
-            sb.append("      \"time\": \"").append(escapeJson(msg.time)).append("\",\n")
-            sb.append("      \"text\": \"").append(escapeJson(msg.text)).append("\",\n")
-            sb.append("      \"mediaType\": \"").append(msg.mediaType.name).append("\"")
-            val media = mediaPaths[msg.id]
-            if (media != null) {
-                sb.append(",\n      \"localRelativePath\": \"").append(escapeJson(media)).append("\"\n")
-            } else {
-                sb.append("\n")
+            messages.forEachIndexed { index, msg ->
+                writer.write("    {\n      \"id\": ")
+                writer.write(msg.id.toString())
+                writer.write(",\n      \"chatId\": ")
+                writer.write(msg.chatId.toString())
+                writer.write(",\n      \"senderName\": \"")
+                writer.write(escapeJson(msg.senderName))
+                writer.write("\",\n      \"isOutbound\": ")
+                writer.write(msg.isOutbound.toString())
+                writer.write(",\n      \"time\": \"")
+                writer.write(escapeJson(msg.time))
+                writer.write("\",\n      \"text\": \"")
+                writer.write(escapeJson(msg.text))
+                writer.write("\",\n      \"mediaType\": \"")
+                writer.write(msg.mediaType.name)
+                writer.write("\"")
+                val media = mediaPaths[msg.id]
+                if (media != null) {
+                    writer.write(",\n      \"localRelativePath\": \"")
+                    writer.write(escapeJson(media))
+                    writer.write("\"\n")
+                } else {
+                    writer.write("\n")
+                }
+                writer.write("    }")
+                if (index < messages.size - 1) {
+                    writer.write(",")
+                }
+                writer.write("\n")
             }
-            sb.append("    }")
-            if (index < messages.size - 1) {
-                sb.append(",")
-            }
-            sb.append("\n")
+
+            writer.write("  ]\n}\n")
+            writer.flush()
         }
-
-        sb.append("  ]\n")
-        sb.append("}\n")
-
-        writer.write(sb.toString())
-        writer.flush()
-        writer.close()
     }
 
     private fun escapeJson(text: String): String {
