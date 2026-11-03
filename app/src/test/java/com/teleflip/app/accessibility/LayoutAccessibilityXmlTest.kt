@@ -121,16 +121,17 @@ class LayoutAccessibilityXmlTest {
         val file = getLayoutFile("dialog_media_viewer.xml")
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
 
-        val buttonIds = listOf(
-            "@+id/btn_viewer_zoom_in",
-            "@+id/btn_viewer_zoom_out",
-            "@+id/btn_viewer_reset",
-            "@+id/btn_viewer_play_pause",
-            "@+id/btn_viewer_rewind",
-            "@+id/btn_viewer_fast_forward",
-            "@+id/btn_viewer_speed",
-            "@+id/btn_viewer_save",
-        )
+        val buttonIds =
+            listOf(
+                "@+id/btn_viewer_zoom_in",
+                "@+id/btn_viewer_zoom_out",
+                "@+id/btn_viewer_reset",
+                "@+id/btn_viewer_play_pause",
+                "@+id/btn_viewer_rewind",
+                "@+id/btn_viewer_fast_forward",
+                "@+id/btn_viewer_speed",
+                "@+id/btn_viewer_save",
+            )
 
         for (btnId in buttonIds) {
             val node = findNodeById(doc, btnId)

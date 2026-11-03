@@ -434,11 +434,12 @@ class MediaViewerDialog(
     private fun updateVideoControlsState() {
         val playPauseText = if (isVideoPlaying) "⏸ Pause" else "▶ Play"
         btnPlayPause?.text = playPauseText
-        val videoStateDesc = if (isVideoPlaying) {
-            context.getString(R.string.cd_video_state_playing)
-        } else {
-            context.getString(R.string.cd_video_state_paused)
-        }
+        val videoStateDesc =
+            if (isVideoPlaying) {
+                context.getString(R.string.cd_video_state_playing)
+            } else {
+                context.getString(R.string.cd_video_state_paused)
+            }
         btnPlayPause?.let { ViewCompat.setStateDescription(it, videoStateDesc) }
 
         val speedLabel = formatSpeedLabel(playbackSpeed)
