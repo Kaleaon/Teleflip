@@ -4784,6 +4784,7 @@ class TelegramManager(
         _chats.update { chats -> listOf(model) + chats.filterNot { it.id == model.id } }
         return model
     }
+
     private fun addOrUpdateChat(chat: TdApi.Chat) {
         lastReadOutboxIds[chat.id] = chat.lastReadOutboxMessageId
         val title = chat.title.ifBlank { "Chat #${chat.id}" }
