@@ -75,7 +75,7 @@ class SubscriberCacheTest {
                 isPremium = true
             }
 
-        telegramManager.handleUserUpdate(user)
+        telegramManager.updateUserCache(user)
 
         assertTrue("User ID 200 should be cached as Premium", telegramManager.subscriberCache[200L] == true)
     }
