@@ -5363,8 +5363,41 @@ class MainActivity : AppCompatActivity() {
         val btnForumTopics = view.findViewById<Button>(R.id.btn_profile_forum_topics)
         val btnSendMsg = view.findViewById<Button>(R.id.btn_profile_send_msg)
         val btnToggleMute = view.findViewById<Button>(R.id.btn_profile_toggle_mute)
+        val btnBlock = view.findViewById<Button>(R.id.btn_profile_block_user)
         val btnSearch = view.findViewById<Button>(R.id.btn_profile_search)
         val btnExportHistory = view.findViewById<Button>(R.id.btn_profile_export_history)
+
+        val dialAction =
+            View.OnClickListener {
+                val phone = tvPhone.text.toString().trim()
+                if (phone.isNotEmpty()) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+                    } catch (e: Exception) {
+                        showToast("Could not open dialer: ${e.message}", true)
+                    }
+                }
+            }
+        rowPhone?.setOnClickListener(dialAction)
+        btnCellCall?.setOnClickListener(dialAction)
+
+        rowUsername?.setOnClickListener {
+            val uname = tvUsername.text.toString().trim()
+            if (uname.isNotEmpty()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("Username", uname))
+                showToast("Copied $uname to clipboard")
+            }
+        }
+
+        rowBio?.setOnClickListener {
+            val bio = tvBio.text.toString().trim()
+            if (bio.isNotEmpty()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("Bio", bio))
+                showToast("Copied bio to clipboard")
+            }
+        }
 
         btnExportHistory?.setOnClickListener {
             showChatExportFormatDialog(chat.id, chat.title)
@@ -5377,11 +5410,42 @@ class MainActivity : AppCompatActivity() {
             btnSelfDestruct?.text = "⏱️ Self-Destruct Timer: $ttlLabel"
             btnMembers?.visibility = View.GONE
             btnForumTopics?.visibility = View.GONE
+            btnBlock?.visibility = View.VISIBLE
         } else {
             btnSecretChat?.visibility = View.GONE
             btnSelfDestruct?.visibility = View.GONE
             btnMembers?.visibility = View.VISIBLE
             btnForumTopics?.visibility = View.VISIBLE
+            btnBlock?.visibility = View.GONE
+            btnTgCall?.visibility = View.GONE
+            btnCellCall?.visibility = View.GONE
+            tvBioLabel.text = "Group / Channel Info"
+        }
+
+        btnTgCall?.setOnClickListener {
+            val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+            initiateAudioCall(userId)
+        }
+
+        btnSendMsg?.setOnClickListener {
+            openConversation(chat)
+        }
+
+        btnSearch?.setOnClickListener {
+            showSearchDialog()
+        }
+
+        btnToggleMute?.setOnClickListener {
+            showChatMuteDialog(chat.id, chat.isMuted, chat.title) { newMuted ->
+                btnToggleMute.text = if (newMuted) "🔔 Notifications: Muted" else "🔔 Notifications: Sound"
+            }
+        }
+
+        if (chat.chatType == ChatType.DIRECT) {
+            btnBlock?.setOnClickListener {
+                val targetUserId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+                confirmBlockUser(targetUserId, chat.title)
+            }
         }
 
         btnSecretChat?.setOnClickListener {
@@ -5409,34 +5473,252 @@ class MainActivity : AppCompatActivity() {
         tvPremium.visibility = if (chat.isPremium) View.VISIBLE else View.GONE
         ivAvatar.loadCircularAvatarOrFallback(chat.avatarPath, chat.avatarLetters, tvAvatar)
 
-        if (chat.chatType != ChatType.DIRECT) {
-            btnTgCall.visibility = View.GONE
-            btnCellCall.visibility = View.GONE
-            tvBioLabel.text = "Group / Channel Info"
+        val focusableControls =
+            listOfNotNull(
+                rowPhone,
+                rowUsername,
+                rowBio,
+                btnTgCall,
+                btnCellCall,
+                btnSecretChat,
+                btnSelfDestruct,
+                btnMembers,
+                btnForumTopics,
+                btnSendMsg,
+                btnToggleMute,
+                btnBlock,
+                btnSearch,
+                btnExportHistory,
+            )
+
+        fun updateProfileFocusChaining() {
+            val visibleControls = focusableControls.filter { it.visibility == View.VISIBLE }
+            for (i in visibleControls.indices) {
+                val current = visibleControls[i]
+                val prev = if (i > 0) visibleControls[i - 1] else visibleControls[i]
+                val next = if (i < visibleControls.size - 1) visibleControls[i + 1] else visibleControls[i]
+                current.nextFocusUpId = prev.id
+                current.nextFocusDownId = next.id
+            }
         }
 
-        softkeyManager.update(
-            left = if (chat.chatType == ChatType.DIRECT) "Call" else "Select",
-            center = "Select",
-            right = "Back",
-            onLeft = {
-                if (chat.chatType == ChatType.DIRECT) {
-                    val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
-                    initiateAudioCall(userId)
+        val onBack: () -> Unit = {
+            if (activeChat != null && activeChat?.id == chat.id) {
+                openConversation(chat)
+            } else {
+                showChatListScreen()
+            }
+        }
+
+        fun updateProfileSoftkeysForView(focusedView: View?) {
+            when (focusedView?.id) {
+                R.id.layout_profile_phone_row -> {
+                    val dial: () -> Unit = { dialAction.onClick(rowPhone) }
+                    softkeyManager.update(
+                        left = "Dial",
+                        center = "Dial",
+                        right = "Back",
+                        onLeft = dial,
+                        onCenter = dial,
+                        onRight = onBack,
+                    )
                 }
-            },
-            onCenter = {
-                currentFocus?.performClick()
-            },
-            onRight = {
-                if (activeChat != null && activeChat?.id == chat.id) {
-                    openConversation(chat)
-                } else {
-                    showChatListScreen()
+                R.id.layout_profile_username_row -> {
+                    val copy: () -> Unit = {
+                        val uname = tvUsername.text.toString().trim()
+                        if (uname.isNotEmpty()) {
+                            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            clipboard?.setPrimaryClip(ClipData.newPlainText("Username", uname))
+                            showToast("Copied $uname to clipboard")
+                        }
+                    }
+                    softkeyManager.update(
+                        left = "Copy",
+                        center = "Copy",
+                        right = "Back",
+                        onLeft = copy,
+                        onCenter = copy,
+                        onRight = onBack,
+                    )
                 }
-            },
-        )
+                R.id.layout_profile_bio_row -> {
+                    val copy: () -> Unit = {
+                        val bio = tvBio.text.toString().trim()
+                        if (bio.isNotEmpty()) {
+                            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            clipboard?.setPrimaryClip(ClipData.newPlainText("Bio", bio))
+                            showToast("Copied bio to clipboard")
+                        }
+                    }
+                    softkeyManager.update(
+                        left = "Copy",
+                        center = "Copy",
+                        right = "Back",
+                        onLeft = copy,
+                        onCenter = copy,
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_tg_call -> {
+                    val callAction: () -> Unit = {
+                        val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+                        initiateAudioCall(userId)
+                    }
+                    softkeyManager.update(
+                        left = "Call",
+                        center = "Call",
+                        right = "Back",
+                        onLeft = callAction,
+                        onCenter = callAction,
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_cell_call -> {
+                    val dial: () -> Unit = { dialAction.onClick(btnCellCall) }
+                    softkeyManager.update(
+                        left = "Dial",
+                        center = "Dial",
+                        right = "Back",
+                        onLeft = dial,
+                        onCenter = dial,
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_secret_chat -> {
+                    softkeyManager.update(
+                        left = "Start",
+                        center = "Start",
+                        right = "Back",
+                        onLeft = { btnSecretChat.performClick() },
+                        onCenter = { btnSecretChat.performClick() },
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_self_destruct -> {
+                    softkeyManager.update(
+                        left = "Timer",
+                        center = "Timer",
+                        right = "Back",
+                        onLeft = { btnSelfDestruct.performClick() },
+                        onCenter = { btnSelfDestruct.performClick() },
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_members -> {
+                    softkeyManager.update(
+                        left = "Members",
+                        center = "Members",
+                        right = "Back",
+                        onLeft = { btnMembers.performClick() },
+                        onCenter = { btnMembers.performClick() },
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_forum_topics -> {
+                    softkeyManager.update(
+                        left = "Topics",
+                        center = "Topics",
+                        right = "Back",
+                        onLeft = { btnForumTopics.performClick() },
+                        onCenter = { btnForumTopics.performClick() },
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_send_msg -> {
+                    softkeyManager.update(
+                        left = "Open",
+                        center = "Open",
+                        right = "Back",
+                        onLeft = { btnSendMsg.performClick() },
+                        onCenter = { btnSendMsg.performClick() },
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_toggle_mute -> {
+                    softkeyManager.update(
+                        left = "Mute",
+                        center = "Mute",
+                        right = "Back",
+                        onLeft = { btnToggleMute.performClick() },
+                        onCenter = { btnToggleMute.performClick() },
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_block_user -> {
+                    softkeyManager.update(
+                        left = "Block",
+                        center = "Block",
+                        right = "Back",
+                        onLeft = { btnBlock.performClick() },
+                        onCenter = { btnBlock.performClick() },
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_search -> {
+                    softkeyManager.update(
+                        left = "Search",
+                        center = "Search",
+                        right = "Back",
+                        onLeft = { btnSearch.performClick() },
+                        onCenter = { btnSearch.performClick() },
+                        onRight = onBack,
+                    )
+                }
+                R.id.btn_profile_export_history -> {
+                    softkeyManager.update(
+                        left = "Export",
+                        center = "Export",
+                        right = "Back",
+                        onLeft = { btnExportHistory.performClick() },
+                        onCenter = { btnExportHistory.performClick() },
+                        onRight = onBack,
+                    )
+                }
+                else -> {
+                    softkeyManager.update(
+                        left = if (chat.chatType == ChatType.DIRECT) "Call" else "Select",
+                        center = "Select",
+                        right = "Back",
+                        onLeft = {
+                            if (chat.chatType == ChatType.DIRECT) {
+                                val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+                                initiateAudioCall(userId)
+                            } else {
+                                currentFocus?.performClick()
+                            }
+                        },
+                        onCenter = {
+                            currentFocus?.performClick()
+                        },
+                        onRight = onBack,
+                    )
+                }
+            }
+        }
+
+        focusableControls.forEach { control ->
+            control.setOnFocusChangeListener { v, hasFocus ->
+                if (hasFocus) {
+                    updateProfileSoftkeysForView(v)
+                }
+            }
+        }
+
+        updateProfileFocusChaining()
         updateActiveCallOverlay()
+
+        val initialFocus =
+            if (btnSendMsg?.visibility == View.VISIBLE) {
+                btnSendMsg
+            } else {
+                focusableControls.firstOrNull { it.visibility == View.VISIBLE }
+            }
+        initialFocus?.let {
+            updateProfileSoftkeysForView(it)
+            it.post {
+                it.requestFocus()
+            }
+        }
 
         telegramManager.loadChatProfile(chat.id) { profile ->
             tvTitle.text = profile.title
@@ -5447,16 +5729,6 @@ class MainActivity : AppCompatActivity() {
                 rowPhone.visibility = View.VISIBLE
                 btnCellCall.visibility = View.VISIBLE
                 tvPhone.text = profile.phoneNumber
-                val dialAction =
-                    View.OnClickListener {
-                        try {
-                            startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${profile.phoneNumber}")))
-                        } catch (e: Exception) {
-                            showToast("Could not open dialer: ${e.message}", true)
-                        }
-                    }
-                rowPhone.setOnClickListener(dialAction)
-                btnCellCall.setOnClickListener(dialAction)
             } else {
                 rowPhone.visibility = View.GONE
                 btnCellCall.visibility = View.GONE
@@ -5483,7 +5755,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            val btnBlock = view.findViewById<Button>(R.id.btn_profile_block_user)
             if (chat.chatType == ChatType.DIRECT) {
                 btnBlock?.visibility = View.VISIBLE
                 btnBlock?.setOnClickListener {
@@ -5506,10 +5777,24 @@ class MainActivity : AppCompatActivity() {
             btnSearch.setOnClickListener {
                 showSearchDialog()
             }
-        }
 
-        btnSendMsg?.post {
-            btnSendMsg.requestFocus()
+            updateProfileFocusChaining()
+
+            val focused = currentFocus
+            if (focused != null && focused.visibility == View.VISIBLE && focusableControls.contains(focused)) {
+                updateProfileSoftkeysForView(focused)
+            } else if (currentFocus == null || currentFocus?.visibility != View.VISIBLE) {
+                val fallbackFocus =
+                    if (btnSendMsg?.visibility == View.VISIBLE) {
+                        btnSendMsg
+                    } else {
+                        focusableControls.firstOrNull { it.visibility == View.VISIBLE }
+                    }
+                fallbackFocus?.let {
+                    updateProfileSoftkeysForView(it)
+                    it.requestFocus()
+                }
+            }
         }
     }
 
