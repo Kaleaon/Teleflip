@@ -337,7 +337,13 @@ class SearchDialog(
         dialogScope.cancel()
     }
 
+    override fun onBackPressed() {
+        keypadEngine?.commitCurrentChar()
+        dismiss()
+    }
+
     override fun dismiss() {
+        keypadEngine?.commitCurrentChar()
         searchJob?.cancel()
         dialogScope.cancel()
         super.dismiss()
@@ -347,7 +353,8 @@ class SearchDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (SoftkeyUtils.isBackOrSoftRightKey(keyCode)) {
+        if (isBackOrRightSoftKey(keyCode)) {
+            keypadEngine?.commitCurrentChar()
             dismiss()
             return true
         }
