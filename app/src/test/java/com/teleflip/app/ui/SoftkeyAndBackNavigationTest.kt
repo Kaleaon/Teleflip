@@ -136,4 +136,40 @@ class SoftkeyAndBackNavigationTest {
             centerTriggered = false
         }
     }
+
+    @Test
+    fun testIsBackOrSoftRightKeyEvaluation() {
+        val validCodes =
+            listOf(
+                KeyEvent.KEYCODE_BACK,
+                KeyEvent.KEYCODE_SOFT_RIGHT,
+                229,
+                230,
+                61,
+                158,
+            )
+        for (code in validCodes) {
+            assertTrue(
+                "Keycode $code should return true for isBackOrSoftRightKey",
+                SoftkeyUtils.isBackOrSoftRightKey(code),
+            )
+        }
+
+        val invalidCodes =
+            listOf(
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_SOFT_LEFT,
+                KeyEvent.KEYCODE_MENU,
+                132,
+                60,
+                228,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+            )
+        for (code in invalidCodes) {
+            assertFalse(
+                "Keycode $code should return false for isBackOrSoftRightKey",
+                SoftkeyUtils.isBackOrSoftRightKey(code),
+            )
+        }
+    }
 }
