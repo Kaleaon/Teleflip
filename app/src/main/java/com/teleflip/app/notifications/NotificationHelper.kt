@@ -5,7 +5,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.media.AudioAttributes
+import android.media.RingtoneManager
+import android.os.PowerManager
 import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import com.teleflip.app.MainActivity
@@ -26,11 +28,26 @@ object NotificationHelper {
     }
 
     fun ensureChannels(context: Context) {
-        if (channelsCreated || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (channelsCreated) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
         synchronized(this) {
             if (!channelsCreated) {
+                val defaultNotifSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                val defaultCallSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+
+                val notifAudioAttr =
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+
+                val callAudioAttr =
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+
                 val msgChannel =
                     NotificationChannel(
                         CHANNEL_MESSAGES,
@@ -40,6 +57,7 @@ object NotificationHelper {
                         description = "Alerts for new Telegram messages when flip phone is closed"
                         enableVibration(true)
                         enableLights(true)
+                        setSound(defaultNotifSound, notifAudioAttr)
                     }
 
                 val callChannel =
@@ -51,6 +69,7 @@ object NotificationHelper {
                         description = "Incoming encrypted Telegram voice calls"
                         enableVibration(true)
                         enableLights(true)
+                        setSound(defaultCallSound, callAudioAttr)
                     }
 
                 val syncChannel =
@@ -85,12 +104,7 @@ object NotificationHelper {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra(EXTRA_OPEN_CHAT_ID, chatId)
                 }
-            val pendingFlags =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                } else {
-                    PendingIntent.FLAG_UPDATE_CURRENT
-                }
+            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val pendingIntent = PendingIntent.getActivity(context, chatId.toInt(), openIntent, pendingFlags)
 
             val contentTitle = if (senderName.isNotBlank() && senderName != chatTitle) "$chatTitle ($senderName)" else chatTitle
@@ -101,11 +115,13 @@ object NotificationHelper {
                     .setContentText(messageText)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                    .setDefaults(NotificationCompat.DEFAULT_ALL)
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
                     .build()
 
             nm.notify(chatId.hashCode(), notification)
+            acquireWakeLock(context, 3000L)
         } catch (_: Throwable) {
             // Safe no-op in headless unit tests where NotificationManager is mocked
         }
@@ -135,12 +151,7 @@ object NotificationHelper {
                 Intent(context, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 }
-            val pendingFlags =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                } else {
-                    PendingIntent.FLAG_UPDATE_CURRENT
-                }
+            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val pendingIntent = PendingIntent.getActivity(context, callId, openIntent, pendingFlags)
 
             val notification =
@@ -150,11 +161,26 @@ object NotificationHelper {
                     .setContentText("$callerName is calling...")
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setCategory(NotificationCompat.CATEGORY_CALL)
+                    .setDefaults(NotificationCompat.DEFAULT_ALL)
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
                     .build()
 
             nm.notify(900000 + callId, notification)
+            acquireWakeLock(context, 10000L)
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun acquireWakeLock(
+        context: Context,
+        timeoutMs: Long,
+    ) {
+        try {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val wl = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "teleflip:notification_wake")
+            wl?.setReferenceCounted(false)
+            wl?.acquire(timeoutMs)
         } catch (_: Throwable) {
         }
     }
