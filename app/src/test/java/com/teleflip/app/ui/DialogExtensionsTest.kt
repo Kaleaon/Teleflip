@@ -5,6 +5,7 @@ import android.app.Dialog
 import android.view.KeyEvent
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ScrollView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -61,6 +62,34 @@ class DialogExtensionsTest {
     }
 
     @Test
+    fun setupDismissKeys_invokesCustomOnDismissOnBackKey() {
+        var customDismissCalled = false
+        val dialog = Dialog(context)
+        dialog.setupDismissKeys { customDismissCalled = true }
+        dialog.show()
+
+        val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)
+        val handled = dialog.dispatchKeyEvent(event)
+
+        assertTrue(handled)
+        assertTrue(customDismissCalled)
+    }
+
+    @Test
+    fun setupDismissKeys_invokesCustomOnDismissOnSoftRightKey() {
+        var customDismissCalled = false
+        val dialog = Dialog(context)
+        dialog.setupDismissKeys { customDismissCalled = true }
+        dialog.show()
+
+        val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SOFT_RIGHT)
+        val handled = dialog.dispatchKeyEvent(event)
+
+        assertTrue(handled)
+        assertTrue(customDismissCalled)
+    }
+
+    @Test
     fun setupDismissKeys_doesNotDismissOnOtherKeys() {
         val dialog = Dialog(context)
         dialog.setupDismissKeys()
@@ -100,6 +129,17 @@ class DialogExtensionsTest {
 
         assertTrue(handled)
         assertFalse(dialog.isShowing)
+    }
+
+    @Test
+    fun diagnosticsDialog_focusesScrollViewOnShow() {
+        val dialog = DiagnosticsDialog(context)
+        dialog.show()
+
+        assertTrue(dialog.isShowing)
+        val scrollView = dialog.findViewById<ScrollView>(R.id.scroll_diag_logs)
+        assertNotNull(scrollView)
+        assertTrue(scrollView.isFocused)
     }
 
     @Test
