@@ -23,10 +23,17 @@ class SymbolsDialog(
             "😊", "😂", "👍", "❤️", "🔥", "🎉", "👏", "🙏",
         )
 
-    private val pageSize = 9
-    private var currentPage = 0
-    private val totalPages: Int
-        get() = (symbols.size + pageSize - 1) / pageSize
+    internal var currentPage: Int = 0
+        internal set
+
+    internal val pageCount: Int
+        get() = totalPages
+
+    internal val totalPages: Int
+        get() = (symbols.size + PAGE_SIZE - 1) / PAGE_SIZE
+
+    internal val visibleSymbols: List<String>
+        get() = getCurrentPageSymbols()
 
     private var softkeyManager: SoftkeyManager? = null
     private var adapter: SymbolAdapter? = null
@@ -42,7 +49,7 @@ class SymbolsDialog(
         rvGrid = findViewById(R.id.rv_symbols_grid)
 
         adapter = SymbolAdapter()
-        rvGrid?.layoutManager = GridLayoutManager(context, 3)
+        rvGrid?.layoutManager = GridLayoutManager(context, COLUMNS)
         rvGrid?.adapter = adapter
 
         val tvLeft = findViewById<TextView>(R.id.tv_softkey_left)
@@ -51,23 +58,29 @@ class SymbolsDialog(
         val softkeyBar = findViewById<View>(R.id.softkey_bar)
 
         if (tvLeft != null && tvCenter != null && tvRight != null) {
-            softkeyManager = SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight)
-            softkeyManager?.update(
-                left = "Page",
-                center = "Select",
-                right = "Back",
-                onLeft = { nextPage() },
-                onCenter = { selectCurrentFocusedSymbol() },
-                onRight = { dismiss() },
-            )
+            softkeyManager =
+                SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight).apply {
+                    update(
+                        left = "Page",
+                        center = "Select",
+                        right = "Back",
+                        onLeft = { nextPage() },
+                        onCenter = { selectCurrentFocusedSymbol() },
+                        onRight = { dismiss() },
+                    )
+                }
         }
 
         updatePageUI()
     }
 
-    private fun getCurrentPageSymbols(): List<String> {
-        val startIndex = currentPage * pageSize
-        val endIndex = minOf(startIndex + pageSize, symbols.size)
+    override fun onBackPressed() {
+        dismiss()
+    }
+
+    internal fun getCurrentPageSymbols(): List<String> {
+        val startIndex = currentPage * PAGE_SIZE
+        val endIndex = minOf(startIndex + PAGE_SIZE, symbols.size)
         return if (startIndex < symbols.size) symbols.subList(startIndex, endIndex) else emptyList()
     }
 
@@ -75,6 +88,7 @@ class SymbolsDialog(
         val currentSymbols = getCurrentPageSymbols()
         tvHeader?.text = "Page ${currentPage + 1}/$totalPages (1-${currentSymbols.size})"
         adapter?.notifyDataSetChanged()
+        rvGrid?.scrollToPosition(0)
         rvGrid?.post {
             rvGrid?.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
         }
@@ -90,24 +104,28 @@ class SymbolsDialog(
         updatePageUI()
     }
 
+    private fun selectSymbol(symbol: String) {
+        dismiss()
+        onSymbolSelected(symbol)
+    }
+
     private fun selectCurrentFocusedSymbol() {
         val currentSymbols = getCurrentPageSymbols()
         if (currentSymbols.isEmpty()) return
 
-        val focusedChild = rvGrid?.focusedChild
-        var selectedIndex = 0
-        if (focusedChild != null) {
-            val pos = rvGrid?.getChildAdapterPosition(focusedChild) ?: RecyclerView.NO_POSITION
-            if (pos != RecyclerView.NO_POSITION && pos in currentSymbols.indices) {
-                selectedIndex = pos
+        val rv = rvGrid
+        val focusedView = rv?.findFocus()
+        if (rv != null && focusedView != null) {
+            val viewHolder = rv.findContainingViewHolder(focusedView)
+            if (viewHolder != null) {
+                val pos = viewHolder.bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION && pos in currentSymbols.indices) {
+                    selectSymbol(currentSymbols[pos])
+                    return
+                }
             }
         }
-        dismiss()
-        onSymbolSelected(currentSymbols[selectedIndex])
-    }
-
-    override fun onBackPressed() {
-        dismiss()
+        selectSymbol(currentSymbols[0])
     }
 
     override fun onKeyDown(
@@ -115,22 +133,26 @@ class SymbolsDialog(
         event: KeyEvent,
     ): Boolean {
         if (keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9) {
+            if (event.repeatCount > 0) return true
             val index = keyCode - KeyEvent.KEYCODE_1
             val currentSymbols = getCurrentPageSymbols()
             if (index in currentSymbols.indices) {
-                dismiss()
-                onSymbolSelected(currentSymbols[index])
+                selectSymbol(currentSymbols[index])
             }
             return true
         }
 
         if (keyCode == KeyEvent.KEYCODE_STAR) {
-            previousPage()
+            if (event.repeatCount == 0) {
+                previousPage()
+            }
             return true
         }
 
         if (keyCode == KeyEvent.KEYCODE_POUND) {
-            nextPage()
+            if (event.repeatCount == 0) {
+                nextPage()
+            }
             return true
         }
 
@@ -162,20 +184,26 @@ class SymbolsDialog(
             val currentSymbols = getCurrentPageSymbols()
             if (position !in currentSymbols.indices) return
             val symbol = currentSymbols[position]
-            holder.tvShortcut.text = "${position + 1}."
+            val shortcutBadge = "${position + 1}."
+            holder.tvShortcut?.text = shortcutBadge
             holder.tvSymbol.text = symbol
-            holder.itemView.contentDescription = "${position + 1}. $symbol"
+            holder.itemView.contentDescription = "$shortcutBadge $symbol"
             holder.itemView.setOnClickListener {
-                dismiss()
-                onSymbolSelected(symbol)
+                selectSymbol(symbol)
             }
         }
 
         override fun getItemCount(): Int = getCurrentPageSymbols().size
 
         inner class SymbolViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            val tvShortcut: TextView = view.findViewById(R.id.tv_symbol_shortcut)
+            val tvShortcut: TextView? = view.findViewById(R.id.tv_symbol_shortcut)
             val tvSymbol: TextView = view.findViewById(R.id.tv_symbol_text)
+            val tvShortcutBadge: TextView? get() = tvShortcut
         }
+    }
+
+    companion object {
+        const val PAGE_SIZE = 9
+        const val COLUMNS = 3
     }
 }
