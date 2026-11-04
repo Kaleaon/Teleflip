@@ -4775,6 +4775,7 @@ class TelegramManager(
         _chats.update { chats -> listOf(model) + chats.filterNot { it.id == model.id } }
         return model
     }
+
     private fun addOrUpdateChat(chat: TdApi.Chat) {
         lastReadOutboxIds[chat.id] = chat.lastReadOutboxMessageId
         val title = chat.title.ifBlank { "Chat #${chat.id}" }
@@ -5055,7 +5056,10 @@ class TelegramManager(
                                 formatting = extractFormatting(newContent),
                                 mediaType = newMediaType,
                                 mediaFileId = newMediaInfo.first,
-                                mediaFilePath = newMediaInfo.second ?: downloadedFilePaths[newMediaInfo.first] ?: old.mediaFilePath.takeIf { old.mediaFileId == newMediaInfo.first },
+                                mediaFilePath =
+                                    newMediaInfo.second
+                                        ?: downloadedFilePaths[newMediaInfo.first]
+                                        ?: old.mediaFilePath.takeIf { old.mediaFileId == newMediaInfo.first },
                                 mediaMimeType = extractMediaMimeType(newContent),
                                 starCount = starCount,
                                 isPaidMediaLocked = isLocked,
@@ -5598,7 +5602,10 @@ class TelegramManager(
         return when (content.constructor) {
             TdApi.MessageText.CONSTRUCTOR -> (content as TdApi.MessageText).text.text
             TdApi.MessagePhoto.CONSTRUCTOR -> "📷 [Photo] " + (content as TdApi.MessagePhoto).caption.text
-            TdApi.MessageContact.CONSTRUCTOR -> (content as TdApi.MessageContact).contact.let { "Contact: ${it.firstName} ${it.lastName}\n${it.phoneNumber}".trim() }
+            TdApi.MessageContact.CONSTRUCTOR -> {
+                val c = (content as TdApi.MessageContact).contact
+                "Contact: ${c.firstName} ${c.lastName}\n${c.phoneNumber}".trim()
+            }
             TdApi.MessageVoiceNote.CONSTRUCTOR -> "🎤 [Voice Note]"
             TdApi.MessageLocation.CONSTRUCTOR -> "📍 [Location]"
             TdApi.MessageAudio.CONSTRUCTOR -> "🎵 [Audio]"

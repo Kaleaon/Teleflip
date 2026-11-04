@@ -1,8 +1,6 @@
 package com.teleflip.app.ui
 
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,6 +9,7 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -120,9 +119,13 @@ class MediaPickerBottomSheetDialog : BottomSheetDialogFragment() {
                     }
                 }
 
-                override fun onTabUnselected(tab: TabLayout.Tab?) {}
+                override fun onTabUnselected(tab: TabLayout.Tab?) {
+                    // No-op
+                }
 
-                override fun onTabReselected(tab: TabLayout.Tab?) {}
+                override fun onTabReselected(tab: TabLayout.Tab?) {
+                    // No-op
+                }
             },
         )
     }
@@ -135,41 +138,27 @@ class MediaPickerBottomSheetDialog : BottomSheetDialogFragment() {
                     displayStickerPackGrid()
                 }
 
-                override fun onTabUnselected(tab: TabLayout.Tab?) {}
+                override fun onTabUnselected(tab: TabLayout.Tab?) {
+                    // No-op
+                }
 
-                override fun onTabReselected(tab: TabLayout.Tab?) {}
+                override fun onTabReselected(tab: TabLayout.Tab?) {
+                    // No-op
+                }
             },
         )
     }
 
     private fun setupGifSearch() {
-        etGifSearch.addTextChangedListener(
-            object : TextWatcher {
-                override fun beforeTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    count: Int,
-                    after: Int,
-                ) {}
-
-                override fun onTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    before: Int,
-                    count: Int,
-                ) {}
-
-                override fun afterTextChanged(s: Editable?) {
-                    val query = s?.toString()?.trim() ?: ""
-                    gifSearchJob?.cancel()
-                    gifSearchJob =
-                        lifecycleScope.launch {
-                            delay(300)
-                            performGifSearch(query)
-                        }
+        etGifSearch.doAfterTextChanged { s ->
+            val query = s?.toString()?.trim() ?: ""
+            gifSearchJob?.cancel()
+            gifSearchJob =
+                lifecycleScope.launch {
+                    delay(GIF_SEARCH_DEBOUNCE_MS)
+                    performGifSearch(query)
                 }
-            },
-        )
+        }
     }
 
     private fun loadStickersTab() {
@@ -203,7 +192,7 @@ class MediaPickerBottomSheetDialog : BottomSheetDialogFragment() {
         }
 
         val pack = installedStickerSets[activeStickerPackIndex]
-        rvMediaGrid.layoutManager = GridLayoutManager(requireContext(), 4)
+        rvMediaGrid.layoutManager = GridLayoutManager(requireContext(), GRID_SPAN_STICKERS)
         rvMediaGrid.adapter =
             StickerGridAdapter(pack.stickers) { item ->
                 telegramManager?.sendSticker(chatId, item.fileId, item.emoji)
@@ -288,12 +277,12 @@ class MediaPickerBottomSheetDialog : BottomSheetDialogFragment() {
         }
 
         tvEmptyState.visibility = View.GONE
-        rvMediaGrid.layoutManager = GridLayoutManager(requireContext(), 2)
+        rvMediaGrid.layoutManager = GridLayoutManager(requireContext(), GRID_SPAN_GIFS)
         rvMediaGrid.adapter =
             GifGridAdapter(gifs) { item ->
                 if (item.queryId != 0L && item.resultId.isNotEmpty()) {
                     telegramManager?.sendInlineQueryResult(chatId, item.queryId, item.resultId)
-                } else if (item.filePath != null || item.fileId > 10) {
+                } else if (item.filePath != null || item.fileId > MIN_ANIMATION_FILE_ID) {
                     telegramManager?.sendSavedAnimation(chatId, item.fileId, item.durationSeconds, item.caption)
                 } else {
                     telegramManager?.sendMessage(chatId, "🎞️ [${item.caption}]")
@@ -318,7 +307,7 @@ class MediaPickerBottomSheetDialog : BottomSheetDialogFragment() {
         pbMediaLoading.visibility = View.GONE
         tvEmptyState.visibility = View.GONE
 
-        rvMediaGrid.layoutManager = GridLayoutManager(requireContext(), 4)
+        rvMediaGrid.layoutManager = GridLayoutManager(requireContext(), GRID_SPAN_EMOJIS)
         rvMediaGrid.adapter =
             SymbolGridAdapter(symbols) { symbol ->
                 telegramManager?.sendStickerEmoji(chatId, symbol)
@@ -460,6 +449,11 @@ class MediaPickerBottomSheetDialog : BottomSheetDialogFragment() {
         private const val TAB_STICKERS = 0
         private const val TAB_GIFS = 1
         private const val TAB_EMOJIS = 2
+        private const val GIF_SEARCH_DEBOUNCE_MS = 300L
+        private const val GRID_SPAN_STICKERS = 4
+        private const val GRID_SPAN_GIFS = 2
+        private const val GRID_SPAN_EMOJIS = 4
+        private const val MIN_ANIMATION_FILE_ID = 10
 
         fun newInstance(chatId: Long): MediaPickerBottomSheetDialog {
             val dialog = MediaPickerBottomSheetDialog()
