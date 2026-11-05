@@ -7,6 +7,7 @@ import com.teleflip.app.model.ChatType
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -106,6 +107,7 @@ class TelegramManagerTest {
         manager.setChatsForTesting(listOf(chat))
         assertEquals(1, manager.chats.value.size)
         assertEquals("Test", manager.chats.value[0].title)
+        assertEquals("Test", manager.chatMap[10L]?.title)
 
         manager.setConnectionStateForTesting("Ready")
         assertEquals("Ready", manager.connectionState.value)
@@ -115,11 +117,92 @@ class TelegramManagerTest {
     }
 
     @Test
+    fun testChatMapDirectLookupAndSynchronization() {
+        val manager = TelegramManager(mockContext)
+        val chat1 = ChatModel(101L, "Chat 1", "Hello", "10:00", 2, ChatType.DIRECT, "C1")
+        val chat2 = ChatModel(102L, "Chat 2", "World", "10:05", 0, ChatType.GROUP, "C2")
+
+        manager.setChatsForTesting(listOf(chat1, chat2))
+
+        assertEquals(2, manager.chatMap.size)
+        assertEquals("Chat 1", manager.chatMap[101L]?.title)
+        assertEquals("Chat 2", manager.chatMap[102L]?.title)
+        assertEquals(manager.chats.value, manager.chatMap.values.toList())
+    }
+
+    @Test
+    fun testToggleChatPinSortsChatMap() {
+        val manager = TelegramManager(mockContext)
+        val chat1 = ChatModel(101L, "Chat 1", "Hello", "10:00", 0, ChatType.DIRECT, "C1", isPinned = false)
+        val chat2 = ChatModel(102L, "Chat 2", "World", "10:05", 0, ChatType.GROUP, "C2", isPinned = false)
+
+        manager.setChatsForTesting(listOf(chat1, chat2))
+
+        manager.toggleChatPin(102L, false)
+
+        val chats = manager.chats.value
+        assertEquals(102L, chats[0].id)
+        assertTrue(chats[0].isPinned)
+        assertEquals(102L, manager.chatMap.keys.first())
+    }
+
+    @Test
+    fun testConcurrentChatMapUpdates() {
+        val manager = TelegramManager(mockContext)
+        val threadCount = 10
+        val operationsPerThread = 100
+        val threads = mutableListOf<Thread>()
+
+        for (t in 0 until threadCount) {
+            val thread =
+                Thread {
+                    for (i in 0 until operationsPerThread) {
+                        val chatId = (t * operationsPerThread + i).toLong()
+                        val chat = ChatModel(chatId, "Chat $chatId", "Message $i", "12:00", 0, ChatType.DIRECT, "C")
+                        synchronized(manager.chatMap) {
+                            manager.chatMap[chatId] = chat
+                        }
+                    }
+                }
+            threads.add(thread)
+            thread.start()
+        }
+
+        threads.forEach { it.join() }
+
+        assertEquals(threadCount * operationsPerThread, manager.chatMap.size)
+        val foundChat = manager.chatMap[(operationsPerThread - 1).toLong()]
+        assertNotNull(foundChat)
+    }
+
+    @Test
     fun testRetryConnectionResetsInFlightQueryState() {
         val manager = TelegramManager(mockContext)
         manager.retryConnection()
 
         assertFalse("retryConnection must reset isAuthQueryInProgress to false", manager.isAuthQueryInProgress)
+    }
+
+    @Test
+    fun testSingletonGetInstanceReturnsSameInstance() {
+        TelegramManager.resetInstance()
+        val instance1 = TelegramManager.getInstance(mockContext)
+        val instance2 = TelegramManager.getInstance(mockContext)
+
+        assertEquals("getInstance must return the identical singleton instance", instance1, instance2)
+        TelegramManager.resetInstance()
+    }
+
+    @Test
+    fun testStopSetsConnectionStateToOffline() {
+        val manager = TelegramManager(mockContext)
+        manager.setConnectionStateForTesting("Connecting...")
+        assertEquals("Connecting...", manager.connectionState.value)
+
+        manager.stop()
+        // Wait briefly for coroutine scope to set Offline
+        Thread.sleep(100)
+        assertEquals("Offline", manager.connectionState.value)
     }
 
     @Test
@@ -186,5 +269,54 @@ class TelegramManagerTest {
         val result = manager.extractStickerInfo(content)
         assertEquals("", result.first)
         assertFalse("Null fullType should safely evaluate isPremium to false", result.second)
+    }
+
+    @Test
+    fun testTdErrorDoesNotForceLoginWhenInitialOrWaitParameters() {
+        val manager = TelegramManager(mockContext)
+        assertEquals(AuthState.Initial, manager.authState.value)
+
+        // Error during initial startup/parameter exchange must not force WaitPhoneNumber
+        manager.onResult(TdApi.Error(400, "Network timeout or transient init error"))
+        assertEquals(
+            "AuthState should remain Initial instead of forcing WaitPhoneNumber",
+            AuthState.Initial,
+            manager.authState.value,
+        )
+
+        manager.setAuthStateForTesting(AuthState.WaitParameters)
+        manager.onResult(TdApi.Error(500, "Database busy"))
+        assertEquals(
+            "AuthState should remain WaitParameters instead of forcing WaitPhoneNumber",
+            AuthState.WaitParameters,
+            manager.authState.value,
+        )
+    }
+
+    @Test
+    fun testAuthStateClosingAndLoggingOutTransitions() {
+        val manager = TelegramManager(mockContext)
+        manager.setAuthStateForTesting(AuthState.Ready)
+
+        manager.onResult(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateClosing()))
+        assertEquals("Ready state should be preserved during closing", AuthState.Ready, manager.authState.value)
+
+        manager.onResult(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateLoggingOut()))
+        assertEquals("Logging out should transition to Initial state", AuthState.Initial, manager.authState.value)
+    }
+
+    @Test
+    fun testAuthStateRegistrationAndEmailTransitions() {
+        val manager = TelegramManager(mockContext)
+
+        manager.onResult(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateWaitRegistration()))
+        assertTrue(manager.authState.value is AuthState.WaitPhoneNumber)
+        val regMsg = (manager.authState.value as AuthState.WaitPhoneNumber).errorMessage
+        assertTrue("Registration error message expected", regMsg?.contains("Registration required") == true)
+
+        manager.onResult(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateWaitEmailAddress()))
+        assertTrue(manager.authState.value is AuthState.WaitPhoneNumber)
+        val emailMsg = (manager.authState.value as AuthState.WaitPhoneNumber).errorMessage
+        assertTrue("Email verification message expected", emailMsg?.contains("Email verification") == true)
     }
 }
