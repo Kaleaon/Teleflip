@@ -278,8 +278,7 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    val emoji = message.stickerEmoji.ifBlank { message.mediaCaption }
-                    tvMedia.text = if (emoji.isNotBlank()) "🎨 [Sticker $emoji]" else "🎨 [Sticker]"
+                    tvMedia.text = StickerEffectDecorator.formatStickerHeader(message)
                 }
                 MediaType.VIDEO -> {
                     ViewCompat.setStateDescription(tvMedia, null)
@@ -333,10 +332,7 @@ class MessageAdapter(
             if (isVisualMedia) {
                 ivPhoto.contentDescription =
                     when (message.mediaType) {
-                        MediaType.STICKER -> {
-                            val emo = message.stickerEmoji.ifBlank { "Sticker" }
-                            "Sticker $emo"
-                        }
+                        MediaType.STICKER -> StickerEffectDecorator.formatStickerContentDescription(message)
                         MediaType.ANIMATION -> "GIF Animation"
                         MediaType.PAID_MEDIA -> {
                             if (message.isPaidMediaLocked) {

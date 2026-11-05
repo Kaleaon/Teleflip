@@ -411,4 +411,26 @@ class SearchDialogTest {
 
         dialog.dismiss()
     }
+
+    @Test
+    fun testDismissCommitsCharacterInSearchDialog() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        assertTrue("Search input should have focus", input.hasFocus())
+
+        val key2Down = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2, 0)
+        dialog.onKeyDown(KeyEvent.KEYCODE_2, key2Down)
+        assertEquals("A", input.text.toString())
+
+        val backEvent = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0)
+        dialog.onKeyDown(KeyEvent.KEYCODE_BACK, backEvent)
+
+        assertEquals("A", input.text.toString())
+    }
 }

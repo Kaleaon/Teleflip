@@ -30,6 +30,9 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
@@ -115,6 +118,39 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    private val photoPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "jpg", "Sending photo…") { id, path, caption ->
+                telegramManager.sendPhoto(id, path, caption)
+            }
+        }
+
+    private val videoPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "mp4", "Sending video…") { id, path, caption ->
+                telegramManager.sendVideo(id, path, 0, caption)
+            }
+        }
+
+    private val documentPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "bin", "Sending file…") { id, path, caption ->
+                telegramManager.sendDocument(id, path, caption)
+            }
+        }
+
+    private val stickerPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "webp", "") { id, path, _ ->
+                telegramManager.sendLocalSticker(id, path)
+            }
+        }
+
+    private val albumPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            receivePhotoAlbum(result.resultCode, result.data)
+        }
+
     internal var currentScreen: Screen = Screen.CHAT_LIST
     internal var activeChat: ChatModel? = null
     internal var pendingTargetChatId: Long = 0L
@@ -186,15 +222,10 @@ class MainActivity : AppCompatActivity() {
     private var tvPasscodeError: TextView? = null
 
     companion object {
-        private const val REQ_PICK_STICKER = 1010
         private const val REQ_CALL_AUDIO_PERM = 1015
         private const val REQ_AUDIO_PERM = 1001
         private const val REQ_LOC_PERM = 1002
         private const val REQ_PHONE_PERM = 1003
-        private const val REQ_PICK_ALBUM = 1016
-        private const val REQ_PICK_PHOTO = 1004
-        private const val REQ_PICK_DOCUMENT = 1005
-        private const val REQ_PICK_VIDEO = 1006
         private const val BYTES_PER_MB = 1024 * 1024L
         private const val MUTE_1_HOUR_SEC = 3600
         private const val MUTE_8_HOURS_SEC = 28800
@@ -220,9 +251,7 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             phonePerms.add(Manifest.permission.READ_PHONE_STATE)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED) {
             phonePerms.add(Manifest.permission.READ_PHONE_NUMBERS)
         }
         if (phonePerms.isNotEmpty()) {
@@ -1655,45 +1684,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val doSend = {
-            commitActiveInputEngines()
-            draftSyncJob?.cancel()
-            draftSyncJob = null
-            val text = etComposeInput?.text?.toString()?.trim() ?: ""
-            val editing = activeEditMessage
-            val replying = activeReplyMessage
-            if (editing != null) {
-                var handled = false
-                if (isCaptionableMedia(editing)) {
-                    telegramManager.editMessageCaption(chat.id, editing.id, text) {
-                        showToast("Caption edited")
-                    }
-                    handled = true
-                } else if (text.isNotEmpty()) {
-                    telegramManager.editMessageText(chat.id, editing.id, text) {
-                        showToast("Message edited")
-                    }
-                    handled = true
-                }
-                if (handled) {
-                    clearReplyOrEditMode()
-                    etComposeInput?.setText("")
-                }
-            } else if (text.isNotEmpty()) {
-                if (replying != null) {
-                    val preview = "${replying.senderName}: ${replying.text.take(35)}"
-                    telegramManager.sendMessage(
-                        chatId = chat.id,
-                        text = text,
-                        replyToMessageId = replying.id,
-                        replyToPreview = preview,
-                    )
-                    clearReplyOrEditMode()
-                    etComposeInput?.setText("")
-                } else {
-                    telegramManager.sendMessage(chat.id, text)
-                    etComposeInput?.setText("")
-                }
-            }
+            dispatchOutboundMessageWithOptions(chat)
         }
 
         btnSend.setOnClickListener { doSend() }
@@ -1745,6 +1736,7 @@ class MainActivity : AppCompatActivity() {
                     right = "Back",
                     onLeft = { showAttachMenu(chat) },
                     onCenter = { doSend() },
+                    onCenterLongClick = { showSendOptionsMenu(chat) },
                     onRight = { showChatListScreen() },
                 )
             } else if (!hasFocus) {
@@ -1765,6 +1757,7 @@ class MainActivity : AppCompatActivity() {
                     etComposeInput?.requestFocus()
                 }
             },
+            onCenterLongClick = { showSendOptionsMenu(chat) },
             onRight = { showChatListScreen() },
         )
 
@@ -2192,15 +2185,8 @@ class MainActivity : AppCompatActivity() {
             center = "Send",
             right = "Back",
             onLeft = { showAttachMenu(chat) },
-            onCenter = {
-                val text = etComposeInput?.text?.toString()?.trim() ?: ""
-                if (text.isNotEmpty()) {
-                    telegramManager.sendMessage(chat.id, text)
-                    etComposeInput?.setText("")
-                } else {
-                    etComposeInput?.requestFocus()
-                }
-            },
+            onCenter = { dispatchOutboundMessageWithOptions(chat) },
+            onCenterLongClick = { showSendOptionsMenu(chat) },
             onRight = { showChatListScreen() },
         )
         etComposeInput?.requestFocus()
@@ -2465,29 +2451,29 @@ class MainActivity : AppCompatActivity() {
         schedulingState: org.drinkless.tdlib.TdApi.MessageSchedulingState? = null,
     ) {
         commitActiveInputEngines()
+        draftSyncJob?.cancel()
+        draftSyncJob = null
         val text = etComposeInput?.text?.toString()?.trim() ?: ""
         val editing = activeEditMessage
         val replying = activeReplyMessage
+        if (text.isEmpty() && (editing == null || !isCaptionableMedia(editing))) {
+            showToast("Please enter a message first")
+            etComposeInput?.requestFocus()
+            return
+        }
         if (editing != null) {
             if (isCaptionableMedia(editing)) {
                 telegramManager.editMessageCaption(chat.id, editing.id, text) {
                     showToast("Caption edited")
                 }
-            } else if (text.isNotEmpty()) {
+            } else {
                 telegramManager.editMessageText(chat.id, editing.id, text) {
                     showToast("Message edited")
                 }
-            } else {
-                showToast("Please enter a message first")
-                return
             }
             clearReplyOrEditMode()
             etComposeInput?.setText("")
         } else if (replying != null) {
-            if (text.isEmpty()) {
-                showToast("Please enter a message first")
-                return
-            }
             val preview = "${replying.senderName}: ${replying.text.take(35)}"
             telegramManager.sendMessage(
                 chatId = chat.id,
@@ -2500,10 +2486,6 @@ class MainActivity : AppCompatActivity() {
             clearReplyOrEditMode()
             etComposeInput?.setText("")
         } else {
-            if (text.isEmpty()) {
-                showToast("Please enter a message first")
-                return
-            }
             telegramManager.sendMessage(
                 chatId = chat.id,
                 text = text,
@@ -2640,7 +2622,7 @@ class MainActivity : AppCompatActivity() {
                             type = "video/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }
-                    startActivityForResult(intent, REQ_PICK_VIDEO)
+                    videoPickerLauncher.launch(intent)
                 } catch (e: Exception) {
                     showToast("System video picker unavailable", isError = true)
                 }
@@ -2883,39 +2865,46 @@ class MainActivity : AppCompatActivity() {
             .setMessage("Fetch all previous messages and media for \"${chat.title}\" directly from Telegram cloud servers?")
             .setPositiveButton("Import All") { dialog, _ ->
                 dialog.dismiss()
-                val progressDialog = ChatExportProgressDialog(this) {}
-                progressDialog.show()
-                lifecycleScope.launch {
-                    try {
-                        val result =
-                            telegramManager.importChatHistoryFromCloud(
-                                chatId = chat.id,
-                                autoDownloadMedia = true,
-                                onProgress = { loadedMsgs, queuedMedia ->
-                                    progressDialog.updateProgress(
-                                        ChatExportProgress(
-                                            stage = ExportStage.FETCHING_CLOUD_HISTORY,
-                                            messagesProcessed = loadedMsgs,
-                                            totalMessages = loadedMsgs,
-                                            mediaDownloaded = queuedMedia,
-                                            totalMedia = queuedMedia,
-                                            statusText = "Imported $loadedMsgs messages ($queuedMedia media queued)...",
-                                        ),
-                                    )
-                                },
-                            )
-                        progressDialog.dismiss()
-                        showToast("✅ Imported ${result.first} messages from cloud (${result.second} media syncing)")
-                        val updated = telegramManager.messages.value[chat.id] ?: emptyList()
-                        messageAdapter?.submitList(updated)
-                        if (updated.isNotEmpty()) {
-                            rvMessages?.scrollToPosition(updated.size - 1)
-                        }
-                    } catch (e: Exception) {
-                        progressDialog.dismiss()
-                        showToast("Failed to import history: ${e.message}")
+                var importJob: Job? = null
+                val progressDialog =
+                    ChatExportProgressDialog(this) {
+                        importJob?.cancel()
                     }
-                }
+                progressDialog.show()
+                importJob =
+                    lifecycleScope.launch {
+                        try {
+                            val result =
+                                telegramManager.importChatHistoryFromCloud(
+                                    chatId = chat.id,
+                                    autoDownloadMedia = true,
+                                    onProgress = { loadedMsgs, queuedMedia ->
+                                        progressDialog.updateProgress(
+                                            ChatExportProgress(
+                                                stage = ExportStage.FETCHING_CLOUD_HISTORY,
+                                                messagesProcessed = loadedMsgs,
+                                                totalMessages = loadedMsgs,
+                                                mediaDownloaded = queuedMedia,
+                                                totalMedia = queuedMedia,
+                                                statusText = "Imported $loadedMsgs messages ($queuedMedia media queued)...",
+                                            ),
+                                        )
+                                    },
+                                )
+                            progressDialog.dismiss()
+                            showToast("✅ Imported ${result.first} messages from cloud (${result.second} media syncing)")
+                            val updated = telegramManager.messages.value[chat.id] ?: emptyList()
+                            messageAdapter?.submitList(updated)
+                            if (updated.isNotEmpty()) {
+                                rvMessages?.scrollToPosition(updated.size - 1)
+                            }
+                        } catch (e: Exception) {
+                            progressDialog.dismiss()
+                            if (e !is kotlinx.coroutines.CancellationException) {
+                                showToast("Failed to import history: ${e.message}")
+                            }
+                        }
+                    }
             }
             .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
             .show()
@@ -3723,16 +3712,11 @@ class MainActivity : AppCompatActivity() {
                             type = if (isPhoto) "image/*" else "*/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }
-                    startActivityForResult(
-                        intent,
-                        if (isSticker) {
-                            REQ_PICK_STICKER
-                        } else if (isPhoto) {
-                            REQ_PICK_PHOTO
-                        } else {
-                            REQ_PICK_DOCUMENT
-                        },
-                    )
+                    when {
+                        isSticker -> stickerPickerLauncher.launch(intent)
+                        isPhoto -> photoPickerLauncher.launch(intent)
+                        else -> documentPickerLauncher.launch(intent)
+                    }
                 } catch (e: Exception) {
                     showToast("System file picker unavailable on this device", isError = true)
                 }
@@ -4753,12 +4737,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hasTelephonyPermission(): Boolean {
         val hasPhoneState = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
-        val hasPhoneNumbers =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                false
-            }
+        val hasPhoneNumbers = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED
         return hasPhoneState || hasPhoneNumbers
     }
 
@@ -6045,7 +6024,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @Deprecated("Deprecated in Java")
     private fun pickPhotoAlbum(chat: ChatModel) {
         commitActiveInputEngines()
         val intent =
@@ -6058,7 +6036,7 @@ class MainActivity : AppCompatActivity() {
         pendingAlbumCaption = etComposeInput?.text?.toString().orEmpty()
         pendingAlbumReplyId = activeReplyMessage?.id ?: 0
         try {
-            startActivityForResult(intent, REQ_PICK_ALBUM)
+            albumPickerLauncher.launch(intent)
         } catch (_: android.content.ActivityNotFoundException) {
             pendingAlbumChatId = null
             showToast("No image picker is installed", true)
@@ -6118,28 +6096,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onActivityResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?,
+    private fun handlePickerResult(
+        result: ActivityResult,
+        ext: String,
+        successToast: String,
+        sendAction: (chatId: Long, path: String, caption: String) -> Unit,
     ) {
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_PICK_ALBUM) {
-            receivePhotoAlbum(resultCode, data)
-            return
-        }
-        if (resultCode != RESULT_OK || data?.data == null) return
-        val uri = data.data ?: return
+        if (result.resultCode != RESULT_OK || result.data?.data == null) return
+        val uri = result.data?.data ?: return
         val chat = activeChat ?: return
         try {
-            val ext =
-                when (requestCode) {
-                    REQ_PICK_STICKER -> "webp"
-                    REQ_PICK_PHOTO -> "jpg"
-                    REQ_PICK_VIDEO -> "mp4"
-                    else -> "bin"
-                }
             val tempFile = File(cacheDir, "upload_${System.currentTimeMillis()}.$ext")
             contentResolver.openInputStream(uri)?.use { input ->
                 tempFile.outputStream().use { output ->
@@ -6148,22 +6114,9 @@ class MainActivity : AppCompatActivity() {
             }
             if (tempFile.exists() && tempFile.length() > 0L) {
                 val caption = etComposeInput?.text?.toString()?.trim().orEmpty()
-                when (requestCode) {
-                    REQ_PICK_STICKER -> {
-                        telegramManager.sendLocalSticker(chat.id, tempFile.absolutePath)
-                    }
-                    REQ_PICK_PHOTO -> {
-                        telegramManager.sendPhoto(chat.id, tempFile.absolutePath, caption)
-                        showToast("Sending photo…")
-                    }
-                    REQ_PICK_VIDEO -> {
-                        telegramManager.sendVideo(chat.id, tempFile.absolutePath, 0, caption)
-                        showToast("Sending video…")
-                    }
-                    else -> {
-                        telegramManager.sendDocument(chat.id, tempFile.absolutePath, caption)
-                        showToast("Sending file…")
-                    }
+                sendAction(chat.id, tempFile.absolutePath, caption)
+                if (successToast.isNotEmpty()) {
+                    showToast(successToast)
                 }
                 if (caption.isNotEmpty()) {
                     etComposeInput?.setText("")
@@ -6200,9 +6153,5 @@ class MainActivity : AppCompatActivity() {
                 showLoginScreen(telegramManager.authState.value)
             }
         }
-    }
-
-    override fun onBackPressed() {
-        super.onBackPressed()
     }
 }
