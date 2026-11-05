@@ -8,6 +8,7 @@
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (SoftkeyUtils.isSoftRightKey(keyCode)) { if (softkeyManager.handleKeyEvent(keyCode, event)) return true }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_DPAD_UP) { if (vh != null) { val pos = vh.adapterPosition if (pos &gt; 0) { focusChatAt(pos - 1) return true } else if (pos == 0) { focusSelectedTabView() return true } } }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_ENDCALL &amp;&amp; event.action == KeyEvent.ACTION_DOWN) { if (telegramManager.hasOngoingCall) { telegramManager.endCurrentCall() return true } }</ID>
+    <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (requestCode == REQ_PHONE_PERM &amp;&amp; grantResults.isNotEmpty() &amp;&amp; grantResults[0] == PackageManager.PERMISSION_GRANTED) { if (currentScreen == Screen.LOGIN) { showLoginScreen(telegramManager.authState.value) } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) { if ((rvResults.adapter?.itemCount ?: 0) &gt; 0) { focusResultAt(0) return true } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog.&lt;no name provided&gt;$if (!isMessageLoading &amp;&amp; messageNextOffset.isNotEmpty() &amp;&amp; totalItemCount &lt; maxResultsLimit) { if (visibleItemCount + firstVisibleItem &gt;= totalItemCount - 2) { loadMoreMessageResults() } }</ID>
     <ID>ComplexCondition:BootReceiver.kt$BootReceiver$action == Intent.ACTION_BOOT_COMPLETED || action == "android.intent.action.QUICKBOOT_POWERON" || action == "com.htc.intent.action.QUICKBOOT_POWERON" || action == Intent.ACTION_MY_PACKAGE_REPLACED</ID>
@@ -402,6 +403,7 @@
     <ID>TooManyFunctions:ProxyStorage.kt$ProxyStorage</ID>
     <ID>TooManyFunctions:StorageManager.kt$StorageManager</ID>
     <ID>TooManyFunctions:TelegramManager.kt$TelegramManager : ResultHandler</ID>
+    <ID>UnusedImports:PollDialogTest.kt$import org.junit.Assert.assertFalse</ID>
     <ID>UnusedParameter:TelegramManager.kt$TelegramManager$replyToPreview: String = ""</ID>
     <ID>UnusedPrivateProperty:AdbReporter.kt$AdbReporter$signal</ID>
     <ID>UnusedPrivateProperty:ChatExportDialog.kt$ChatExportDialog$private val chatId: Long</ID>
