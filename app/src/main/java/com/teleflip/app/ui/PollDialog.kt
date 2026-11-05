@@ -3,6 +3,7 @@ package com.teleflip.app.ui
 import android.content.Context
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -16,6 +17,7 @@ class PollDialog(
 ) : BaseDialog(context) {
     private val engines = mutableMapOf<Int, KeypadInputEngine>()
     private var isAnonymous = true
+    private lateinit var softkeyManager: SoftkeyManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +32,40 @@ class PollDialog(
         val btnAnon = findViewById<Button>(R.id.btn_poll_anonymous_toggle)
         val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
         val btnCancel = findViewById<Button>(R.id.btn_poll_cancel)
+
+        val tvSoftLeft = findViewById<TextView>(R.id.tv_softkey_left)
+        val tvSoftCenter = findViewById<TextView>(R.id.tv_softkey_center)
+        val tvSoftRight = findViewById<TextView>(R.id.tv_softkey_right)
+        val softkeyBar = findViewById<View>(R.id.softkey_bar)
+
+        if (tvSoftLeft != null && tvSoftCenter != null && tvSoftRight != null) {
+            softkeyManager = SoftkeyManager(softkeyBar, tvSoftLeft, tvSoftCenter, tvSoftRight)
+            softkeyManager.update(
+                left = "Clear",
+                center = "Submit",
+                right = "Cancel",
+                onLeft = {
+                    val focusedEdit = currentFocus as? EditText
+                    if (focusedEdit != null) {
+                        engines[focusedEdit.id]?.commitCurrentChar()
+                        focusedEdit.setText("")
+                    }
+                },
+                onCenter = {
+                    engines.values.forEach { it.commitCurrentChar() }
+                    val current = currentFocus
+                    if (current is Button) {
+                        current.performClick()
+                    } else {
+                        btnSubmit?.performClick()
+                    }
+                },
+                onRight = {
+                    engines.values.forEach { it.commitCurrentChar() }
+                    dismiss()
+                },
+            )
+        }
 
         listOfNotNull(etQuestion, etOpt1, etOpt2, etOpt3).forEach { field ->
             engines[field.id] =
@@ -81,31 +117,57 @@ class PollDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        if (::softkeyManager.isInitialized && softkeyManager.handleKeyEvent(keyCode, event)) {
+            return true
+        }
+
         if (isBackOrRightSoftKey(keyCode)) {
             engines.values.forEach { it.commitCurrentChar() }
             dismiss()
             return true
         }
 
+        if (isDpadNavigationKey(keyCode)) {
+            engines.values.forEach { it.commitCurrentChar() }
+        }
+
         val focusedEdit = currentFocus as? EditText
-        if (focusedEdit != null) {
-            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
-                engines[focusedEdit.id]?.commitCurrentChar()
-                focusedEdit.setText("")
-                return true
-            }
-            val isInputKey =
-                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
-                    keyCode == KeyEvent.KEYCODE_STAR ||
-                    keyCode == KeyEvent.KEYCODE_POUND ||
-                    keyCode == KeyEvent.KEYCODE_DEL ||
-                    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-            if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
-                return true
-            }
-            engines[focusedEdit.id]?.commitCurrentChar()
+        if (focusedEdit != null && handleFocusedEditKey(focusedEdit, keyCode, event)) {
+            return true
         }
 
         return super.onKeyDown(keyCode, event)
+    }
+
+    private fun isDpadNavigationKey(keyCode: Int): Boolean =
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT -> true
+            else -> false
+        }
+
+    private fun handleFocusedEditKey(
+        focusedEdit: EditText,
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+            engines[focusedEdit.id]?.commitCurrentChar()
+            focusedEdit.setText("")
+            return true
+        }
+        val isInputKey =
+            (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                keyCode == KeyEvent.KEYCODE_STAR ||
+                keyCode == KeyEvent.KEYCODE_POUND ||
+                keyCode == KeyEvent.KEYCODE_DEL ||
+                keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+        val handled = isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true
+        if (!handled) {
+            engines[focusedEdit.id]?.commitCurrentChar()
+        }
+        return handled
     }
 }
