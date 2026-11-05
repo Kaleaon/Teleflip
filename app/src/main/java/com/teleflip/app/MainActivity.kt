@@ -215,6 +215,7 @@ class MainActivity : AppCompatActivity() {
     // Login State
     private var etLoginInput: EditText? = null
     private var loginInputEngine: KeypadInputEngine? = null
+    private var qrGenerationJob: Job? = null
 
     // Passcode Lock State
     internal var passcodeEntry: String = ""
@@ -4366,6 +4367,8 @@ class MainActivity : AppCompatActivity() {
         btnForgotPassword?.visibility = View.GONE
         btnResetAccount?.visibility = View.GONE
 
+        qrGenerationJob?.cancel()
+
         when (state) {
             is AuthState.WaitPhoneNumber -> {
                 layoutInputContainer?.visibility = View.VISIBLE
@@ -4421,10 +4424,13 @@ class MainActivity : AppCompatActivity() {
                 btnUseSim?.visibility = View.GONE
                 btnQrLogin?.visibility = View.GONE
 
-                val qrBitmap = com.teleflip.app.ui.QrCodeGenerator.generateQrCodeBitmap(state.link)
-                if (qrBitmap != null) {
-                    ivQrCode?.setImageBitmap(qrBitmap)
-                }
+                qrGenerationJob =
+                    lifecycleScope.launch {
+                        val qrBitmap = com.teleflip.app.ui.QrCodeGenerator.generateQrCodeBitmapAsync(state.link)
+                        if (qrBitmap != null) {
+                            ivQrCode?.setImageBitmap(qrBitmap)
+                        }
+                    }
 
                 if (state.errorMessage != null) {
                     val errorMessage = "⚠️ Error: ${state.errorMessage}"
