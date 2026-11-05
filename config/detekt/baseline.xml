@@ -64,7 +64,6 @@
     <ID>CyclomaticComplexMethod:NewChatDialog.kt$NewChatDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:StorageManager.kt$StorageManager$private fun performSdCardDetection(context: Context): File?</ID>
-    <ID>CyclomaticComplexMethod:SymbolsDialog.kt$SymbolsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:TelegramFeatureMenus.kt$TelegramFeatureMenus$fun buttons(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun fetchCustomEmojiStickers(onResult: (List&lt;StickerItem&gt;) -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
@@ -319,7 +318,6 @@
     <ID>NestedBlockDepth:MainActivity.kt$MainActivity$override fun dispatchKeyEvent(event: KeyEvent): Boolean</ID>
     <ID>NestedBlockDepth:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>NestedBlockDepth:StorageManager.kt$StorageManager$private fun performSdCardDetection(context: Context): File?</ID>
-    <ID>NestedBlockDepth:SymbolsDialog.kt$SymbolsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:AdbReporter.kt$AdbReporter$private fun readTailLines( file: File, maxLines: Int, ): List&lt;String&gt;</ID>
     <ID>ReturnCount:ChatExportDialog.kt$ChatExportDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:KeypadInputEngine.kt$KeypadInputEngine$fun handleKeyEvent( keyCode: Int, event: KeyEvent, ): Boolean</ID>
@@ -400,7 +398,6 @@
     <ID>TooManyFunctions:ProxyStorage.kt$ProxyStorage</ID>
     <ID>TooManyFunctions:StorageManager.kt$StorageManager</ID>
     <ID>TooManyFunctions:TelegramManager.kt$TelegramManager : ResultHandler</ID>
-    <ID>UnusedImports:PollDialogTest.kt$import org.junit.Assert.assertFalse</ID>
     <ID>UnusedParameter:TelegramManager.kt$TelegramManager$replyToPreview: String = ""</ID>
     <ID>UnusedPrivateProperty:AdbReporter.kt$AdbReporter$signal</ID>
     <ID>UnusedPrivateProperty:ChatExportDialog.kt$ChatExportDialog$private val chatId: Long</ID>
