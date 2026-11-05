@@ -172,49 +172,6 @@
 
     </FrameLayout>
 
-    <!-- Bottom Softkey Bar -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="@color/bg_dark_card">
-
-        <TextView
-            android:id="@+id/tv_search_softkey_left"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="start|center_vertical"
-            android:paddingStart="12dp"
-            android:text="Clear"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tv_search_softkey_center"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="Select"
-            android:textColor="@color/focus_highlight_gold"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tv_search_softkey_right"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="end|center_vertical"
-            android:paddingEnd="12dp"
-            android:text="Back"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-    </LinearLayout>
+    <include layout="@layout/layout_softkeys" />
 
 </LinearLayout>

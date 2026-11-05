@@ -248,6 +248,14 @@ class ProxySettingsDialog(
             engines.values.forEach { it.commitCurrentChar() }
             dismiss()
         }
+
+        setupSoftkeys(
+            left = "",
+            center = "Save",
+            right = "Close",
+            onCenter = { btnSaveEnable?.performClick() },
+            onRight = { dismiss() },
+        )
     }
 
     override fun dismiss() {
