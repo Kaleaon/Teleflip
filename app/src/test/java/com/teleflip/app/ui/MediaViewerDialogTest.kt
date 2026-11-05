@@ -79,6 +79,17 @@ class MediaViewerDialogTest {
     }
 
     @Test
+    fun unlockedPaidVideoUsesKeypadVideoControls() {
+        val message = samplePhotoMessage.copy(mediaType = MediaType.PAID_MEDIA, mediaFilePath = null, isPaidMediaLocked = false, mediaMimeType = "video/mp4")
+        val dialog = MediaViewerDialog(context, message, {}, {})
+        dialog.show()
+        assertTrue(dialog.findViewById<TextView>(R.id.tv_viewer_controls_hint)!!.text.contains("Play/Pause"))
+        dialog.onKeyDown(KeyEvent.KEYCODE_3, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_3))
+        assertEquals(1.25f, dialog.playbackSpeed)
+        dialog.dismiss()
+    }
+
+    @Test
     fun panBy_returnsFalseWhenUnzoomed_andTrueWhenZoomedIn() {
         val dialog = MediaViewerDialog(context, samplePhotoMessage, {}, {})
         dialog.show()
@@ -411,5 +422,110 @@ class MediaViewerDialogTest {
 
         shadowOf(android.os.Looper.getMainLooper()).idle()
         // Should close cleanly without crashing or updating dismissed views
+    }
+
+    @Test
+    fun openViewerUsesDownloadedPathWithoutBeingReopened() {
+        val pending = samplePhotoMessage.copy(mediaFileId = 7, mediaFilePath = null)
+        val updates = kotlinx.coroutines.flow.MutableStateFlow(mapOf(100L to listOf(pending)))
+        var saved: MessageModel? = null
+        var downloadRequests = 0
+        val dialog = MediaViewerDialog(context, pending, { saved = it }, { downloadRequests++ }, updates)
+        dialog.show()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        updates.value = mapOf(100L to listOf(pending.copy(mediaFilePath = samplePhotoFile.absolutePath)))
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        dialog.onKeyDown(KeyEvent.KEYCODE_1, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_1))
+        assertEquals(samplePhotoFile.absolutePath, saved?.mediaFilePath)
+        assertEquals(1, downloadRequests)
+        dialog.dismiss()
+    }
+
+    @Test
+    fun webmStickerUsesVideoDownloadPath() {
+        val pending = samplePhotoMessage.copy(mediaType = MediaType.STICKER, mediaFileId = 7, mediaFilePath = null, stickerFormat = "webm")
+        val dialog = MediaViewerDialog(context, pending, {}, {})
+        dialog.show()
+        val status = dialog.findViewById<TextView>(R.id.tv_viewer_status)
+        assertTrue(status.text.toString().contains("video/GIF"))
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testFooterActionButtonsExistAndAreFocusable() {
+        val dialog = MediaViewerDialog(context, samplePhotoMessage, {}, {})
+        dialog.show()
+
+        val btnZoomIn = dialog.findViewById<View>(R.id.btn_zoom_in)
+        val btnZoomOut = dialog.findViewById<View>(R.id.btn_zoom_out)
+        val btnPanLeft = dialog.findViewById<View>(R.id.btn_pan_left)
+        val btnPanRight = dialog.findViewById<View>(R.id.btn_pan_right)
+        val btnReset = dialog.findViewById<View>(R.id.btn_reset)
+        val btnSave = dialog.findViewById<View>(R.id.btn_save)
+
+        assertNotNull(btnZoomIn)
+        assertNotNull(btnZoomOut)
+        assertNotNull(btnPanLeft)
+        assertNotNull(btnPanRight)
+        assertNotNull(btnReset)
+        assertNotNull(btnSave)
+
+        assertTrue(btnZoomIn.isFocusable)
+        assertTrue(btnZoomOut.isFocusable)
+        assertTrue(btnPanLeft.isFocusable)
+        assertTrue(btnPanRight.isFocusable)
+        assertTrue(btnReset.isFocusable)
+        assertTrue(btnSave.isFocusable)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testFooterActionButtonsPerformZoomPanResetSave() {
+        var savedMessage: MessageModel? = null
+        val dialog = MediaViewerDialog(context, samplePhotoMessage, { savedMessage = it }, {})
+        dialog.show()
+
+        val btnZoomIn = dialog.findViewById<View>(R.id.btn_zoom_in)
+        val btnZoomOut = dialog.findViewById<View>(R.id.btn_zoom_out)
+        val btnPanLeft = dialog.findViewById<View>(R.id.btn_pan_left)
+        val btnPanRight = dialog.findViewById<View>(R.id.btn_pan_right)
+        val btnReset = dialog.findViewById<View>(R.id.btn_reset)
+        val btnSave = dialog.findViewById<View>(R.id.btn_save)
+
+        // Initial state
+        assertEquals(1.0f, dialog.zoomLevel)
+        assertEquals(0f, dialog.panX)
+
+        // Click Zoom In
+        btnZoomIn.performClick()
+        assertEquals(1.5f, dialog.zoomLevel)
+
+        // Click Pan Left
+        btnPanLeft.performClick()
+        assertEquals(48f, dialog.panX)
+
+        // Click Pan Right
+        btnPanRight.performClick()
+        assertEquals(0f, dialog.panX)
+
+        // Click Reset
+        btnPanLeft.performClick()
+        assertEquals(48f, dialog.panX)
+        btnReset.performClick()
+        assertEquals(1.0f, dialog.zoomLevel)
+        assertEquals(0f, dialog.panX)
+
+        // Click Zoom Out
+        btnZoomIn.performClick()
+        assertEquals(1.5f, dialog.zoomLevel)
+        btnZoomOut.performClick()
+        assertEquals(1.0f, dialog.zoomLevel)
+
+        // Click Save
+        btnSave.performClick()
+        assertEquals(samplePhotoMessage.id, savedMessage?.id)
+
+        dialog.dismiss()
     }
 }
