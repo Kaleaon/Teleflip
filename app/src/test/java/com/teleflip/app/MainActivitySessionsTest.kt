@@ -1,9 +1,6 @@
 package com.teleflip.app
 
-import android.content.Context
-import android.widget.Button
 import androidx.appcompat.app.AlertDialog
-import com.teleflip.app.model.SessionModel
 import com.teleflip.app.telegram.TelegramManager
 import com.teleflip.app.ui.OptionsMenuDialog
 import org.drinkless.tdlib.Client
@@ -51,34 +48,38 @@ class MainActivitySessionsTest {
         val handlerCaptor = ArgumentCaptor.forClass(Client.ResultHandler::class.java)
         verify(mockClient, timeout(1000)).send(functionCaptor.capture(), handlerCaptor.capture())
 
-        val session1 = TdApi.Session().apply {
-            id = 101L
-            isCurrent = true
-            deviceModel = "Linux"
-            platform = "Android"
-            systemVersion = "14.0"
-            applicationName = "Teleflip"
-            applicationVersion = "1.0"
-            lastActiveDate = 1700000
-            ipAddress = "127.0.0.1"
-            location = "US"
-        }
-        val session2 = TdApi.Session().apply {
-            id = 102L
-            isCurrent = false
-            deviceModel = "MacBook Pro"
-            platform = "macOS"
-            systemVersion = "14.2"
-            applicationName = "Teleflip Mac"
-            applicationVersion = "2.0"
-            lastActiveDate = 1690000
-            ipAddress = "192.168.1.50"
-            location = "US"
-        }
+        val session1 =
+            TdApi.Session().apply {
+                id = 101L
+                isCurrent = true
+                deviceModel = "Linux"
+                platform = "Android"
+                systemVersion = "14.0"
+                applicationName = "Teleflip"
+                applicationVersion = "1.0"
+                lastActiveDate = 1700000
+                ipAddress = "127.0.0.1"
+                location = "US"
+            }
+        val session2 =
+            TdApi.Session().apply {
+                id = 102L
+                isCurrent = false
+                deviceModel = "MacBook Pro"
+                platform = "macOS"
+                systemVersion = "14.2"
+                applicationName = "Teleflip Mac"
+                applicationVersion = "2.0"
+                lastActiveDate = 1690000
+                ipAddress = "192.168.1.50"
+                location = "US"
+            }
 
-        handlerCaptor.value.onResult(TdApi.Sessions().apply {
-            sessions = arrayOf(session1, session2)
-        })
+        handlerCaptor.value.onResult(
+            TdApi.Sessions().apply {
+                sessions = arrayOf(session1, session2)
+            },
+        )
         ShadowLooper.idleMainLooper()
 
         val latestDialog = ShadowAlertDialog.getLatestDialog()
@@ -110,34 +111,38 @@ class MainActivitySessionsTest {
         val handlerCaptor = ArgumentCaptor.forClass(Client.ResultHandler::class.java)
         verify(mockClient, timeout(1000)).send(functionCaptor.capture(), handlerCaptor.capture())
 
-        val session1 = TdApi.Session().apply {
-            id = 101L
-            isCurrent = true
-            deviceModel = "Linux"
-            platform = "Android"
-            systemVersion = "14.0"
-            applicationName = "Teleflip"
-            applicationVersion = "1.0"
-            lastActiveDate = 1700000
-            ipAddress = "127.0.0.1"
-            location = "US"
-        }
-        val session2 = TdApi.Session().apply {
-            id = 102L
-            isCurrent = false
-            deviceModel = "MacBook Pro"
-            platform = "macOS"
-            systemVersion = "14.2"
-            applicationName = "Teleflip Mac"
-            applicationVersion = "2.0"
-            lastActiveDate = 1690000
-            ipAddress = "192.168.1.50"
-            location = "US"
-        }
+        val session1 =
+            TdApi.Session().apply {
+                id = 101L
+                isCurrent = true
+                deviceModel = "Linux"
+                platform = "Android"
+                systemVersion = "14.0"
+                applicationName = "Teleflip"
+                applicationVersion = "1.0"
+                lastActiveDate = 1700000
+                ipAddress = "127.0.0.1"
+                location = "US"
+            }
+        val session2 =
+            TdApi.Session().apply {
+                id = 102L
+                isCurrent = false
+                deviceModel = "MacBook Pro"
+                platform = "macOS"
+                systemVersion = "14.2"
+                applicationName = "Teleflip Mac"
+                applicationVersion = "2.0"
+                lastActiveDate = 1690000
+                ipAddress = "192.168.1.50"
+                location = "US"
+            }
 
-        handlerCaptor.value.onResult(TdApi.Sessions().apply {
-            sessions = arrayOf(session1, session2)
-        })
+        handlerCaptor.value.onResult(
+            TdApi.Sessions().apply {
+                sessions = arrayOf(session1, session2)
+            },
+        )
         ShadowLooper.idleMainLooper()
 
         val optionsDialog = ShadowAlertDialog.getLatestDialog() as OptionsMenuDialog

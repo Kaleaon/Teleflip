@@ -155,33 +155,36 @@ class TelegramSessionTest {
 
         assertTrue(functionCaptor.value is TdApi.GetActiveSessions)
 
-        val session1 = TdApi.Session().apply {
-            id = 101L
-            isCurrent = true
-            deviceModel = "Linux"
-            platform = "Android"
-            systemVersion = "14.0"
-            applicationName = "Teleflip"
-            applicationVersion = "1.0"
-            lastActiveDate = 1700000
-            ipAddress = "127.0.0.1"
-            location = "US"
-        }
-        val session2 = TdApi.Session().apply {
-            id = 102L
-            isCurrent = false
-            deviceModel = "Windows"
-            platform = "Desktop"
-            systemVersion = "11.0"
-            applicationName = "Teleflip Desktop"
-            applicationVersion = "1.0"
-            lastActiveDate = 1690000
-            ipAddress = "192.168.1.1"
-            location = "US"
-        }
-        val sessionsResponse = TdApi.Sessions().apply {
-            sessions = arrayOf(session1, session2)
-        }
+        val session1 =
+            TdApi.Session().apply {
+                id = 101L
+                isCurrent = true
+                deviceModel = "Linux"
+                platform = "Android"
+                systemVersion = "14.0"
+                applicationName = "Teleflip"
+                applicationVersion = "1.0"
+                lastActiveDate = 1700000
+                ipAddress = "127.0.0.1"
+                location = "US"
+            }
+        val session2 =
+            TdApi.Session().apply {
+                id = 102L
+                isCurrent = false
+                deviceModel = "Windows"
+                platform = "Desktop"
+                systemVersion = "11.0"
+                applicationName = "Teleflip Desktop"
+                applicationVersion = "1.0"
+                lastActiveDate = 1690000
+                ipAddress = "192.168.1.1"
+                location = "US"
+            }
+        val sessionsResponse =
+            TdApi.Sessions().apply {
+                sessions = arrayOf(session1, session2)
+            }
 
         handlerCaptor.value.onResult(sessionsResponse)
         ShadowLooper.idleMainLooper()
