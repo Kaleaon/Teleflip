@@ -425,6 +425,52 @@ class MediaViewerDialogTest {
     }
 
     @Test
+    fun testOnScreenControlButtonsInPhotoMode() {
+        var savedMessage: MessageModel? = null
+        val dialog = MediaViewerDialog(context, samplePhotoMessage, { savedMessage = it }, {})
+        dialog.show()
+
+        val btnZoomIn = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_zoom_in)
+        val btnZoomOut = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_zoom_out)
+        val btnReset = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_reset)
+        val btnSave = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_save)
+
+        val btnPlayPause = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_play_pause)
+        val btnSpeed = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_speed)
+
+        assertNotNull(btnZoomIn)
+        assertNotNull(btnZoomOut)
+        assertNotNull(btnReset)
+        assertNotNull(btnSave)
+
+        assertEquals(View.VISIBLE, btnZoomIn.visibility)
+        assertEquals(View.VISIBLE, btnZoomOut.visibility)
+        assertEquals(View.VISIBLE, btnReset.visibility)
+        assertEquals(View.VISIBLE, btnSave.visibility)
+
+        assertEquals(View.GONE, btnPlayPause.visibility)
+        assertEquals(View.GONE, btnSpeed.visibility)
+
+        assertTrue("btnZoomIn should be focusable", btnZoomIn.isFocusable)
+        assertTrue("btnSave should be focusable", btnSave.isFocusable)
+
+        // Click Zoom In button
+        assertEquals(1.0f, dialog.zoomLevel)
+        btnZoomIn.performClick()
+        assertTrue(dialog.zoomLevel > 1.0f)
+
+        // Click Reset button
+        btnReset.performClick()
+        assertEquals(1.0f, dialog.zoomLevel)
+
+        // Click Save button
+        btnSave.performClick()
+        assertEquals(samplePhotoMessage.id, savedMessage?.id)
+
+        dialog.dismiss()
+    }
+
+    @Test
     fun openViewerUsesDownloadedPathWithoutBeingReopened() {
         val pending = samplePhotoMessage.copy(mediaFileId = 7, mediaFilePath = null)
         val updates = kotlinx.coroutines.flow.MutableStateFlow(mapOf(100L to listOf(pending)))
@@ -438,6 +484,39 @@ class MediaViewerDialogTest {
         dialog.onKeyDown(KeyEvent.KEYCODE_1, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_1))
         assertEquals(samplePhotoFile.absolutePath, saved?.mediaFilePath)
         assertEquals(1, downloadRequests)
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testOnScreenControlButtonsInVideoMode() {
+        val videoMessage = createTestMessage(MediaType.VIDEO)
+        val dialog = MediaViewerDialog(context, videoMessage, {}, {})
+        dialog.show()
+
+        val btnZoomIn = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_zoom_in)
+        val btnPlayPause = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_play_pause)
+        val btnRewind = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_rewind)
+        val btnFastForward = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_fast_forward)
+        val btnSpeed = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_speed)
+        val btnSave = dialog.findViewById<android.widget.Button>(R.id.btn_viewer_save)
+
+        assertEquals(View.GONE, btnZoomIn.visibility)
+
+        assertEquals(View.VISIBLE, btnPlayPause.visibility)
+        assertEquals(View.VISIBLE, btnRewind.visibility)
+        assertEquals(View.VISIBLE, btnFastForward.visibility)
+        assertEquals(View.VISIBLE, btnSpeed.visibility)
+        assertEquals(View.VISIBLE, btnSave.visibility)
+
+        assertTrue("btnPlayPause should be focusable", btnPlayPause.isFocusable)
+        assertTrue("btnSpeed should be focusable", btnSpeed.isFocusable)
+
+        // Click Speed button
+        assertEquals(1.0f, dialog.playbackSpeed, 0.001f)
+        btnSpeed.performClick()
+        assertEquals(1.25f, dialog.playbackSpeed, 0.001f)
+        assertEquals("1.25x", btnSpeed.text.toString())
+
         dialog.dismiss()
     }
 

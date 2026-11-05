@@ -59,6 +59,7 @@
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun updateInCallUI(call: ActiveCall)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun updateSoftkeysForFocusedMessage( chat: ChatModel, msg: MessageModel, )</ID>
     <ID>CyclomaticComplexMethod:MediaViewerDialog.kt$MediaViewerDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>CyclomaticComplexMethod:MediaViewerDialog.kt$MediaViewerDialog$private fun renderMedia()</ID>
     <ID>CyclomaticComplexMethod:MessageAdapter.kt$MessageAdapter.MessageViewHolder$fun bind(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:MessageTextFormatter.kt$MessageTextFormatter$fun format( message: MessageModel, revealSpoilers: Boolean = false, ): CharSequence</ID>
     <ID>CyclomaticComplexMethod:NewChatDialog.kt$NewChatDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>

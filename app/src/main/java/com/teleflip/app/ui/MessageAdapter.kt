@@ -34,6 +34,8 @@ class MessageAdapter(
     private val onMessageAction: ((MessageModel) -> Unit)? = null,
     private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
     private val customEmojiResolver: ((String) -> String?)? = null,
+    private val onReplyQuoteClick: ((MessageModel) -> Unit)? = null,
+    private val onReactionsClick: ((MessageModel) -> Unit)? = null,
     private val onQuoteClick: ((Long) -> Unit)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     companion object {
@@ -210,21 +212,30 @@ class MessageAdapter(
                 tvForwarded?.visibility = View.GONE
             }
 
+            val hasReply = message.replyToPreview.isNotBlank() || message.replyToMessageId != 0L
             if (message.replyToPreview.isNotBlank()) {
                 tvReplyQuote?.visibility = View.VISIBLE
-                tvReplyQuote?.text = "↩ ${message.replyToPreview}"
+                val text = "↩ ${message.replyToPreview}"
+                tvReplyQuote?.text = text
+                tvReplyQuote?.contentDescription = "Quoted reply: ${message.replyToPreview}"
             } else if (message.replyToMessageId != 0L) {
                 tvReplyQuote?.visibility = View.VISIBLE
-                tvReplyQuote?.text = "↩ Reply to #${message.replyToMessageId}"
+                val text = "↩ Reply to #${message.replyToMessageId}"
+                tvReplyQuote?.text = text
+                tvReplyQuote?.contentDescription = "Quoted reply to message #${message.replyToMessageId}"
             } else {
                 tvReplyQuote?.visibility = View.GONE
+                tvReplyQuote?.contentDescription = null
             }
 
-            if (message.replyToMessageId != 0L) {
+            if (hasReply) {
                 tvReplyQuote?.isFocusable = true
                 tvReplyQuote?.isClickable = true
                 tvReplyQuote?.setOnClickListener {
-                    onQuoteClick?.invoke(message.replyToMessageId)
+                    onReplyQuoteClick?.invoke(message)
+                    if (message.replyToMessageId != 0L) {
+                        onQuoteClick?.invoke(message.replyToMessageId)
+                    }
                 }
             } else {
                 tvReplyQuote?.setOnClickListener(null)
@@ -426,6 +437,10 @@ class MessageAdapter(
 
             if (message.reactions.isNotEmpty()) {
                 tvReactions?.visibility = View.VISIBLE
+                tvReactions?.contentDescription = "Reactions: ${message.reactions.joinToString(", ")}"
+                tvReactions?.setOnClickListener {
+                    onReactionsClick?.invoke(message)
+                }
                 val ssb = SpannableStringBuilder()
                 val density = context.resources.displayMetrics.density
                 val targetSize = (16 * density).toInt().coerceAtLeast(1)
@@ -485,6 +500,8 @@ class MessageAdapter(
                 tvReactions?.text = ssb
             } else {
                 tvReactions?.visibility = View.GONE
+                tvReactions?.contentDescription = null
+                tvReactions?.setOnClickListener(null)
             }
 
             val metaPrefix =

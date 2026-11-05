@@ -1602,6 +1602,9 @@ class MainActivity : AppCompatActivity() {
                         showToast("Quoted message not found")
                     }
                 },
+                onReactionsClick = { rxnMsg ->
+                    showReactionPickerDialog(rxnMsg)
+                },
             )
         rvMessages?.adapter = messageAdapter
 
