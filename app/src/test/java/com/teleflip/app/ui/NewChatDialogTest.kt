@@ -2,7 +2,9 @@ package com.teleflip.app.ui
 
 import android.app.Application
 import android.view.KeyEvent
+import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.teleflip.app.R
@@ -24,6 +26,83 @@ class NewChatDialogTest {
     }
 
     @Test
+    fun testInitialFocusDefaultsToStartDirectChat() {
+        val dialog =
+            NewChatDialog(
+                context = context,
+                onStartChatByQuery = {},
+                onOpenSavedMessages = {},
+                onCreateGroup = {},
+                onCreateChannel = {},
+            )
+        dialog.show()
+
+        val btnDirect = dialog.findViewById<Button>(R.id.btn_start_direct_chat)
+        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+
+        assertTrue("btn_start_direct_chat should have focus initially", btnDirect.hasFocus())
+        assertFalse("Input field should not have focus initially", etInput.hasFocus())
+    }
+
+    @Test
+    fun testSoftkeyLabelsUpdateOnFocusChange() {
+        val dialog =
+            NewChatDialog(
+                context = context,
+                onStartChatByQuery = {},
+                onOpenSavedMessages = {},
+                onCreateGroup = {},
+                onCreateChannel = {},
+            )
+        dialog.show()
+
+        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
+
+        // Initially btn_start_direct_chat is focused and etInput is empty
+        assertEquals("", tvLeft.text.toString())
+        assertEquals("Select", tvCenter.text.toString())
+        assertEquals("Back", tvRight.text.toString())
+
+        // Add text to input field while button is focused
+        etInput.setText("UserQuery")
+        assertEquals("Clear Input", tvLeft.text.toString())
+
+        // Focus input field
+        etInput.requestFocus()
+        assertTrue("Input field should have focus", etInput.hasFocus())
+        assertEquals("Clear", tvLeft.text.toString())
+        assertEquals("Start", tvCenter.text.toString())
+        assertEquals("Back", tvRight.text.toString())
+    }
+
+    @Test
+    fun testCenterSoftkeyTriggersFocusedActionButton() {
+        var openSavedCalled = false
+        val dialog =
+            NewChatDialog(
+                context = context,
+                onStartChatByQuery = {},
+                onOpenSavedMessages = { openSavedCalled = true },
+                onCreateGroup = {},
+                onCreateChannel = {},
+            )
+        dialog.show()
+
+        val btnSaved = dialog.findViewById<Button>(R.id.btn_open_saved_messages)
+        btnSaved.requestFocus()
+        assertTrue(btnSaved.hasFocus())
+
+        val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        tvCenter.performClick()
+
+        assertTrue("Open Saved Messages should be called when Center softkey is clicked", openSavedCalled)
+        assertFalse("Dialog should be dismissed after action", dialog.isShowing)
+    }
+
+    @Test
     fun testDpadRightDelegatesToSuperWhenInputHasFocus() {
         var startChatCalled = false
         val dialog =
@@ -37,7 +116,8 @@ class NewChatDialogTest {
         dialog.show()
 
         val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
-        assertTrue("Input should have focus initially", etInput.hasFocus())
+        etInput.requestFocus()
+        assertTrue("Input should have focus", etInput.hasFocus())
 
         val dpadRightEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)
         val handled = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, dpadRightEvent)
@@ -59,7 +139,8 @@ class NewChatDialogTest {
         dialog.show()
 
         val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
-        assertTrue("Input should have focus initially", etInput.hasFocus())
+        etInput.requestFocus()
+        assertTrue("Input should have focus", etInput.hasFocus())
 
         val inputKeys =
             listOf(
