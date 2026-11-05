@@ -29,7 +29,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1190,7 +1189,7 @@ class MainActivity : AppCompatActivity() {
         isError: Boolean = false,
     ) {
         com.teleflip.app.report.AdbReporter.reportPopup("UI_Popup", msg, isError)
-        Toast.makeText(this, msg, if (isError) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+        com.teleflip.app.ui.StatusMessageDispatcher.showStatus(this, msg, isError)
     }
 
     private var activeDialogCount = 0

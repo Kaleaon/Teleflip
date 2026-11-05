@@ -2,6 +2,8 @@ package com.teleflip.app.ui
 
 import android.app.Application
 import android.view.KeyEvent
+import android.view.View
+import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
@@ -26,6 +28,22 @@ class ProxySettingsDialogTest {
         context = ApplicationProvider.getApplicationContext()
         context.setTheme(R.style.Theme_TeleFlip)
         mockTelegramManager = mock(TelegramManager::class.java)
+    }
+
+    @Test
+    fun testEmptyServerSubmission_showsInlineErrorAndFocusesServerField() {
+        val dialog = ProxySettingsDialog(context, mockTelegramManager)
+        dialog.show()
+
+        val btnSaveEnable = dialog.findViewById<Button>(R.id.btn_proxy_save_enable)
+        val tvError = dialog.findViewById<TextView>(R.id.tv_proxy_error)
+        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+
+        btnSaveEnable.performClick()
+
+        assertEquals(View.VISIBLE, tvError.visibility)
+        assertEquals("Please enter a valid server address", tvError.text.toString())
+        assertTrue("etServer should have focus when server is empty", etServer.hasFocus())
     }
 
     @Test

@@ -16,12 +16,16 @@ class PollDialog(
 ) : BaseDialog(context) {
     private val engines = mutableMapOf<Int, KeypadInputEngine>()
     private var isAnonymous = true
+    private var tvError: TextView? = null
+
+    override fun getErrorTextView(): TextView? = tvError
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_create_poll)
         setupDismissKeys()
 
+        tvError = findViewById(R.id.tv_poll_error)
         val tvMode = findViewById<TextView>(R.id.tv_poll_input_mode)
         val etQuestion = findViewById<EditText>(R.id.et_poll_question)
         val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
@@ -58,9 +62,18 @@ class PollDialog(
                     etOpt3?.text?.toString()?.trim(),
                 ).filter { it.isNotBlank() }
 
-            if (question.isNotBlank() && opts.size >= 2) {
-                dismiss()
-                onCreatePoll(question, opts, isAnonymous)
+            when {
+                question.isBlank() -> {
+                    showDialogError("Please enter a poll question", etQuestion)
+                }
+                opts.size < 2 -> {
+                    showDialogError("Please enter at least 2 poll options", etOpt1)
+                }
+                else -> {
+                    clearDialogError()
+                    dismiss()
+                    onCreatePoll(question, opts, isAnonymous)
+                }
             }
         }
 
