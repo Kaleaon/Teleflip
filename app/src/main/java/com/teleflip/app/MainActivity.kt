@@ -83,6 +83,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -206,6 +207,9 @@ class MainActivity : AppCompatActivity() {
     private var tvReplyEditPreview: TextView? = null
     private var layoutPinnedBanner: View? = null
     private var tvPinnedBannerText: TextView? = null
+    private var layoutSlowModeBanner: View? = null
+    private var tvSlowModeBannerText: TextView? = null
+    private var slowModeTickerJob: Job? = null
 
     // Voice Recording State
     private var layoutVoiceRecording: LinearLayout? = null
@@ -519,6 +523,14 @@ class MainActivity : AppCompatActivity() {
                     if (view != null) {
                         renderChatFolderTabs(view, folders)
                     }
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            telegramManager.slowModeStates.collectLatest {
+                if (currentScreen == Screen.CONVERSATION && activeChat != null) {
+                    startSlowModeTicker(activeChat!!.id)
                 }
             }
         }
@@ -1564,6 +1576,9 @@ class MainActivity : AppCompatActivity() {
         layoutPinnedBanner?.isFocusable = true
         layoutPinnedBanner?.isClickable = true
         tvPinnedBannerText = view.findViewById(R.id.tv_pinned_banner_text)
+        layoutSlowModeBanner = view.findViewById(R.id.layout_slow_mode_banner)
+        tvSlowModeBannerText = view.findViewById(R.id.tv_slow_mode_banner_text)
+        startSlowModeTicker(chat.id)
         view.findViewById<View>(R.id.btn_cancel_reply_edit)?.setOnClickListener {
             clearReplyOrEditMode()
         }
@@ -1761,6 +1776,41 @@ class MainActivity : AppCompatActivity() {
 
         etComposeInput?.requestFocus()
         updateActiveCallOverlay()
+    }
+
+    private fun startSlowModeTicker(chatId: Long) {
+        slowModeTickerJob?.cancel()
+        slowModeTickerJob =
+            lifecycleScope.launch {
+                var wasVisible = false
+                while (isActive) {
+                    if (currentScreen != Screen.CONVERSATION || activeChat?.id != chatId) {
+                        layoutSlowModeBanner?.visibility = View.GONE
+                        break
+                    }
+                    val remainingSec = telegramManager.getSlowModeRemainingSeconds(chatId)
+                    if (remainingSec > 0) {
+                        val minutes = remainingSec / 60
+                        val secs = remainingSec % 60
+                        val formattedTime = String.format(java.util.Locale.US, "%02d:%02d", minutes, secs)
+                        val bannerText = "Slow mode active: wait $formattedTime to send next message"
+
+                        tvSlowModeBannerText?.text = bannerText
+                        if (layoutSlowModeBanner?.visibility != View.VISIBLE) {
+                            layoutSlowModeBanner?.visibility = View.VISIBLE
+                            tvSlowModeBannerText?.contentDescription = bannerText
+                            layoutSlowModeBanner?.announceForAccessibility(bannerText)
+                        }
+                        wasVisible = true
+                    } else {
+                        if (wasVisible || layoutSlowModeBanner?.visibility == View.VISIBLE) {
+                            layoutSlowModeBanner?.visibility = View.GONE
+                        }
+                        break
+                    }
+                    delay(1000L)
+                }
+            }
     }
 
     private var lastResendTimestamp = 0L
@@ -2439,6 +2489,16 @@ class MainActivity : AppCompatActivity() {
         if (text.isEmpty()) {
             showToast("Please enter a message first")
             etComposeInput?.requestFocus()
+            return
+        }
+        val remainingSlowModeSec = telegramManager.getSlowModeRemainingSeconds(chat.id)
+        if (remainingSlowModeSec > 0) {
+            val minutes = remainingSlowModeSec / 60
+            val secs = remainingSlowModeSec % 60
+            val formatted = String.format(java.util.Locale.US, "%02d:%02d", minutes, secs)
+            val warningText = "Slow mode is active. Wait $formatted to send next message."
+            showToast(warningText, isError = true)
+            layoutSlowModeBanner?.announceForAccessibility(warningText)
             return
         }
         val editing = activeEditMessage

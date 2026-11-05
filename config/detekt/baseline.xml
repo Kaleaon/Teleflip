@@ -123,6 +123,7 @@
     <ID>LongMethod:TelegramManager.kt$TelegramManager$private fun handleAuthState(state: TdApi.AuthorizationState)</ID>
     <ID>LongParameterList:ChatExportEngine.kt$ChatExportEngine$( context: Context, scope: CoroutineScope, telegramManager: TelegramManager, chatId: Long, chatTitle: String, format: ExportFormat, mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate, onProgress: (completedCount: Int) -&gt; Unit, onComplete: (Result&lt;List&lt;File&gt;&gt;) -&gt; Unit, )</ID>
     <ID>LongParameterList:TelegramManager.kt$TelegramManager$( server: String, port: Int, type: ProxyType, username: String = "", password: String = "", secret: String = "", enableNow: Boolean = true, callback: ((Boolean, String?) -&gt; Unit)? = null, )</ID>
+    <ID>LoopWithTooManyJumpStatements:MainActivity.kt$MainActivity$while</ID>
     <ID>LoopWithTooManyJumpStatements:TelegramManager.kt$TelegramManager$while</ID>
     <ID>MagicNumber:AdbReportReceiver.kt$AdbReportReceiver$100</ID>
     <ID>MagicNumber:AdbReportReceiver.kt$AdbReportReceiver$30</ID>
@@ -187,6 +188,8 @@
     <ID>MagicNumber:MessageAdapter.kt$MessageAdapter.MessageViewHolder$120</ID>
     <ID>MagicNumber:MessageAdapter.kt$MessageAdapter.MessageViewHolder$16</ID>
     <ID>MagicNumber:MessageAdapter.kt$MessageAdapter.MessageViewHolder$160</ID>
+    <ID>MagicNumber:Models.kt$SlowModeState$1000</ID>
+    <ID>MagicNumber:Models.kt$SlowModeState$999</ID>
     <ID>MagicNumber:NotificationHelper.kt$NotificationHelper$10000L</ID>
     <ID>MagicNumber:NotificationHelper.kt$NotificationHelper$3000L</ID>
     <ID>MagicNumber:NotificationHelper.kt$NotificationHelper$900000</ID>
@@ -349,6 +352,7 @@
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$@androidx.annotation.VisibleForTesting internal fun extractStickerInfo(content: TdApi.MessageContent?): Pair&lt;String, Boolean&gt;</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun acceptCall( callId: Int, onResult: ((Boolean, String?) -&gt; Unit)? = null, )</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun discardCall( callId: Int, durationSec: Int = 0, onResult: ((Boolean, String?) -&gt; Unit)? = null, )</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun getChatIdForSupergroup(supergroupId: Long): Long</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun getSenderDisplayName(message: TdApi.Message): String</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun isChatMuted(chatId: Long): Boolean</ID>
@@ -400,7 +404,6 @@
     <ID>TooManyFunctions:ProxyStorage.kt$ProxyStorage</ID>
     <ID>TooManyFunctions:StorageManager.kt$StorageManager</ID>
     <ID>TooManyFunctions:TelegramManager.kt$TelegramManager : ResultHandler</ID>
-    <ID>UnusedImports:PollDialogTest.kt$import org.junit.Assert.assertFalse</ID>
     <ID>UnusedParameter:TelegramManager.kt$TelegramManager$replyToPreview: String = ""</ID>
     <ID>UnusedPrivateProperty:AdbReporter.kt$AdbReporter$signal</ID>
     <ID>UnusedPrivateProperty:ChatExportDialog.kt$ChatExportDialog$private val chatId: Long</ID>
