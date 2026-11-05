@@ -159,6 +159,7 @@
     <ID>MagicNumber:MainActivity.kt$MainActivity$200</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$24</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$25</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$2592000</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$3</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$30</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$300L</ID>
@@ -173,7 +174,9 @@
     <ID>MagicNumber:MainActivity.kt$MainActivity$525600</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$6</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$60</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$604800</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$7</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$86400</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$9</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$900L</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity.&lt;no name provided&gt;$10</ID>
@@ -400,7 +403,6 @@
     <ID>TooManyFunctions:ProxyStorage.kt$ProxyStorage</ID>
     <ID>TooManyFunctions:StorageManager.kt$StorageManager</ID>
     <ID>TooManyFunctions:TelegramManager.kt$TelegramManager : ResultHandler</ID>
-    <ID>UnusedImports:PollDialogTest.kt$import org.junit.Assert.assertFalse</ID>
     <ID>UnusedParameter:TelegramManager.kt$TelegramManager$replyToPreview: String = ""</ID>
     <ID>UnusedPrivateProperty:AdbReporter.kt$AdbReporter$signal</ID>
     <ID>UnusedPrivateProperty:ChatExportDialog.kt$ChatExportDialog$private val chatId: Long</ID>
