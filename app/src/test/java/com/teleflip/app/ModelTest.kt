@@ -127,4 +127,45 @@ class ModelTest {
         assertEquals(4, MessageStatus.values().size)
         assertEquals(12, MediaType.values().size)
     }
+
+    @Test
+    fun testMediaPickerModels() {
+        val sticker =
+            com.teleflip.app.model.StickerItem(
+                fileId = 123,
+                emoji = "🎉",
+                filePath = "/tmp/sticker.webp",
+                setName = "Party Pack",
+            )
+        assertEquals(123, sticker.fileId)
+        assertEquals("🎉", sticker.emoji)
+        assertEquals("/tmp/sticker.webp", sticker.filePath)
+        assertEquals("Party Pack", sticker.setName)
+
+        val set =
+            com.teleflip.app.model.StickerSetModel(
+                id = 456L,
+                title = "Party Pack",
+                stickers = listOf(sticker),
+            )
+        assertEquals(456L, set.id)
+        assertEquals("Party Pack", set.title)
+        assertEquals(1, set.stickers.size)
+
+        val gif =
+            com.teleflip.app.model.SavedGifItem(
+                fileId = 789,
+                filePath = "/tmp/anim.mp4",
+                durationSeconds = 5,
+                caption = "Applause",
+                queryId = 9999L,
+                resultId = "res_123",
+            )
+        assertEquals(789, gif.fileId)
+        assertEquals("/tmp/anim.mp4", gif.filePath)
+        assertEquals(5, gif.durationSeconds)
+        assertEquals("Applause", gif.caption)
+        assertEquals(9999L, gif.queryId)
+        assertEquals("res_123", gif.resultId)
+    }
 }

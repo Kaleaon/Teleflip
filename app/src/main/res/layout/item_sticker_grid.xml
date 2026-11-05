@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="72dp"
+    android:layout_margin="3dp"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:clickable="true"
+    android:background="@drawable/bg_item_selector">
+
+    <ImageView
+        android:id="@+id/iv_sticker_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="4dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="Sticker thumbnail" />
+
+    <TextView
+        android:id="@+id/tv_sticker_emoji_fallback"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:textColor="@color/text_primary"
+        android:textSize="24sp"
+        android:visibility="gone" />
+
+</FrameLayout>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/bg_dark_card"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/tv_media_picker_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Media Picker"
+        android:textColor="@color/focus_highlight_gold"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="4dp" />
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_layout_media"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/bg_dark_card"
+        app:tabIndicatorColor="@color/tg_blue"
+        app:tabSelectedTextColor="@color/tg_blue"
+        app:tabTextColor="@color/text_secondary"
+        app:tabMode="fixed" />
+
+    <EditText
+        android:id="@+id/et_gif_search"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/bg_item_selector"
+        android:hint="Search GIFs (@gif)..."
+        android:textColorHint="@color/text_secondary"
+        android:textColor="@color/text_primary"
+        android:textSize="14sp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:singleLine="true"
+        android:imeOptions="actionSearch"
+        android:visibility="gone" />
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_layout_sticker_packs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@color/bg_dark_card"
+        app:tabIndicatorColor="@color/focus_highlight_gold"
+        app:tabSelectedTextColor="@color/focus_highlight_gold"
+        app:tabTextColor="@color/text_secondary"
+        app:tabMode="scrollable"
+        android:visibility="visible" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="280dp"
+        android:layout_marginTop="4dp">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_media_grid"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:padding="2dp" />
+
+        <ProgressBar
+            android:id="@+id/pb_media_loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tv_empty_state"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="No items found"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+</LinearLayout>
