@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="LabeledInputView">
+        <attr name="inputLabel" format="string" />
+        <attr name="inputHint" format="string" />
+        <attr name="inputType" format="enum">
+            <enum name="text" value="1" />
+            <enum name="number" value="2" />
+            <enum name="phone" value="3" />
+            <enum name="password" value="129" />
+            <enum name="textPassword" value="129" />
+            <enum name="textVisiblePassword" value="145" />
+        </attr>
+        <attr name="inputSingleLine" format="boolean" />
+        <attr name="inputMaxLines" format="integer" />
+    </declare-styleable>
+</resources>

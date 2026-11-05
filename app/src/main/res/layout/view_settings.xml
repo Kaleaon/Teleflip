@@ -51,56 +51,28 @@
         </LinearLayout>
 
         <!-- API ID Setting -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Telegram API ID:"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="4dp" />
-
-        <EditText
-            android:id="@+id/et_api_id"
+        <com.teleflip.app.ui.LabeledInputView
+            android:id="@+id/liv_api_id"
+            xmlns:app="http://schemas.android.com/apk/res-auto"
             android:layout_width="match_parent"
-            android:layout_height="42dp"
-            android:hint="e.g. 21724"
-            android:textColor="@color/text_primary"
-            android:textColorHint="@color/text_hint"
-            android:textSize="14sp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:background="@drawable/bg_edittext_selector"
-            android:inputType="number"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:layout_marginBottom="12dp" />
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:inputLabel="Telegram API ID:"
+            app:inputHint="e.g. 21724"
+            app:inputType="number"
+            app:inputSingleLine="true" />
 
         <!-- API HASH Setting -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Telegram API Hash:"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="4dp" />
-
-        <EditText
-            android:id="@+id/et_api_hash"
+        <com.teleflip.app.ui.LabeledInputView
+            android:id="@+id/liv_api_hash"
+            xmlns:app="http://schemas.android.com/apk/res-auto"
             android:layout_width="match_parent"
-            android:layout_height="42dp"
-            android:hint="e.g. 3e0cb5da..."
-            android:textColor="@color/text_primary"
-            android:textColorHint="@color/text_hint"
-            android:textSize="13sp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:background="@drawable/bg_edittext_selector"
-            android:inputType="text"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:layout_marginBottom="12dp" />
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:inputLabel="Telegram API Hash:"
+            app:inputHint="e.g. 3e0cb5da..."
+            app:inputType="text"
+            app:inputSingleLine="true" />
 
         <!-- Keypad Timeout Setting -->
         <TextView

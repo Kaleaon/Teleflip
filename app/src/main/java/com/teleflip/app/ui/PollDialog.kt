@@ -23,10 +23,15 @@ class PollDialog(
         setupDismissKeys()
 
         val tvMode = findViewById<TextView>(R.id.tv_poll_input_mode)
-        val etQuestion = findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = findViewById<EditText>(R.id.et_poll_opt2)
-        val etOpt3 = findViewById<EditText>(R.id.et_poll_opt3)
+        val livQuestion = findViewById<LabeledInputView>(R.id.liv_poll_question)
+        val livOpt1 = findViewById<LabeledInputView>(R.id.liv_poll_opt1)
+        val livOpt2 = findViewById<LabeledInputView>(R.id.liv_poll_opt2)
+        val livOpt3 = findViewById<LabeledInputView>(R.id.liv_poll_opt3)
+
+        val etQuestion = livQuestion?.editText
+        val etOpt1 = livOpt1?.editText
+        val etOpt2 = livOpt2?.editText
+        val etOpt3 = livOpt3?.editText
         val btnAnon = findViewById<Button>(R.id.btn_poll_anonymous_toggle)
         val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
         val btnCancel = findViewById<Button>(R.id.btn_poll_cancel)

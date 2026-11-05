@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
-import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
@@ -176,7 +175,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         assertTrue("Search input should have focus initially", etSearchInput.hasFocus())
         assertEquals(SearchDialog.SearchTab.CHATS, dialog.currentTab)
 
@@ -198,7 +197,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         val tabChats = dialog.findViewById<android.view.View>(R.id.tab_search_chats)
 
         tabChats.isFocusableInTouchMode = true
@@ -228,7 +227,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         assertTrue("Search input should have focus", etSearchInput.hasFocus())
 
         // Key '2' -> 'A' (CAP_FIRST mode)
@@ -268,7 +267,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val input = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         input.setText("News")
 
         // Before 300ms delay: no search should be dispatched
@@ -302,7 +301,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val input = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
 
         // Rapid keypresses
         input.setText("N")
@@ -350,7 +349,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val input = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         val progressBar = dialog.findViewById<ProgressBar>(R.id.progress_search)
 
         // First query
@@ -389,7 +388,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val input = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         val progressBar = dialog.findViewById<ProgressBar>(R.id.progress_search)
         val emptyLayout = dialog.findViewById<View>(R.id.layout_search_empty)
         val emptyTitle = dialog.findViewById<TextView>(R.id.tv_search_empty_title)
