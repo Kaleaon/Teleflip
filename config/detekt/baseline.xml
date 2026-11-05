@@ -304,7 +304,6 @@
     <ID>MaxLineLength:TelegramFeatures.kt$TelegramFeatures$messages.messages.filterNotNull().sortedBy { m -&gt; (m.schedulingState as? TdApi.MessageSchedulingStateSendAtDate)?.sendDate ?: Int.MAX_VALUE }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$TdApi.CallStateReady.CONSTRUCTOR -&gt; if (_activeCall.value?.callId == call.id &amp;&amp; _activeCall.value?.state == CallState.READY) CallState.READY else CallState.CONNECTING</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$TdApi.MessageContact.CONSTRUCTOR -&gt; (content as TdApi.MessageContact).contact.let { "Contact: ${it.firstName} ${it.lastName}\n${it.phoneNumber}".trim() }</ID>
-    <ID>MaxLineLength:TelegramManager.kt$TelegramManager$_chats.update { chats -&gt; chats.map { if (it.id == chatId) it.copy(isArchived = newValue, isPinned = if (newValue) false else it.isPinned) else it } }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$_messages.update { current -&gt; current + (chatId to current[chatId].orEmpty().map { if (it.id == messageId) it.copy(isPinned = newValue) else it }) }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$check(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { "Microphone permission is required for calls" }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$current + (updateEdited.chatId to current[updateEdited.chatId].orEmpty().map { if (it.id == updateEdited.messageId) it.copy(hasBotButtons = hasButtons) else it })</ID>
@@ -405,7 +404,6 @@
     <ID>TooManyFunctions:ProxyStorage.kt$ProxyStorage</ID>
     <ID>TooManyFunctions:StorageManager.kt$StorageManager</ID>
     <ID>TooManyFunctions:TelegramManager.kt$TelegramManager : ResultHandler</ID>
-    <ID>UnusedImports:PollDialogTest.kt$import org.junit.Assert.assertFalse</ID>
     <ID>UnusedParameter:TelegramManager.kt$TelegramManager$replyToPreview: String = ""</ID>
     <ID>UnusedPrivateProperty:AdbReporter.kt$AdbReporter$signal</ID>
     <ID>UnusedPrivateProperty:ChatExportDialog.kt$ChatExportDialog$private val chatId: Long</ID>
