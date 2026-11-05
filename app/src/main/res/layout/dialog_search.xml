@@ -15,7 +15,7 @@
         android:paddingStart="12dp"
         android:paddingEnd="12dp">
 
-        <TextView
+        <com.teleflip.app.ui.SectionHeaderView
             android:id="@+id/tv_search_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"

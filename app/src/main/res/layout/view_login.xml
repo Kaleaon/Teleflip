@@ -20,7 +20,7 @@
             android:contentDescription="TeleFlip Logo"
             android:layout_marginTop="8dp" />
 
-        <TextView
+        <com.teleflip.app.ui.SectionHeaderView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="TeleFlip"

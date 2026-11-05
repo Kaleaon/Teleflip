@@ -49,7 +49,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
-                <TextView
+                <com.teleflip.app.ui.SectionHeaderView
                     android:id="@+id/tv_profile_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -168,7 +168,7 @@
         </LinearLayout>
 
         <!-- Actions Divider -->
-        <TextView
+        <com.teleflip.app.ui.SectionHeaderView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Actions"
