@@ -54,6 +54,7 @@ import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
+import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.model.SavedGifItem
 import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.notifications.NotificationHelper
@@ -74,6 +75,7 @@ import com.teleflip.app.ui.MessageAdapter
 import com.teleflip.app.ui.NewChatDialog
 import com.teleflip.app.ui.OptionsMenuDialog
 import com.teleflip.app.ui.PollDialog
+import com.teleflip.app.ui.ProxySettingsDialog
 import com.teleflip.app.ui.SoftkeyManager
 import com.teleflip.app.ui.SoftkeyUtils
 import com.teleflip.app.ui.SymbolsDialog
@@ -154,6 +156,26 @@ class MainActivity : AppCompatActivity() {
     internal var currentScreen: Screen = Screen.CHAT_LIST
     internal var activeChat: ChatModel? = null
     internal var pendingTargetChatId: Long = 0L
+    internal var pendingProxyItem: ProxyItem? = null
+
+    private fun handleDeepLinkIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        val proxyItem = telegramManager.parseProxyUri(data) ?: return
+        if (PasscodeManager.isLocked(this)) {
+            pendingProxyItem = proxyItem
+        } else {
+            ProxySettingsDialog(
+                context = this,
+                telegramManager = telegramManager,
+                initialProxyItem = proxyItem,
+                onProxyChanged = {
+                    if (currentScreen == Screen.LOGIN) {
+                        updateLoginConnectionState(telegramManager.connectionState.value)
+                    }
+                },
+            ).show()
+        }
+    }
     private var pendingTargetMessageId: Long? = null
     private var callTimerJob: Job? = null
     private var callDurationSec: Int = 0
@@ -318,6 +340,8 @@ class MainActivity : AppCompatActivity() {
 
         telegramManager.start()
 
+        handleDeepLinkIntent(intent)
+
         pendingTargetChatId = intent?.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L) ?: 0L
 
         if (PasscodeManager.isLocked(this)) {
@@ -403,6 +427,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleDeepLinkIntent(intent)
         val targetOpenChatId = intent.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L)
         if (targetOpenChatId != 0L) {
             pendingTargetChatId = targetOpenChatId
@@ -3281,6 +3306,20 @@ class MainActivity : AppCompatActivity() {
         passcodeEntry = ""
         if (unlocked) {
             tvPasscodeError?.text = ""
+            if (pendingProxyItem != null) {
+                val proxyItem = pendingProxyItem
+                pendingProxyItem = null
+                ProxySettingsDialog(
+                    context = this,
+                    telegramManager = telegramManager,
+                    initialProxyItem = proxyItem,
+                    onProxyChanged = {
+                        if (currentScreen == Screen.LOGIN) {
+                            updateLoginConnectionState(telegramManager.connectionState.value)
+                        }
+                    },
+                ).show()
+            }
             if (pendingTargetChatId != 0L) {
                 val targetId = pendingTargetChatId
                 pendingTargetChatId = 0L
@@ -4313,7 +4352,14 @@ class MainActivity : AppCompatActivity() {
         val btnForgotPassword = view.findViewById<Button>(R.id.btn_forgot_password)
         val btnResetAccount = view.findViewById<Button>(R.id.btn_reset_account)
         val btnUseSim = view.findViewById<Button>(R.id.btn_use_sim_number)
+        val btnLoginProxy = view.findViewById<Button>(R.id.btn_login_proxy)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
+
+        btnLoginProxy?.setOnClickListener {
+            ProxySettingsDialog(this, telegramManager) {
+                updateLoginConnectionState(telegramManager.connectionState.value)
+            }.show()
+        }
 
         btnQrLogin?.setOnClickListener {
             telegramManager.requestQrCodeLogin()
@@ -4453,8 +4499,10 @@ class MainActivity : AppCompatActivity() {
                 btnForgotPassword?.nextFocusUpId = R.id.btn_login_submit
                 btnForgotPassword?.nextFocusDownId = R.id.btn_reset_account
                 btnResetAccount?.nextFocusUpId = R.id.btn_forgot_password
-                btnResetAccount?.nextFocusDownId = R.id.btn_config_credentials
-                btnConfig.nextFocusUpId = R.id.btn_reset_account
+                btnResetAccount?.nextFocusDownId = R.id.btn_login_proxy
+                btnLoginProxy?.nextFocusUpId = R.id.btn_reset_account
+                btnLoginProxy?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_proxy
 
                 btnForgotPassword?.setOnClickListener {
                     telegramManager.requestPasswordRecovery()
@@ -4498,8 +4546,10 @@ class MainActivity : AppCompatActivity() {
                 btnForgotPassword?.visibility = View.GONE
                 btnResetAccount?.visibility = View.GONE
 
-                btnSubmit.nextFocusDownId = R.id.btn_config_credentials
-                btnConfig.nextFocusUpId = R.id.btn_login_submit
+                btnSubmit.nextFocusDownId = R.id.btn_login_proxy
+                btnLoginProxy?.nextFocusUpId = R.id.btn_login_submit
+                btnLoginProxy?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_proxy
 
                 tvLabel.text = "Email Recovery Code (numbers only):"
                 etLoginInput?.hint = "123456"
@@ -4525,8 +4575,10 @@ class MainActivity : AppCompatActivity() {
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
                 btnUseSim?.visibility = View.GONE
-                btnSubmit.nextFocusDownId = R.id.btn_config_credentials
-                btnConfig.nextFocusUpId = R.id.btn_login_submit
+                btnSubmit.nextFocusDownId = R.id.btn_login_proxy
+                btnLoginProxy?.nextFocusUpId = R.id.btn_login_submit
+                btnLoginProxy?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_proxy
                 val errorMessage = "⚠️ Error: ${state.message}"
                 tvStatus.text = errorMessage
                 tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))

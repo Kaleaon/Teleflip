@@ -69,6 +69,7 @@
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun fetchCustomEmojiStickers(onResult: (List&lt;StickerItem&gt;) -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun parseProxyUri(uri: Uri): ProxyItem?</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun updateUserCache(user: TdApi.User)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$override fun onResult(obj: TdApi.Object?)</ID>
@@ -224,9 +225,11 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$0x6FB9F0</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$100</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000</ID>
+    <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000.0</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$10000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1024L</ID>
+    <ID>MagicNumber:TelegramManager.kt$TelegramManager$1080</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$120</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1200L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1500L</ID>
@@ -352,6 +355,7 @@
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun getSenderDisplayName(message: TdApi.Message): String</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun isChatMuted(chatId: Long): Boolean</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun parseProxyUri(uri: Uri): ProxyItem?</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun toggleMessageReaction( chatId: Long, messageId: Long, emoji: String, )</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$private fun extractIsPaidMediaLocked(content: TdApi.MessageContent?): Boolean</ID>
@@ -400,7 +404,6 @@
     <ID>TooManyFunctions:ProxyStorage.kt$ProxyStorage</ID>
     <ID>TooManyFunctions:StorageManager.kt$StorageManager</ID>
     <ID>TooManyFunctions:TelegramManager.kt$TelegramManager : ResultHandler</ID>
-    <ID>UnusedImports:PollDialogTest.kt$import org.junit.Assert.assertFalse</ID>
     <ID>UnusedParameter:TelegramManager.kt$TelegramManager$replyToPreview: String = ""</ID>
     <ID>UnusedPrivateProperty:AdbReporter.kt$AdbReporter$signal</ID>
     <ID>UnusedPrivateProperty:ChatExportDialog.kt$ChatExportDialog$private val chatId: Long</ID>
