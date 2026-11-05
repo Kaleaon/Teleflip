@@ -32,31 +32,17 @@ class SymbolsDialog(
     internal val visibleSymbols: List<String>
         get() = symbols.drop(currentPage * PAGE_SIZE).take(PAGE_SIZE)
 
-    private var softkeyManager: SoftkeyManager? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_symbols)
-        setupDismissKeys()
-
-        val softkeyBar = findViewById<View>(R.id.softkey_bar)
-        val tvLeft = findViewById<TextView>(R.id.tv_softkey_left)
-        val tvCenter = findViewById<TextView>(R.id.tv_softkey_center)
-        val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
-
-        if (tvLeft != null && tvCenter != null && tvRight != null) {
-            softkeyManager =
-                SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight).apply {
-                    update(
-                        left = "Next",
-                        center = "Select",
-                        right = "Cancel",
-                        onLeft = { nextPage() },
-                        onCenter = { selectFocusedSymbol() },
-                        onRight = { dismiss() },
-                    )
-                }
-        }
+        setupSoftkeys(
+            left = "Next",
+            center = "Select",
+            right = "Cancel",
+            onLeft = { nextPage() },
+            onCenter = { selectFocusedSymbol() },
+            onRight = { dismiss() },
+        )
 
         val rv = findViewById<RecyclerView>(R.id.rv_symbols_grid)
         rv?.layoutManager = GridLayoutManager(context, COLUMNS)
@@ -117,10 +103,6 @@ class SymbolsDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
-            return true
-        }
-
         if (keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_8) {
             if (event.repeatCount > 0) return true
             val index = keyCode - KeyEvent.KEYCODE_1
@@ -168,11 +150,6 @@ class SymbolsDialog(
                     }
                 }
             }
-        }
-
-        if (isBackOrRightSoftKey(keyCode)) {
-            dismiss()
-            return true
         }
 
         return super.onKeyDown(keyCode, event)

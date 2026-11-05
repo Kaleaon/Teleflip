@@ -131,4 +131,6 @@
         android:background="@drawable/bg_item_selector"
         android:focusable="true" />
 
+    <include layout="@layout/layout_softkeys" />
+
 </LinearLayout>

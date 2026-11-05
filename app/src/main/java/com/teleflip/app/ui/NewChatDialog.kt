@@ -24,7 +24,25 @@ class NewChatDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_new_chat)
-        setupDismissKeys()
+        setupSoftkeys(
+            left = "Clear",
+            center = "Start",
+            right = "Cancel",
+            onLeft = {
+                keypadEngine?.commitCurrentChar()
+                etInput?.setText("")
+            },
+            onCenter = {
+                keypadEngine?.commitCurrentChar()
+                val query = etInput?.text?.toString()?.trim().orEmpty()
+                dismiss()
+                onStartChatByQuery(query)
+            },
+            onRight = {
+                keypadEngine?.commitCurrentChar()
+                dismiss()
+            },
+        )
 
         val input = findViewById<EditText>(R.id.et_new_chat_input)
         val tvMode = findViewById<TextView>(R.id.tv_new_chat_input_mode)
@@ -100,18 +118,6 @@ class NewChatDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (isBackOrRightSoftKey(keyCode)) {
-            keypadEngine?.commitCurrentChar()
-            dismiss()
-            return true
-        }
-
-        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
-            keypadEngine?.commitCurrentChar()
-            etInput?.setText("")
-            return true
-        }
-
         val input = etInput
         val isInputKey =
             (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
