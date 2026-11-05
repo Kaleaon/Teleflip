@@ -204,4 +204,96 @@ class AdbReporterTest {
         assertTrue(recent.first().contains("Message 36"))
         assertTrue(recent.last().contains("Message 50"))
     }
+
+    @Test
+    fun testEmptyLogFileReturnsNoErrorsRecorded() {
+        val emptyFile = tempFolder.newFile("empty.log")
+        AdbReporter.setLogFile(emptyFile)
+        val logs = AdbReporter.getRecentLogs(10)
+        assertEquals(1, logs.size)
+        assertEquals("No errors recorded.", logs[0])
+    }
+
+    @Test
+    fun testZeroOrNegativeMaxLinesReturnsEmptyList() {
+        AdbReporter.reportInfo("Comp", "Message 1")
+        assertEquals(emptyList<String>(), AdbReporter.getRecentLogs(0))
+        assertEquals(emptyList<String>(), AdbReporter.getRecentLogs(-5))
+    }
+
+    @Test
+    fun testMultiMegabyteLogFileReverseReading() {
+        val largeFile = tempFolder.newFile("large_teleflip_reports.log")
+        largeFile.bufferedWriter().use { writer ->
+            for (i in 1..50000) {
+                writer.write("[2026-10-19 10:00:00.000] [INFO] [LargeTest] Historical line number $i\n")
+            }
+        }
+        assertTrue("Large log file should be > 2MB", largeFile.length() > 2 * 1024 * 1024)
+        AdbReporter.setLogFile(largeFile)
+
+        val startTime = System.currentTimeMillis()
+        val recent = AdbReporter.getRecentLogs(20)
+        val duration = System.currentTimeMillis() - startTime
+
+        assertEquals(20, recent.size)
+        assertTrue("First line should be line 49981", recent.first().contains("Historical line number 49981"))
+        assertTrue("Last line should be line 50000", recent.last().contains("Historical line number 50000"))
+        assertTrue("Reverse block reading multi-MB file should take under 500ms, took $duration ms", duration < 500)
+    }
+
+    @Test
+    fun testLinesExceedingBlockBoundarySize() {
+        val largeLineFile = tempFolder.newFile("large_lines.log")
+        val longString1 = "A".repeat(10000)
+        val longString2 = "B".repeat(12000)
+        largeLineFile.writeText("Short line 1\n$longString1\nShort line 2\n$longString2\nShort line 3\n")
+        AdbReporter.setLogFile(largeLineFile)
+
+        val recent = AdbReporter.getRecentLogs(3)
+        assertEquals(3, recent.size)
+        assertEquals("Short line 2", recent[0])
+        assertEquals(longString2, recent[1])
+        assertEquals("Short line 3", recent[2])
+    }
+
+    @Test
+    fun testMultibyteUtf8CharactersAcrossBlockBoundaries() {
+        val utf8File = tempFolder.newFile("utf8_test.log")
+        val padding = "X".repeat(4090)
+        val emojiLine = "Emoji test: 📱 🚀 💬 Teleflip"
+        utf8File.writeText("Line 1\n$padding\n$emojiLine\nLine 3\n")
+        AdbReporter.setLogFile(utf8File)
+
+        val recent = AdbReporter.getRecentLogs(2)
+        assertEquals(2, recent.size)
+        assertEquals(emojiLine, recent[0])
+        assertEquals("Line 3", recent[1])
+    }
+
+    @Test
+    fun testFileWithoutNewlines() {
+        val noNewlineFile = tempFolder.newFile("no_newline.log")
+        noNewlineFile.writeText("Single line log entry without trailing newline")
+        AdbReporter.setLogFile(noNewlineFile)
+
+        val recent = AdbReporter.getRecentLogs(10)
+        assertEquals(1, recent.size)
+        assertEquals("Single line log entry without trailing newline", recent[0])
+    }
+
+    @Test
+    fun testFileWithAndWithoutTrailingNewline() {
+        val fileWithTrailing = tempFolder.newFile("trailing_newline.log")
+        fileWithTrailing.writeText("Alpha\nBeta\nGamma\n")
+        AdbReporter.setLogFile(fileWithTrailing)
+        val recentWith = AdbReporter.getRecentLogs(2)
+        assertEquals(listOf("Beta", "Gamma"), recentWith)
+
+        val fileWithoutTrailing = tempFolder.newFile("no_trailing_newline.log")
+        fileWithoutTrailing.writeText("Alpha\nBeta\nGamma")
+        AdbReporter.setLogFile(fileWithoutTrailing)
+        val recentWithout = AdbReporter.getRecentLogs(2)
+        assertEquals(listOf("Beta", "Gamma"), recentWithout)
+    }
 }
