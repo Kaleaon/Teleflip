@@ -127,31 +127,47 @@ class PollDialog(
             return true
         }
 
-        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
-            keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-        ) {
+        if (isDpadNavigationKey(keyCode)) {
             engines.values.forEach { it.commitCurrentChar() }
         }
 
         val focusedEdit = currentFocus as? EditText
-        if (focusedEdit != null) {
-            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
-                engines[focusedEdit.id]?.commitCurrentChar()
-                focusedEdit.setText("")
-                return true
-            }
-            val isInputKey =
-                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
-                    keyCode == KeyEvent.KEYCODE_STAR ||
-                    keyCode == KeyEvent.KEYCODE_POUND ||
-                    keyCode == KeyEvent.KEYCODE_DEL ||
-                    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-            if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
-                return true
-            }
-            engines[focusedEdit.id]?.commitCurrentChar()
+        if (focusedEdit != null && handleFocusedEditKey(focusedEdit, keyCode, event)) {
+            return true
         }
 
         return super.onKeyDown(keyCode, event)
+    }
+
+    private fun isDpadNavigationKey(keyCode: Int): Boolean =
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT -> true
+            else -> false
+        }
+
+    private fun handleFocusedEditKey(
+        focusedEdit: EditText,
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+            engines[focusedEdit.id]?.commitCurrentChar()
+            focusedEdit.setText("")
+            return true
+        }
+        val isInputKey =
+            (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                keyCode == KeyEvent.KEYCODE_STAR ||
+                keyCode == KeyEvent.KEYCODE_POUND ||
+                keyCode == KeyEvent.KEYCODE_DEL ||
+                keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+        val handled = isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true
+        if (!handled) {
+            engines[focusedEdit.id]?.commitCurrentChar()
+        }
+        return handled
     }
 }
