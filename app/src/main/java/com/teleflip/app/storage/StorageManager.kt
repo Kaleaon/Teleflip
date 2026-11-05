@@ -48,6 +48,7 @@ object StorageManager {
     private const val PREF_AUTO_DOWNLOAD = "pref_auto_download_media"
     private const val PREF_KEEP_MEDIA = "pref_keep_media_days"
     private const val PREF_SAVE_TO_DOWNLOADS = "pref_save_to_downloads"
+    private const val PREF_SYNC_CONTACTS = "pref_sync_contacts"
 
     private fun getPrefs(context: Context): SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -358,6 +359,19 @@ object StorageManager {
     ) {
         val prefs = getPrefs(context)
         prefs.edit().putBoolean(PREF_SAVE_TO_DOWNLOADS, enabled).apply()
+    }
+
+    fun isSyncContactsEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(PREF_SYNC_CONTACTS, true)
+    }
+
+    fun setSyncContactsEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(PREF_SYNC_CONTACTS, enabled).apply()
     }
 
     fun copyMediaFiles(

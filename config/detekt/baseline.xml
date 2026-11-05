@@ -3,6 +3,7 @@
   <ManuallySuppressedIssues></ManuallySuppressedIssues>
   <CurrentIssues>
     <ID>CollapsibleIfStatements:KeypadInputEngine.kt$KeypadInputEngine.&lt;no name provided&gt;$if (eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) { if (lastKeyCode != -1) { val curStart = editText.selectionStart val curEnd = editText.selectionEnd if (curStart != expectedSelection || curEnd != curStart) { commitCurrentChar() } } }</ID>
+    <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) { if (telegramManager.authState.value is AuthState.Ready &amp;&amp; telegramManager.syncContactsEnabled) { telegramManager.syncContacts() } }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (SoftkeyUtils.isSoftLeftKey(keyCode)) { if (softkeyManager.handleKeyEvent(keyCode, event)) return true }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (SoftkeyUtils.isSoftRightKey(keyCode)) { if (softkeyManager.handleKeyEvent(keyCode, event)) return true }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_DPAD_UP) { if (vh != null) { val pos = vh.adapterPosition if (pos &gt; 0) { focusChatAt(pos - 1) return true } else if (pos == 0) { focusSelectedTabView() return true } } }</ID>
@@ -70,6 +71,7 @@
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun syncContacts(onComplete: ((Boolean, Int) -&gt; Unit)? = null)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun updateUserCache(user: TdApi.User)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$override fun onResult(obj: TdApi.Object?)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$private fun addOrUpdateChat(chat: TdApi.Chat)</ID>
@@ -301,6 +303,7 @@
     <ID>MaxLineLength:TelegramFeatures.kt$TelegramFeatures$messages.messages.filterNotNull().sortedBy { m -&gt; (m.schedulingState as? TdApi.MessageSchedulingStateSendAtDate)?.sendDate ?: Int.MAX_VALUE }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$TdApi.CallStateReady.CONSTRUCTOR -&gt; if (_activeCall.value?.callId == call.id &amp;&amp; _activeCall.value?.state == CallState.READY) CallState.READY else CallState.CONNECTING</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$TdApi.MessageContact.CONSTRUCTOR -&gt; (content as TdApi.MessageContact).contact.let { "Contact: ${it.firstName} ${it.lastName}\n${it.phoneNumber}".trim() }</ID>
+    <ID>MaxLineLength:TelegramManager.kt$TelegramManager$_chats.update { chats -&gt; chats.map { if (it.id == chatId) it.copy(isArchived = newValue, isPinned = if (newValue) false else it.isPinned) else it } }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$_messages.update { current -&gt; current + (chatId to current[chatId].orEmpty().map { if (it.id == messageId) it.copy(isPinned = newValue) else it }) }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$check(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { "Microphone permission is required for calls" }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$current + (updateEdited.chatId to current[updateEdited.chatId].orEmpty().map { if (it.id == updateEdited.messageId) it.copy(hasBotButtons = hasButtons) else it })</ID>
