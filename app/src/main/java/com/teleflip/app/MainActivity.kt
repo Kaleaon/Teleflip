@@ -5991,10 +5991,11 @@ class MainActivity : AppCompatActivity() {
 
         // In Settings: Route keypad keys to settings input engine matching focused field
         if (currentScreen == Screen.SETTINGS) {
-            val focusedView = currentFocus
-                ?: settingsInputEngines.keys
-                    .mapNotNull { findViewById<View>(it) }
-                    .firstOrNull { it.hasFocus() }
+            val focusedView =
+                currentFocus
+                    ?: settingsInputEngines.keys
+                        .mapNotNull { findViewById<View>(it) }
+                        .firstOrNull { it.hasFocus() }
             val focusedId = focusedView?.id
             if (focusedId != null) {
                 val engine = settingsInputEngines[focusedId]

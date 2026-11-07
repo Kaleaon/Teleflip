@@ -437,12 +437,13 @@ class MediaViewerDialog(
 
     internal fun startProgressTracking() {
         stopProgressTracking()
-        progressJob = dialogScope.launch {
-            while (isActive) {
-                updateProgressUI()
-                delay(250L)
+        progressJob =
+            dialogScope.launch {
+                while (isActive) {
+                    updateProgressUI()
+                    delay(250L)
+                }
             }
-        }
     }
 
     internal fun stopProgressTracking() {
