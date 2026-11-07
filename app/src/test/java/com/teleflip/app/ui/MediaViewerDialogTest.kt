@@ -430,16 +430,17 @@ class MediaViewerDialogTest {
         val sampleVideoFile = tempFolder.newFile("sample_video.mp4")
         FileOutputStream(sampleVideoFile).use { it.write("fake video content".toByteArray()) }
 
-        val videoMessage = MessageModel(
-            id = 10,
-            chatId = 100,
-            senderName = "Test",
-            text = "Video test",
-            time = "10:00 AM",
-            isOutbound = false,
-            mediaType = MediaType.VIDEO,
-            mediaFilePath = sampleVideoFile.absolutePath,
-        )
+        val videoMessage =
+            MessageModel(
+                id = 10,
+                chatId = 100,
+                senderName = "Test",
+                text = "Video test",
+                time = "10:00 AM",
+                isOutbound = false,
+                mediaType = MediaType.VIDEO,
+                mediaFilePath = sampleVideoFile.absolutePath,
+            )
 
         val dialog = MediaViewerDialog(context, videoMessage, {}, {})
         dialog.show()
@@ -470,16 +471,17 @@ class MediaViewerDialogTest {
 
     @Test
     fun testProgressLayoutVisibility_photoAndSticker_gone() {
-        val photoMessage = MessageModel(
-            id = 11,
-            chatId = 100,
-            senderName = "Test",
-            text = "Photo test",
-            time = "10:00 AM",
-            isOutbound = false,
-            mediaType = MediaType.PHOTO,
-            mediaFilePath = samplePhotoFile.absolutePath,
-        )
+        val photoMessage =
+            MessageModel(
+                id = 11,
+                chatId = 100,
+                senderName = "Test",
+                text = "Photo test",
+                time = "10:00 AM",
+                isOutbound = false,
+                mediaType = MediaType.PHOTO,
+                mediaFilePath = samplePhotoFile.absolutePath,
+            )
 
         val dialog = MediaViewerDialog(context, photoMessage, {}, {})
         dialog.show()
