@@ -64,10 +64,10 @@ class KeypadInputEngine(
         val externalFocusListener = editText.onFocusChangeListener
         editText.onFocusChangeListener =
             View.OnFocusChangeListener { v, hasFocus ->
-                if (!hasFocus) {
-                    commitCurrentChar()
-                } else {
+                if (hasFocus) {
                     updateModeIndicator()
+                } else {
+                    commitCurrentChar()
                 }
                 externalFocusListener?.onFocusChange(v, hasFocus)
             }
