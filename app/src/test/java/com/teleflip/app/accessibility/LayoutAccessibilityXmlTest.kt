@@ -136,10 +136,8 @@ class LayoutAccessibilityXmlTest {
         tagName: String,
         result: MutableList<org.w3c.dom.Node> = mutableListOf()
     ): List<org.w3c.dom.Node> {
-        if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE) {
-            if (node.nodeName == tagName) {
-                result.add(node)
-            }
+        if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE && node.nodeName == tagName) {
+            result.add(node)
         }
         val children = node.childNodes
         for (i in 0 until children.length) {

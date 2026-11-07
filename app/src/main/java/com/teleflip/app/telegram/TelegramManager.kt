@@ -4278,6 +4278,21 @@ class TelegramManager(
         tdClient?.send(TdApi.SetNetworkType(type)) { /* no-op */ }
     }
 
+    fun toggleChatMute(
+        chatId: Long,
+        currentMuted: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(currentMuted)
+            return
+        }
+        val newMuted = !currentMuted
+        val muteFor = if (newMuted) Int.MAX_VALUE else 0
+        setChatNotificationMute(chatId, muteFor, onResult)
+    }
+
     fun setChatNotificationMute(
         chatId: Long,
         muteForSeconds: Int,
