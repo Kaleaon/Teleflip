@@ -4221,8 +4221,12 @@ class MainActivity : AppCompatActivity() {
         }
         options.add(
             MenuOption(options.size + 1, if (msg.isPinned) "📌 Unpin Message" else "📌 Pin Message") {
-                telegramManager.togglePinMessage(msg.chatId, msg.id, msg.isPinned) { isNowPinned ->
-                    showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                if (msg.isPinned) {
+                    telegramManager.togglePinMessage(msg.chatId, msg.id, msg.isPinned) { isNowPinned ->
+                        showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                    }
+                } else {
+                    showPinMessageOptionsDialog(msg)
                 }
             },
         )
@@ -4351,6 +4355,33 @@ class MainActivity : AppCompatActivity() {
         options.add(MenuOption(options.size + 1, "Delete Message") { featureMenus.delete(msg) })
 
         OptionsMenuDialog(this, "Message Actions", options).show()
+    }
+
+    private fun showPinMessageOptionsDialog(msg: MessageModel) {
+        val options =
+            listOf(
+                MenuOption(1, "🔔 Pin and Notify Members") {
+                    telegramManager.togglePinMessage(
+                        chatId = msg.chatId,
+                        messageId = msg.id,
+                        currentPinned = false,
+                        disableNotification = false,
+                    ) { isNowPinned ->
+                        showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                    }
+                },
+                MenuOption(2, "🔕 Pin Silently") {
+                    telegramManager.togglePinMessage(
+                        chatId = msg.chatId,
+                        messageId = msg.id,
+                        currentPinned = false,
+                        disableNotification = true,
+                    ) { isNowPinned ->
+                        showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                    }
+                },
+            )
+        OptionsMenuDialog(this, "Pin Message", options).show()
     }
 
     private fun handleChatAccessibilityAction(

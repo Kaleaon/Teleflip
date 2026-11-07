@@ -295,4 +295,59 @@ class TelegramParityFeaturesTest {
         assertEquals(2, quizMsg?.pollCorrectOptionIndex)
         assertEquals("Key # switches between Abc, abc, ABC, and 123", quizMsg?.pollExplanation)
     }
+
+    @Test
+    fun testTogglePinMessageWithDisableNotificationFalse() {
+        val client = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(client)
+        telegramManager.togglePinMessage(chatId = 77L, messageId = 888L, currentPinned = false, disableNotification = false)
+
+        val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        Mockito.verify(client).send(captor.capture(), Mockito.any())
+        val pinRequest = captor.value as TdApi.PinChatMessage
+        assertEquals(77L, pinRequest.chatId)
+        assertEquals(888L, pinRequest.messageId)
+        assertFalse(pinRequest.disableNotification)
+    }
+
+    @Test
+    fun testTogglePinMessageWithDisableNotificationTrue() {
+        val client = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(client)
+        telegramManager.togglePinMessage(chatId = 77L, messageId = 888L, currentPinned = false, disableNotification = true)
+
+        val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        Mockito.verify(client).send(captor.capture(), Mockito.any())
+        val pinRequest = captor.value as TdApi.PinChatMessage
+        assertEquals(77L, pinRequest.chatId)
+        assertEquals(888L, pinRequest.messageId)
+        assertTrue(pinRequest.disableNotification)
+    }
+
+    @Test
+    fun testTogglePinMessageDefaultDisableNotification() {
+        val client = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(client)
+        telegramManager.togglePinMessage(chatId = 77L, messageId = 888L, currentPinned = false)
+
+        val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        Mockito.verify(client).send(captor.capture(), Mockito.any())
+        val pinRequest = captor.value as TdApi.PinChatMessage
+        assertEquals(77L, pinRequest.chatId)
+        assertEquals(888L, pinRequest.messageId)
+        assertFalse(pinRequest.disableNotification)
+    }
+
+    @Test
+    fun testTogglePinMessageUnpinMessage() {
+        val client = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(client)
+        telegramManager.togglePinMessage(chatId = 77L, messageId = 888L, currentPinned = true)
+
+        val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        Mockito.verify(client).send(captor.capture(), Mockito.any())
+        val unpinRequest = captor.value as TdApi.UnpinChatMessage
+        assertEquals(77L, unpinRequest.chatId)
+        assertEquals(888L, unpinRequest.messageId)
+    }
 }
