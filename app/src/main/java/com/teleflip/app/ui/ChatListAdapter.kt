@@ -14,10 +14,12 @@ import com.teleflip.app.accessibility.AccessibilityActionManager
 import com.teleflip.app.model.ChatModel
 
 class ChatListAdapter(
-    private val onChatSelected: (ChatModel) -> Unit = {},
     private val onChatFocused: ((ChatModel) -> Unit)? = null,
+    private val onChatSelected: (ChatModel) -> Unit,
     private val onChatAction: ((actionId: Int, chat: ChatModel) -> Boolean)? = null,
 ) : ListAdapter<ChatModel, ChatListAdapter.ChatViewHolder>(ChatDiffCallback()) {
+    constructor(onChatSelected: (ChatModel) -> Unit) : this(null, onChatSelected, null)
+
     private var attachedRecyclerView: RecyclerView? = null
 
     override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
