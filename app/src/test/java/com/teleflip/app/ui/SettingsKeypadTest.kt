@@ -80,7 +80,8 @@ class SettingsKeypadTest {
         assertTrue(etApiId.hasFocus())
         etApiId.setText("")
 
-        // Switch et_api_id to NUMERIC mode by pressing '#' 3 times (CAP_FIRST -> LOWER -> UPPER -> NUMERIC)
+        // Cycle et_api_id through modes back to NUMERIC (NUMERIC -> CAP_FIRST -> LOWER -> UPPER -> NUMERIC)
+        dispatchKey(activity, KeyEvent.KEYCODE_POUND)
         dispatchKey(activity, KeyEvent.KEYCODE_POUND)
         dispatchKey(activity, KeyEvent.KEYCODE_POUND)
         dispatchKey(activity, KeyEvent.KEYCODE_POUND)
@@ -111,19 +112,19 @@ class SettingsKeypadTest {
         etApiHash.requestFocus()
         etApiHash.setText("")
 
-        // Press '#' (POUND) to cycle mode: CAP_FIRST -> LOWER
+        // Press '#' (POUND) to cycle mode: LOWER -> UPPER
         dispatchKey(activity, KeyEvent.KEYCODE_POUND)
 
-        // Type '2' -> 'a' in LOWER mode
+        // Type '2' -> 'A' in UPPER mode
         dispatchKey(activity, KeyEvent.KEYCODE_2)
-        assertEquals("a", etApiHash.text.toString())
+        assertEquals("A", etApiHash.text.toString())
 
         // Manual commit with DPAD_RIGHT
         dispatchKey(activity, KeyEvent.KEYCODE_DPAD_RIGHT)
 
-        // Press '2' again immediately -> appends new 'a' rather than cycling to 'b'
+        // Press '2' again immediately -> appends new 'A' rather than cycling to 'B'
         dispatchKey(activity, KeyEvent.KEYCODE_2)
-        assertEquals("aa", etApiHash.text.toString())
+        assertEquals("AA", etApiHash.text.toString())
     }
 
     @Test

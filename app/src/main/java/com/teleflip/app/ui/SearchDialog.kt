@@ -97,16 +97,38 @@ class SearchDialog(
         rvResults.itemAnimator = null
 
         chatAdapter =
-            ChatListAdapter { chat ->
-                dismiss()
-                onChatSelected(chat)
-            }
+            ChatListAdapter(
+                onChatSelected = { chat ->
+                    dismiss()
+                    onChatSelected(chat)
+                },
+                onChatAction = { actionId, chat ->
+                    if (actionId == com.teleflip.app.R.id.action_chat_open) {
+                        dismiss()
+                        onChatSelected(chat)
+                        true
+                    } else {
+                        false
+                    }
+                },
+            )
 
         messageSearchAdapter =
-            MessageSearchResultAdapter { result ->
-                dismiss()
-                onMessageSelected(result.chatId, result.messageId)
-            }
+            MessageSearchResultAdapter(
+                onItemClick = { result ->
+                    dismiss()
+                    onMessageSelected(result.chatId, result.messageId)
+                },
+                onSearchResultAccessibilityAction = { actionId, result ->
+                    if (actionId == com.teleflip.app.R.id.action_search_jump) {
+                        dismiss()
+                        onMessageSelected(result.chatId, result.messageId)
+                        true
+                    } else {
+                        false
+                    }
+                },
+            )
 
         setupTabs()
         setupSearchInput()
@@ -124,6 +146,7 @@ class SearchDialog(
     }
 
     fun selectTab(tab: SearchTab) {
+        val prevFocused = currentFocus
         currentTab = tab
         tabChats.isSelected = (tab == SearchTab.CHATS)
         tabContacts.isSelected = (tab == SearchTab.CONTACTS)
@@ -135,6 +158,16 @@ class SearchDialog(
             }
             SearchTab.MESSAGES -> {
                 rvResults.adapter = messageSearchAdapter
+            }
+        }
+
+        if (prevFocused == etSearchInput) {
+            etSearchInput.requestFocus()
+        } else if (prevFocused == tabChats || prevFocused == tabContacts || prevFocused == tabMessages) {
+            when (tab) {
+                SearchTab.CHATS -> tabChats.requestFocus()
+                SearchTab.CONTACTS -> tabContacts.requestFocus()
+                SearchTab.MESSAGES -> tabMessages.requestFocus()
             }
         }
 
@@ -217,6 +250,20 @@ class SearchDialog(
         )
     }
 
+    private fun performSearch(query: String) {
+        searchJob?.cancel()
+        val requestId = ++searchSequence
+        performSearch(query.trim(), requestId)
+    }
+
+    private fun restoreFocusIfNeeded(focusedBefore: View?) {
+        if (focusedBefore == etSearchInput) {
+            etSearchInput.requestFocus()
+        } else if (focusedBefore == tabChats || focusedBefore == tabContacts || focusedBefore == tabMessages) {
+            focusedBefore.requestFocus()
+        }
+    }
+
     private fun performSearch(
         trimmed: String,
         requestId: Long,
@@ -237,6 +284,7 @@ class SearchDialog(
             SearchTab.CHATS -> {
                 telegramManager.searchChats(trimmed) { results ->
                     if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchChats
+                    val focusedBefore = currentFocus
                     progressBar.visibility = View.GONE
                     chatAdapter?.submitList(results)
                     if (results.isEmpty()) {
@@ -245,11 +293,13 @@ class SearchDialog(
                     } else {
                         layoutEmpty.visibility = View.GONE
                     }
+                    restoreFocusIfNeeded(focusedBefore)
                 }
             }
             SearchTab.CONTACTS -> {
                 telegramManager.searchContacts(trimmed) { results ->
                     if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchContacts
+                    val focusedBefore = currentFocus
                     progressBar.visibility = View.GONE
                     chatAdapter?.submitList(results)
                     if (results.isEmpty()) {
@@ -258,6 +308,7 @@ class SearchDialog(
                     } else {
                         layoutEmpty.visibility = View.GONE
                     }
+                    restoreFocusIfNeeded(focusedBefore)
                 }
             }
             SearchTab.MESSAGES -> {
@@ -265,6 +316,7 @@ class SearchDialog(
                 messageNextOffset = ""
                 telegramManager.searchMessages(trimmed, offset = "", limit = 20) { _, results, nextOffset ->
                     if (requestId != searchSequence || trimmed != currentQuery.trim()) return@searchMessages
+                    val focusedBefore = currentFocus
                     isMessageLoading = false
                     messageNextOffset = nextOffset
                     progressBar.visibility = View.GONE
@@ -276,6 +328,7 @@ class SearchDialog(
                     } else {
                         layoutEmpty.visibility = View.GONE
                     }
+                    restoreFocusIfNeeded(focusedBefore)
                 }
             }
         }
@@ -324,7 +377,13 @@ class SearchDialog(
         dialogScope.cancel()
     }
 
+    override fun onBackPressed() {
+        keypadEngine?.commitCurrentChar()
+        dismiss()
+    }
+
     override fun dismiss() {
+        keypadEngine?.commitCurrentChar()
         searchJob?.cancel()
         dialogScope.cancel()
         super.dismiss()
@@ -334,7 +393,8 @@ class SearchDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
+        if (isBackOrRightSoftKey(keyCode)) {
+            keypadEngine?.commitCurrentChar()
             dismiss()
             return true
         }
@@ -362,12 +422,6 @@ class SearchDialog(
                 val count = rvResults.adapter?.itemCount ?: 0
                 if (count > 0) {
                     focusResultAt(0)
-                } else {
-                    when (currentTab) {
-                        SearchTab.CHATS -> tabChats.requestFocus()
-                        SearchTab.CONTACTS -> tabContacts.requestFocus()
-                        SearchTab.MESSAGES -> tabMessages.requestFocus()
-                    }
                 }
                 return true
             }
