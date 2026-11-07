@@ -109,7 +109,6 @@
 
             <Button
                 android:id="@+id/btn_call_accept"
-                android:nextFocusDown="@id/btn_call_mute"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:text="📞 Accept Call"
@@ -118,6 +117,12 @@
                 android:textStyle="bold"
                 android:background="@drawable/bg_button_selector"
                 android:visibility="gone"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusUp="@+id/btn_call_end"
+                android:nextFocusDown="@+id/btn_call_mute"
+                android:nextFocusLeft="@+id/btn_call_accept"
+                android:nextFocusRight="@+id/btn_call_accept"
                 android:layout_marginBottom="10dp" />
 
             <LinearLayout
@@ -128,8 +133,6 @@
 
                 <Button
                     android:id="@+id/btn_call_mute"
-                    android:nextFocusRight="@id/btn_call_speaker"
-                    android:nextFocusDown="@id/btn_call_end"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
@@ -137,12 +140,16 @@
                     android:textColor="@color/text_primary"
                     android:textSize="13sp"
                     android:background="@drawable/bg_button_selector"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusUp="@+id/btn_call_accept"
+                    android:nextFocusDown="@+id/btn_call_end"
+                    android:nextFocusLeft="@+id/btn_call_speaker"
+                    android:nextFocusRight="@+id/btn_call_speaker"
                     android:layout_marginEnd="6dp" />
 
                 <Button
                     android:id="@+id/btn_call_speaker"
-                    android:nextFocusLeft="@id/btn_call_mute"
-                    android:nextFocusDown="@id/btn_call_end"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
@@ -150,19 +157,30 @@
                     android:textColor="@color/text_primary"
                     android:textSize="13sp"
                     android:background="@drawable/bg_button_selector"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusUp="@+id/btn_call_accept"
+                    android:nextFocusDown="@+id/btn_call_end"
+                    android:nextFocusLeft="@+id/btn_call_mute"
+                    android:nextFocusRight="@+id/btn_call_mute"
                     android:layout_marginStart="6dp" />
             </LinearLayout>
 
             <Button
                 android:id="@+id/btn_call_end"
-                android:nextFocusUp="@id/btn_call_mute"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:text="❌ End Call"
                 android:textColor="@color/text_error"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:background="@drawable/bg_button_selector" />
+                android:background="@drawable/bg_button_selector"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusUp="@+id/btn_call_mute"
+                android:nextFocusDown="@+id/btn_call_accept"
+                android:nextFocusLeft="@+id/btn_call_end"
+                android:nextFocusRight="@+id/btn_call_end" />
         </LinearLayout>
 
     </LinearLayout>
