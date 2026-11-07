@@ -76,6 +76,19 @@ class ProxySettingsDialogTest {
     }
 
     @Test
+    fun testInputKeysNotConsumedWhenNoEditTextFocused() {
+        val dialog = ProxySettingsDialog(context, mockTelegramManager)
+        dialog.show()
+
+        dialog.currentFocus?.clearFocus()
+
+        val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
+        val handled = dialog.onKeyDown(KeyEvent.KEYCODE_2, event)
+
+        assertFalse("KEYCODE_2 should not be consumed when no EditText is focused", handled)
+    }
+
+    @Test
     fun testBackNavigationCommitsPendingCharacter() {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
@@ -92,6 +105,27 @@ class ProxySettingsDialogTest {
         assertTrue("KEYCODE_BACK should be handled by onKeyDown", handled)
         assertEquals("A", etServer.text.toString())
         assertFalse("Dialog should be dismissed after back key", dialog.isShowing)
+    }
+
+    @Test
+    fun testSoftRightKeyCommitsAndDismissesDialog() {
+        val dialog = ProxySettingsDialog(context, mockTelegramManager)
+        dialog.show()
+
+        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        etServer.requestFocus()
+
+        val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
+        dialog.onKeyDown(KeyEvent.KEYCODE_2, event2)
+
+        assertTrue(dialog.isShowing)
+
+        val softRightEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SOFT_RIGHT)
+        val handled = dialog.onKeyDown(KeyEvent.KEYCODE_SOFT_RIGHT, softRightEvent)
+
+        assertTrue("Soft Right key should be handled in onKeyDown", handled)
+        assertFalse("Dialog should be dismissed after Soft Right key", dialog.isShowing)
+        assertEquals("A", etServer.text.toString())
     }
 
     @Test
