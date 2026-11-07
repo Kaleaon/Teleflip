@@ -35,7 +35,7 @@ class ListFocusPreservationTest {
         recyclerView.layoutManager = LinearLayoutManager(activity)
         activity.setContentView(recyclerView)
 
-        val adapter = ChatListAdapter {}
+        val adapter = ChatListAdapter(onChatSelected = {})
         recyclerView.adapter = adapter
 
         val chat1 = ChatModel(101L, "Chat 1", "Msg 1", "10:00", 0, ChatType.DIRECT, "C1")
@@ -81,7 +81,7 @@ class ListFocusPreservationTest {
         recyclerView.layoutManager = LinearLayoutManager(activity)
         activity.setContentView(recyclerView)
 
-        val adapter = ChatListAdapter {}
+        val adapter = ChatListAdapter(onChatSelected = {})
         recyclerView.adapter = adapter
 
         val chat1 = ChatModel(101L, "Chat 1", "Msg 1", "10:00", 0, ChatType.DIRECT, "C1")
