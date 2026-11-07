@@ -10,17 +10,31 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.R
+import com.teleflip.app.accessibility.AccessibilityActionManager
 import com.teleflip.app.model.ChatModel
 
 class ChatListAdapter(
+    private val onChatFocused: ((ChatModel) -> Unit)? = null,
     private val onChatSelected: (ChatModel) -> Unit,
+    private val onChatAction: ((actionId: Int, chat: ChatModel) -> Boolean)? = null,
 ) : ListAdapter<ChatModel, ChatListAdapter.ChatViewHolder>(ChatDiffCallback()) {
     override fun submitList(newItems: List<ChatModel>?) {
         super.submitList(if (newItems != null) ArrayList(newItems) else null)
     }
 
+    override fun submitList(
+        newItems: List<ChatModel>?,
+        commitCallback: Runnable?,
+    ) {
+        super.submitList(if (newItems != null) ArrayList(newItems) else null, commitCallback)
+    }
+
     fun getItemAt(position: Int): ChatModel? {
         return if (position in 0 until currentList.size) getItem(position) else null
+    }
+
+    fun getPositionForChatId(chatId: Long): Int {
+        return currentList.indexOfFirst { it.id == chatId }
     }
 
     override fun onCreateViewHolder(
@@ -41,6 +55,7 @@ class ChatListAdapter(
     override fun onViewRecycled(holder: ChatViewHolder) {
         super.onViewRecycled(holder)
         holder.clearImage()
+        AccessibilityActionManager.clearActions(holder.itemView)
     }
 
     inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -109,8 +124,23 @@ class ChatListAdapter(
                 tvUnread.visibility = View.GONE
             }
 
+            itemView.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    onChatFocused?.invoke(chat)
+                }
+            }
+
             itemView.setOnClickListener {
                 onChatSelected(chat)
+            }
+
+            AccessibilityActionManager.bindActions(itemView, chat) { actionId, item ->
+                if (actionId == R.id.action_chat_open) {
+                    onChatSelected(item)
+                    true
+                } else {
+                    onChatAction?.invoke(actionId, item) ?: false
+                }
             }
         }
 
