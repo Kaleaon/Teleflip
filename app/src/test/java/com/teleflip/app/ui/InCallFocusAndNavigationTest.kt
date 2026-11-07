@@ -20,7 +20,6 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 @RunWith(RobolectricTestRunner::class)
 class InCallFocusAndNavigationTest {
-
     private val androidNs = "http://schemas.android.com/apk/res/android"
     private lateinit var activity: MainActivity
 
@@ -80,13 +79,14 @@ class InCallFocusAndNavigationTest {
 
     @Test
     fun testIncomingPendingCallFocusesAcceptButton() {
-        val incomingCall = ActiveCall(
-            callId = 100,
-            userId = 200L,
-            userName = "Alice",
-            isOutgoing = false,
-            state = CallState.PENDING
-        )
+        val incomingCall =
+            ActiveCall(
+                callId = 100,
+                userId = 200L,
+                userName = "Alice",
+                isOutgoing = false,
+                state = CallState.PENDING,
+            )
 
         val showInCallScreenMethod = MainActivity::class.java.getDeclaredMethod("showInCallScreen", ActiveCall::class.java)
         showInCallScreenMethod.isAccessible = true
@@ -102,13 +102,14 @@ class InCallFocusAndNavigationTest {
 
     @Test
     fun testActiveCallFocusesMuteButton() {
-        val activeCall = ActiveCall(
-            callId = 101,
-            userId = 201L,
-            userName = "Bob",
-            isOutgoing = true,
-            state = CallState.READY
-        )
+        val activeCall =
+            ActiveCall(
+                callId = 101,
+                userId = 201L,
+                userName = "Bob",
+                isOutgoing = true,
+                state = CallState.READY,
+            )
 
         val showInCallScreenMethod = MainActivity::class.java.getDeclaredMethod("showInCallScreen", ActiveCall::class.java)
         showInCallScreenMethod.isAccessible = true
@@ -125,13 +126,14 @@ class InCallFocusAndNavigationTest {
 
     @Test
     fun testPendingToActiveCallTransitionTransfersFocusToMuteButton() {
-        val pendingCall = ActiveCall(
-            callId = 102,
-            userId = 202L,
-            userName = "Charlie",
-            isOutgoing = false,
-            state = CallState.PENDING
-        )
+        val pendingCall =
+            ActiveCall(
+                callId = 102,
+                userId = 202L,
+                userName = "Charlie",
+                isOutgoing = false,
+                state = CallState.PENDING,
+            )
 
         val showInCallScreenMethod = MainActivity::class.java.getDeclaredMethod("showInCallScreen", ActiveCall::class.java)
         showInCallScreenMethod.isAccessible = true
@@ -156,13 +158,14 @@ class InCallFocusAndNavigationTest {
 
     @Test
     fun testDpadCenterKeyTriggersClickOnFocusedButton() {
-        val activeCall = ActiveCall(
-            callId = 103,
-            userId = 203L,
-            userName = "Dave",
-            isOutgoing = true,
-            state = CallState.READY
-        )
+        val activeCall =
+            ActiveCall(
+                callId = 103,
+                userId = 203L,
+                userName = "Dave",
+                isOutgoing = true,
+                state = CallState.READY,
+            )
 
         val showInCallScreenMethod = MainActivity::class.java.getDeclaredMethod("showInCallScreen", ActiveCall::class.java)
         showInCallScreenMethod.isAccessible = true
@@ -183,7 +186,10 @@ class InCallFocusAndNavigationTest {
         assertTrue("Focused button click listener should be invoked on DPAD_CENTER press", clicked)
     }
 
-    private fun getAttr(node: org.w3c.dom.Node?, attrName: String): String? {
+    private fun getAttr(
+        node: org.w3c.dom.Node?,
+        attrName: String,
+    ): String? {
         return node?.attributes?.getNamedItemNS(androidNs, attrName)?.nodeValue
     }
 
