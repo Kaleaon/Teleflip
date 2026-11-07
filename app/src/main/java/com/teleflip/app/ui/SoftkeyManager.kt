@@ -19,11 +19,18 @@ class SoftkeyManager(
     private var onLeftClick: (() -> Unit)? = null
     private var onCenterClick: (() -> Unit)? = null
     private var onRightClick: (() -> Unit)? = null
+    private var onCenterLongClick: (() -> Unit)? = null
 
     init {
         tvLeft.setOnClickListener { onLeftClick?.invoke() }
         tvCenter.setOnClickListener { onCenterClick?.invoke() }
         tvRight.setOnClickListener { onRightClick?.invoke() }
+        tvCenter.setOnLongClickListener {
+            onCenterLongClick?.let {
+                it.invoke()
+                true
+            } ?: false
+        }
     }
 
     fun setSoftkeyBarVisible(visible: Boolean) {
@@ -37,6 +44,7 @@ class SoftkeyManager(
         onLeft: (() -> Unit)? = null,
         onCenter: (() -> Unit)? = null,
         onRight: (() -> Unit)? = null,
+        onCenterLongClick: (() -> Unit)? = null,
     ) {
         tvLeft.text = left
         tvCenter.text = center
@@ -49,6 +57,7 @@ class SoftkeyManager(
         this.onLeftClick = onLeft
         this.onCenterClick = onCenter
         this.onRightClick = onRight
+        this.onCenterLongClick = onCenterLongClick
     }
 
     fun handleKeyEvent(
