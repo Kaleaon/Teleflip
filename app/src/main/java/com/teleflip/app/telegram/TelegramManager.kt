@@ -1062,7 +1062,11 @@ class TelegramManager(
         }
     }
 
-    private fun updateLocalPinnedState(chatId: Long, messageId: Long, newPinned: Boolean) {
+    private fun updateLocalPinnedState(
+        chatId: Long,
+        messageId: Long,
+        newPinned: Boolean,
+    ) {
         _messages.update { current ->
             val chatMsgs =
                 (current[chatId] ?: emptyList()).map { msg ->
@@ -5552,7 +5556,10 @@ class TelegramManager(
         }
     }
 
-    private fun syncPinnedMessagesToChat(chatId: Long, chat: ChatModel?) {
+    private fun syncPinnedMessagesToChat(
+        chatId: Long,
+        chat: ChatModel?,
+    ) {
         if (chat == null) return
         val allPinnedMsgIds = _messages.value[chatId].orEmpty().filter { it.isPinned }.map { it.id }
         if (allPinnedMsgIds.isNotEmpty()) {

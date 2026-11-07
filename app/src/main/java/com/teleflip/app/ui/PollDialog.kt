@@ -312,7 +312,8 @@ class PollDialog(
             KeyEvent.KEYCODE_DPAD_UP,
             KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT,
-            KeyEvent.KEYCODE_DPAD_RIGHT -> true
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            -> true
             else -> false
         }
 
