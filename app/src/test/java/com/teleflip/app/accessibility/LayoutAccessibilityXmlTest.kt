@@ -31,23 +31,24 @@ class LayoutAccessibilityXmlTest {
         val headerView = SectionHeaderView(context)
         assertTrue(
             "SectionHeaderView must be marked as an accessibility heading",
-            ViewCompat.isAccessibilityHeading(headerView)
+            ViewCompat.isAccessibilityHeading(headerView),
         )
     }
 
     @Test
     fun testSectionHeaderViewsInLayoutXmlFiles() {
-        val layoutFiles = listOf(
-            "view_settings.xml",
-            "view_profile.xml",
-            "dialog_diagnostics.xml",
-            "dialog_create_poll.xml",
-            "view_login.xml",
-            "view_passcode_lock.xml",
-            "dialog_new_chat.xml",
-            "dialog_search.xml",
-            "dialog_options_menu.xml"
-        )
+        val layoutFiles =
+            listOf(
+                "view_settings.xml",
+                "view_profile.xml",
+                "dialog_diagnostics.xml",
+                "dialog_create_poll.xml",
+                "view_login.xml",
+                "view_passcode_lock.xml",
+                "dialog_new_chat.xml",
+                "dialog_search.xml",
+                "dialog_options_menu.xml",
+            )
 
         for (filename in layoutFiles) {
             val file = getLayoutFile(filename)
@@ -55,7 +56,7 @@ class LayoutAccessibilityXmlTest {
             val sectionHeaders = findNodesByTagName(doc, "com.teleflip.app.ui.SectionHeaderView")
             assertTrue(
                 "Layout $filename should contain at least one <com.teleflip.app.ui.SectionHeaderView>",
-                sectionHeaders.isNotEmpty()
+                sectionHeaders.isNotEmpty(),
             )
         }
     }
@@ -134,7 +135,7 @@ class LayoutAccessibilityXmlTest {
     private fun findNodesByTagName(
         node: org.w3c.dom.Node,
         tagName: String,
-        result: MutableList<org.w3c.dom.Node> = mutableListOf()
+        result: MutableList<org.w3c.dom.Node> = mutableListOf(),
     ): List<org.w3c.dom.Node> {
         if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE && node.nodeName == tagName) {
             result.add(node)
@@ -171,4 +172,3 @@ class LayoutAccessibilityXmlTest {
         return result
     }
 }
-
