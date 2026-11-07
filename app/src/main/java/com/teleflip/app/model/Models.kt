@@ -53,6 +53,7 @@ data class ChatModel(
     val isMuted: Boolean = false,
     val draftText: String = "",
     val pinnedMessageId: Long = 0L,
+    val pinnedMessageIds: List<Long> = emptyList(),
     val isArchived: Boolean = false,
     val folderName: String = "",
     val isSecretChat: Boolean = false,
@@ -67,7 +68,17 @@ data class ChatModel(
     // Unix timestamp (seconds) of the last message, used as sort fallback.
     val lastMessageDate: Long = 0L,
     val lastMessageId: Long = 0L,
-)
+) {
+    fun getEffectivePinnedMessageIds(): List<Long> {
+        return if (pinnedMessageIds.isNotEmpty()) {
+            pinnedMessageIds
+        } else if (pinnedMessageId != 0L) {
+            listOf(pinnedMessageId)
+        } else {
+            emptyList()
+        }
+    }
+}
 
 enum class MessageStatus {
     SENDING,
@@ -121,6 +132,10 @@ data class MessageModel(
     val pollIsAnonymous: Boolean = true,
     val pollIsClosed: Boolean = false,
     val pollTotalVoters: Int = 0,
+    val pollIsQuiz: Boolean = false,
+    val pollCorrectOptionIndex: Int = -1,
+    val pollExplanation: String = "",
+    val pollAllowsMultipleAnswers: Boolean = false,
     val messageThreadId: Long = 0L,
     val selfDestructSeconds: Int = 0,
     val transcript: String = "",
