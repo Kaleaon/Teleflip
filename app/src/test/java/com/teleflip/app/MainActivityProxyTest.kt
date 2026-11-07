@@ -34,6 +34,7 @@ class MainActivityProxyTest {
         val activity = controller.get()
 
         activity.telegramManager.setAuthStateForTesting(AuthState.WaitPhoneNumber(null))
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
 
         val btnProxy = activity.findViewById<Button>(R.id.btn_login_proxy)
 

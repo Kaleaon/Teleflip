@@ -132,6 +132,12 @@ class ProxyManagerTest {
     @Test
     fun testTelegramManagerDispatchesAddAndEnableProxy() {
         val mockClient = mock(Client::class.java)
+        org.mockito.Mockito.`doAnswer` { invocation ->
+            val handler = invocation.getArgument<Client.ResultHandler>(1)
+            handler.onResult(TdApi.AddedProxy().apply { id = 1 })
+            null
+        }.`when`(mockClient).send(any(), any())
+
         telegramManager.setTdClientForTesting(mockClient)
 
         val latch = java.util.concurrent.CountDownLatch(1)
@@ -146,7 +152,11 @@ class ProxyManagerTest {
             callback = { _, _ -> latch.countDown() },
         )
 
-        latch.await(2, java.util.concurrent.TimeUnit.SECONDS)
+        val startTime = System.currentTimeMillis()
+        while (latch.count > 0 && System.currentTimeMillis() - startTime < 5000) {
+            org.robolectric.shadows.ShadowLooper.idleMainLooper(50, java.util.concurrent.TimeUnit.MILLISECONDS)
+            Thread.sleep(50)
+        }
 
         verify(mockClient).send(queryCaptor.capture(), any())
         val query = queryCaptor.value
@@ -223,8 +233,11 @@ class ProxyManagerTest {
             latch.countDown()
         }
 
-        latch.await(2, java.util.concurrent.TimeUnit.SECONDS)
-        org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+        val startTime = System.currentTimeMillis()
+        while (latch.count > 0 && System.currentTimeMillis() - startTime < 5000) {
+            org.robolectric.shadows.ShadowLooper.idleMainLooper(50, java.util.concurrent.TimeUnit.MILLISECONDS)
+            Thread.sleep(50)
+        }
 
         verify(mockClient).send(queryCaptor.capture(), any())
         val query = queryCaptor.value
