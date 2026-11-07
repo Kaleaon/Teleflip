@@ -97,16 +97,38 @@ class SearchDialog(
         rvResults.itemAnimator = null
 
         chatAdapter =
-            ChatListAdapter { chat ->
-                dismiss()
-                onChatSelected(chat)
-            }
+            ChatListAdapter(
+                onChatSelected = { chat ->
+                    dismiss()
+                    onChatSelected(chat)
+                },
+                onChatAction = { actionId, chat ->
+                    if (actionId == com.teleflip.app.R.id.action_chat_open) {
+                        dismiss()
+                        onChatSelected(chat)
+                        true
+                    } else {
+                        false
+                    }
+                },
+            )
 
         messageSearchAdapter =
-            MessageSearchResultAdapter { result ->
-                dismiss()
-                onMessageSelected(result.chatId, result.messageId)
-            }
+            MessageSearchResultAdapter(
+                onItemClick = { result ->
+                    dismiss()
+                    onMessageSelected(result.chatId, result.messageId)
+                },
+                onSearchResultAccessibilityAction = { actionId, result ->
+                    if (actionId == com.teleflip.app.R.id.action_search_jump) {
+                        dismiss()
+                        onMessageSelected(result.chatId, result.messageId)
+                        true
+                    } else {
+                        false
+                    }
+                },
+            )
 
         setupTabs()
         setupSearchInput()
@@ -324,7 +346,13 @@ class SearchDialog(
         dialogScope.cancel()
     }
 
+    override fun onBackPressed() {
+        keypadEngine?.commitCurrentChar()
+        dismiss()
+    }
+
     override fun dismiss() {
+        keypadEngine?.commitCurrentChar()
         searchJob?.cancel()
         dialogScope.cancel()
         super.dismiss()
@@ -334,7 +362,8 @@ class SearchDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
+        if (isBackOrRightSoftKey(keyCode)) {
+            keypadEngine?.commitCurrentChar()
             dismiss()
             return true
         }
