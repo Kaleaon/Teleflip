@@ -349,6 +349,7 @@ class TelegramManager(
     var chatBatchSize: Int = DEFAULT_CHAT_BATCH_SIZE
 
     companion object {
+        private const val MUTE_FOR_ONE_YEAR_SECONDS = 31_536_000
         const val DEFAULT_CHAT_BATCH_SIZE = 10
         private val DEFAULT_CUSTOM_EMOJIS =
             mapOf(
@@ -4276,6 +4277,21 @@ class TelegramManager(
 
     fun setNetworkType(type: TdApi.NetworkType) {
         tdClient?.send(TdApi.SetNetworkType(type)) { /* no-op */ }
+    }
+
+    fun toggleChatMute(
+        chatId: Long,
+        currentMuted: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(currentMuted)
+            return
+        }
+        val newMuted = !currentMuted
+        val muteFor = if (newMuted) MUTE_FOR_ONE_YEAR_SECONDS else 0
+        setChatNotificationMute(chatId, muteFor, onResult)
     }
 
     fun setChatNotificationMute(
