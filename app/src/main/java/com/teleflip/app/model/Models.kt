@@ -53,6 +53,7 @@ data class ChatModel(
     val isMuted: Boolean = false,
     val draftText: String = "",
     val pinnedMessageId: Long = 0L,
+    val pinnedMessageIds: List<Long> = emptyList(),
     val isArchived: Boolean = false,
     val folderName: String = "",
     val isSecretChat: Boolean = false,
@@ -61,7 +62,23 @@ data class ChatModel(
     val isForum: Boolean = false,
     val activeTopicId: Long = 0L,
     val activeTopicName: String = "",
-)
+    val isMarkedUnread: Boolean = false,
+    // TDLib main chat list order (higher = closer to top). 0 when unknown.
+    val order: Long = 0L,
+    // Unix timestamp (seconds) of the last message, used as sort fallback.
+    val lastMessageDate: Long = 0L,
+    val lastMessageId: Long = 0L,
+) {
+    fun getEffectivePinnedMessageIds(): List<Long> {
+        return if (pinnedMessageIds.isNotEmpty()) {
+            pinnedMessageIds
+        } else if (pinnedMessageId != 0L) {
+            listOf(pinnedMessageId)
+        } else {
+            emptyList()
+        }
+    }
+}
 
 enum class MessageStatus {
     SENDING,
@@ -74,13 +91,18 @@ enum class MediaType {
     NONE,
     PHOTO,
     VOICE,
+    AUDIO,
     LOCATION,
     DOCUMENT,
     STICKER,
     VIDEO,
     ANIMATION,
     POLL,
+    PAID_MEDIA,
+    CONTACT,
 }
+
+data class MessageFormatting(val offset: Int, val length: Int, val kind: String, val url: String = "")
 
 data class MessageModel(
     val id: Long,
@@ -110,9 +132,19 @@ data class MessageModel(
     val pollIsAnonymous: Boolean = true,
     val pollIsClosed: Boolean = false,
     val pollTotalVoters: Int = 0,
+    val pollIsQuiz: Boolean = false,
+    val pollCorrectOptionIndex: Int = -1,
+    val pollExplanation: String = "",
+    val pollAllowsMultipleAnswers: Boolean = false,
     val messageThreadId: Long = 0L,
     val selfDestructSeconds: Int = 0,
     val transcript: String = "",
+    val starCount: Long = 0L,
+    val isPaidMediaLocked: Boolean = false,
+    val mediaMimeType: String = "",
+    val stickerFormat: String = "",
+    val hasBotButtons: Boolean = false,
+    val formatting: List<MessageFormatting> = emptyList(),
 )
 
 data class MessageSearchResult(
@@ -128,6 +160,7 @@ data class MessageSearchResult(
 enum class CallState {
     PENDING,
     EXCHANGING_KEYS,
+    CONNECTING,
     READY,
     HANGING_UP,
     DISCARDED,
@@ -143,6 +176,7 @@ data class ActiveCall(
     val durationSec: Int = 0,
     val isMuted: Boolean = false,
     val isSpeakerOn: Boolean = false,
+    val verificationEmojis: List<String> = emptyList(),
 )
 
 data class ChatProfile(

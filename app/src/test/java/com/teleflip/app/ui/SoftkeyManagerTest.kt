@@ -109,9 +109,34 @@ class SoftkeyManagerTest {
     }
 
     @Test
-    @Suppress("DEPRECATION")
-    fun testHandleBack() {
-        val handled = softkeyManager.handleBack()
-        assertFalse(handled)
+    fun testCenterLongClickInvokesCallback() {
+        val captor = ArgumentCaptor.forClass(android.view.View.OnLongClickListener::class.java)
+        verify(tvCenter).setOnLongClickListener(captor.capture())
+        val listener = captor.value
+
+        var longClicked = false
+        softkeyManager.update(
+            center = "Send",
+            onCenterLongClick = { longClicked = true },
+        )
+
+        val consumed = listener.onLongClick(tvCenter)
+        assertTrue(consumed)
+        assertTrue(longClicked)
+    }
+
+    @Test
+    fun testCenterLongClickWithoutCallbackReturnsFalse() {
+        val captor = ArgumentCaptor.forClass(android.view.View.OnLongClickListener::class.java)
+        verify(tvCenter).setOnLongClickListener(captor.capture())
+        val listener = captor.value
+
+        softkeyManager.update(
+            center = "Send",
+            onCenterLongClick = null,
+        )
+
+        val consumed = listener.onLongClick(tvCenter)
+        assertFalse(consumed)
     }
 }

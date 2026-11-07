@@ -278,6 +278,16 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_profile_export_history"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="📥 Export Chat History"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:background="@drawable/bg_button_selector"
             android:layout_marginBottom="12dp" />
 
     </LinearLayout>
