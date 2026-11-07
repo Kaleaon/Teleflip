@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MessageModel
+import com.teleflip.app.model.PollOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -210,5 +211,88 @@ class TelegramParityFeaturesTest {
 
         assertEquals("Synced cloud draft", telegramManager.getChatDraft(5L))
         assertEquals("Synced cloud draft", telegramManager.chats.value.first().draftText)
+    }
+
+    @Test
+    fun testSendQuizPollWithExplanationAndMultipleAnswers() {
+        val client = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(client)
+
+        // Send Quiz poll
+        telegramManager.sendPoll(
+            chatId = 55L,
+            question = "Which primary key toggles case?",
+            options = listOf("Key 1", "Key 0", "Key #"),
+            isAnonymous = false,
+            isQuiz = true,
+            correctOptionIndex = 2,
+            explanation = "Key # switches between Abc, abc, ABC, and 123",
+        )
+
+        val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        Mockito.verify(client).send(captor.capture(), Mockito.any())
+        val req = captor.value as TdApi.SendMessage
+        val pollContent = req.inputMessageContent as TdApi.InputMessagePoll
+        assertFalse(pollContent.isAnonymous)
+        val quizType = pollContent.type as TdApi.InputPollTypeQuiz
+        assertEquals(2, quizType.correctOptionIds[0])
+        assertEquals("Key # switches between Abc, abc, ABC, and 123", quizType.explanation.text)
+
+        Mockito.reset(client)
+
+        // Send Regular Poll with multiple answers
+        telegramManager.sendPoll(
+            chatId = 55L,
+            question = "Select favorite colors",
+            options = listOf("Red", "Blue", "Green"),
+            isAnonymous = true,
+            isQuiz = false,
+            allowsMultipleAnswers = true,
+        )
+
+        Mockito.verify(client).send(captor.capture(), Mockito.any())
+        val regReq = captor.value as TdApi.SendMessage
+        val regContent = regReq.inputMessageContent as TdApi.InputMessagePoll
+        assertTrue(regContent.isAnonymous)
+        assertTrue(regContent.allowsMultipleAnswers)
+        assertTrue(regContent.type is TdApi.InputPollTypeRegular)
+    }
+
+    @Test
+    fun testParseIncomingQuizPollMessage() {
+        val quizType =
+            TdApi.PollTypeQuiz().apply {
+                correctOptionIds = intArrayOf(2)
+                explanation = TdApi.FormattedText("Key # switches between Abc, abc, ABC, and 123", emptyArray())
+            }
+        val poll =
+            TdApi.Poll().apply {
+                id = 100L
+                question = TdApi.FormattedText("Which primary key toggles case?", emptyArray())
+                options =
+                    arrayOf(
+                        TdApi.PollOption().apply { text = TdApi.FormattedText("Key 1", emptyArray()) },
+                        TdApi.PollOption().apply { text = TdApi.FormattedText("Key 0", emptyArray()) },
+                        TdApi.PollOption().apply { text = TdApi.FormattedText("Key #", emptyArray()) },
+                    )
+                type = quizType
+                isAnonymous = false
+            }
+        val msg =
+            TdApi.Message().apply {
+                id = 1234L
+                chatId = 55L
+                isOutgoing = false
+                date = 1000000
+                content = TdApi.MessagePoll().apply { this.poll = poll }
+            }
+        telegramManager.onResult(TdApi.UpdateNewMessage(msg))
+        val messages = telegramManager.messages.value[55L]
+        assertNotNull(messages)
+        assertEquals(1, messages?.size)
+        val quizMsg = messages?.first()
+        assertTrue(quizMsg?.pollIsQuiz == true)
+        assertEquals(2, quizMsg?.pollCorrectOptionIndex)
+        assertEquals("Key # switches between Abc, abc, ABC, and 123", quizMsg?.pollExplanation)
     }
 }
