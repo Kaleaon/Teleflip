@@ -296,6 +296,8 @@ class TelegramManager(
     var scopeGroupChatsMuted = false
     var scopeChannelChatsMuted = false
     private val prefMutedChatsKey = "teleflip_muted_chat_ids"
+    private val prefMutedSoundChatsKey = "teleflip_muted_sound_chat_ids"
+    private val prefChatSoundUriPrefix = "teleflip_chat_sound_uri_"
     val fileDownloadWaiters =
         java.util.concurrent.ConcurrentHashMap<Int, CopyOnWriteArrayList<CompletableDeferred<String?>>>()
 
@@ -1072,21 +1074,81 @@ class TelegramManager(
         }
     }
 
+    private fun updateLocalPinnedState(chatId: Long, messageId: Long, newPinned: Boolean) {
+        _messages.update { current ->
+            val chatMsgs =
+                (current[chatId] ?: emptyList()).map { msg ->
+                    if (msg.id == messageId) {
+                        msg.copy(isPinned = newPinned)
+                    } else {
+                        msg
+                    }
+                }
+            current + (chatId to chatMsgs)
+        }
+
+        synchronized(chatMap) {
+            val existing = chatMap[chatId] ?: _chats.value.find { it.id == chatId }
+            if (existing != null) {
+                val currentPinnedIds = existing.getEffectivePinnedMessageIds()
+                val newPinnedIds =
+                    if (newPinned) {
+                        if (currentPinnedIds.contains(messageId)) currentPinnedIds else currentPinnedIds + messageId
+                    } else {
+                        currentPinnedIds.filter { it != messageId }
+                    }
+                val newPinnedSingleId = newPinnedIds.lastOrNull() ?: 0L
+                chatMap[chatId] =
+                    existing.copy(
+                        pinnedMessageId = newPinnedSingleId,
+                        pinnedMessageIds = newPinnedIds,
+                    )
+            }
+        }
+        _chats.value =
+            synchronized(chatMap) {
+                if (chatMap.isNotEmpty()) {
+                    chatMap.values.toList()
+                } else {
+                    _chats.value.map { chat ->
+                        if (chat.id == chatId) {
+                            val currentPinnedIds = chat.getEffectivePinnedMessageIds()
+                            val newPinnedIds =
+                                if (newPinned) {
+                                    if (currentPinnedIds.contains(messageId)) currentPinnedIds else currentPinnedIds + messageId
+                                } else {
+                                    currentPinnedIds.filter { it != messageId }
+                                }
+                            val newPinnedSingleId = newPinnedIds.lastOrNull() ?: 0L
+                            chat.copy(
+                                pinnedMessageId = newPinnedSingleId,
+                                pinnedMessageIds = newPinnedIds,
+                            )
+                        } else {
+                            chat
+                        }
+                    }
+                }
+            }
+    }
+
     fun togglePinMessage(
         chatId: Long,
         messageId: Long,
         currentPinned: Boolean,
         onResult: ((Boolean) -> Unit)? = null,
     ) {
+        val newPinned = !currentPinned
+        updateLocalPinnedState(chatId, messageId, newPinned)
+
         val client = tdClient
         if (client == null) {
             reportOperationError("TDLib is not initialized")
-            onResult?.invoke(currentPinned)
+            onResult?.invoke(newPinned)
             return
         }
-        val newValue = !currentPinned
         val request =
-            if (newValue) {
+            if (newPinned) {
                 TdApi.PinChatMessage().apply {
                     this.chatId = chatId
                     this.messageId = messageId
@@ -1096,16 +1158,17 @@ class TelegramManager(
             }
         client.send(request) { result ->
             if (result is TdApi.Ok) {
-                _messages.update { current -> current + (chatId to current[chatId].orEmpty().map { if (it.id == messageId) it.copy(isPinned = newValue) else it }) }
-                synchronized(chatMap) {
-                    val existing = chatMap[chatId]
-                    if (existing != null) chatMap[chatId] = existing.copy(pinnedMessageId = if (newValue) messageId else 0L)
-                }
-                _chats.value = synchronized(chatMap) { chatMap.values.toList() }
+                updateLocalPinnedState(chatId, messageId, newPinned)
             } else if (result is TdApi.Error) {
                 reportOperationError(result.message)
             }
-            scope.launch(Dispatchers.Main) { onResult?.invoke(if (result is TdApi.Ok) newValue else currentPinned) }
+            if (onResult != null) {
+                try {
+                    scope.launch(Dispatchers.Main) { onResult.invoke(if (result is TdApi.Ok) newPinned else currentPinned) }
+                } catch (e: Throwable) {
+                    onResult.invoke(if (result is TdApi.Ok) newPinned else currentPinned)
+                }
+            }
         }
     }
 
@@ -1619,6 +1682,10 @@ class TelegramManager(
         question: String,
         options: List<String>,
         isAnonymous: Boolean = true,
+        isQuiz: Boolean = false,
+        correctOptionIndex: Int = -1,
+        explanation: String = "",
+        allowsMultipleAnswers: Boolean = false,
         disableNotification: Boolean = false,
         schedulingState: TdApi.MessageSchedulingState? = null,
     ) {
@@ -1630,7 +1697,15 @@ class TelegramManager(
             val pollContent =
                 TdApi.InputMessagePoll().apply {
                     this.isAnonymous = isAnonymous
-                    this.type = TdApi.InputPollTypeRegular(false)
+                    this.allowsMultipleAnswers = if (!isQuiz) allowsMultipleAnswers else false
+                    if (isQuiz) {
+                        val validIndex = if (correctOptionIndex in cleanOptions.indices) correctOptionIndex else 0
+                        val correctOptionIds = intArrayOf(validIndex)
+                        val formattedExp = TdApi.FormattedText(explanation.trim(), emptyArray())
+                        this.type = TdApi.InputPollTypeQuiz(correctOptionIds, formattedExp, null)
+                    } else {
+                        this.type = TdApi.InputPollTypeRegular(false)
+                    }
                 }
             setPollQuestionAndOptionsCompat(pollContent, trimmedQuestion, cleanOptions)
             val sendReq =
@@ -3468,6 +3543,28 @@ class TelegramManager(
         }
     }
 
+    fun terminateSession(
+        sessionId: Long,
+        onResult: (Boolean, String?) -> Unit,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult(false, "Not connected")
+            return
+        }
+        client.send(TdApi.TerminateSession(sessionId)) { obj ->
+            scope.launch(Dispatchers.Main) {
+                if (obj is TdApi.Ok) {
+                    onResult(true, null)
+                } else if (obj is TdApi.Error) {
+                    onResult(false, obj.message)
+                } else {
+                    onResult(false, "Failed to terminate session")
+                }
+            }
+        }
+    }
+
     // =========================================================================
     // Storage & Media Cache Cleaner
     // =========================================================================
@@ -3603,6 +3700,8 @@ class TelegramManager(
         fromChatId: Long,
         toChatId: Long,
         messageId: Long,
+        sendCopy: Boolean = false,
+        removeCaption: Boolean = false,
         onComplete: ((Boolean) -> Unit)? = null,
     ) {
         val client = tdClient
@@ -3617,6 +3716,8 @@ class TelegramManager(
                     this.chatId = toChatId
                     this.fromChatId = fromChatId
                     this.messageIds = longArrayOf(messageId)
+                    this.sendCopy = sendCopy
+                    this.removeCaption = removeCaption
                 }
             client.send(req) { result ->
                 val success = result is TdApi.Messages
@@ -4159,6 +4260,63 @@ class TelegramManager(
         return getPersistedMutedChatIds().contains(chatId.toString())
     }
 
+    fun getPersistedMutedSoundChatIds(): MutableSet<String> {
+        val raw =
+            try {
+                prefs.getStringSet(prefMutedSoundChatsKey, null)
+            } catch (_: Exception) {
+                null
+            } ?: emptySet()
+        return raw.toMutableSet()
+    }
+
+    fun persistChatSoundMuted(
+        chatId: Long,
+        isMuted: Boolean,
+    ) {
+        val currentSet = getPersistedMutedSoundChatIds()
+        val idStr = chatId.toString()
+        val changed =
+            if (isMuted) {
+                currentSet.add(idStr)
+            } else {
+                currentSet.remove(idStr)
+            }
+        if (changed) {
+            prefs.edit()?.putStringSet(prefMutedSoundChatsKey, HashSet(currentSet))?.apply()
+        }
+    }
+
+    fun isChatSoundMuted(chatId: Long): Boolean {
+        val settings = chatNotificationSettingsCache[chatId]
+        if (settings != null) {
+            if (!settings.useDefaultSound && settings.soundId == 0L) {
+                return true
+            }
+        }
+        return getPersistedMutedSoundChatIds().contains(chatId.toString())
+    }
+
+    fun getChatSoundUri(chatId: Long): String? {
+        return try {
+            prefs.getString(prefChatSoundUriPrefix + chatId, null)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun persistChatSoundUri(
+        chatId: Long,
+        uri: String?,
+    ) {
+        val key = prefChatSoundUriPrefix + chatId
+        if (uri.isNullOrBlank()) {
+            prefs.edit()?.remove(key)?.apply()
+        } else {
+            prefs.edit()?.putString(key, uri)?.apply()
+        }
+    }
+
     fun handleChatNotificationSettingsUpdated(
         chatId: Long,
         notificationSettings: TdApi.ChatNotificationSettings,
@@ -4168,6 +4326,10 @@ class TelegramManager(
         val chatType = existingChat?.chatType ?: ChatType.DIRECT
         val isMuted = isNotificationSettingsMuted(notificationSettings, chatType)
         persistChatMuted(chatId, isMuted)
+
+        val isSoundMuted = !notificationSettings.useDefaultSound && notificationSettings.soundId == 0L
+        persistChatSoundMuted(chatId, isSoundMuted)
+
         if (isMuted) {
             NotificationHelper.cancelMessageNotification(context, chatId)
         }
@@ -4242,6 +4404,23 @@ class TelegramManager(
         muteForSeconds: Int,
         onResult: ((Boolean) -> Unit)? = null,
     ) {
+        setChatNotificationSettings(
+            chatId = chatId,
+            muteForSeconds = muteForSeconds,
+            isSoundMuted = isChatSoundMuted(chatId),
+            customSoundUri = getChatSoundUri(chatId),
+            onResult = onResult,
+        )
+    }
+
+    fun setChatNotificationSettings(
+        chatId: Long,
+        muteForSeconds: Int,
+        isSoundMuted: Boolean = false,
+        customSoundUri: String? = null,
+        soundId: Long = if (isSoundMuted) 0L else 1L,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
         val client = tdClient
         val previousMuted = isChatMuted(chatId)
         if (client == null) {
@@ -4251,6 +4430,9 @@ class TelegramManager(
         }
         val isMuted = muteForSeconds > 0
         persistChatMuted(chatId, isMuted)
+        persistChatSoundMuted(chatId, isSoundMuted)
+        persistChatSoundUri(chatId, customSoundUri)
+
         if (isMuted) {
             NotificationHelper.cancelMessageNotification(context, chatId)
         }
@@ -4263,8 +4445,6 @@ class TelegramManager(
         val settings =
             TdApi.ChatNotificationSettings().apply {
                 if (currentSettings != null) {
-                    this.useDefaultSound = currentSettings.useDefaultSound
-                    this.soundId = currentSettings.soundId
                     this.useDefaultShowPreview = currentSettings.useDefaultShowPreview
                     this.showPreview = currentSettings.showPreview
                     this.useDefaultMuteStories = currentSettings.useDefaultMuteStories
@@ -4282,6 +4462,14 @@ class TelegramManager(
                 }
                 this.useDefaultMuteFor = false
                 this.muteFor = muteForSeconds
+
+                if (isSoundMuted) {
+                    this.useDefaultSound = false
+                    this.soundId = 0L
+                } else {
+                    this.useDefaultSound = (soundId == 0L && currentSettings?.useDefaultSound != false && customSoundUri == null)
+                    this.soundId = if (soundId != 0L) soundId else (currentSettings?.soundId ?: 1L)
+                }
             }
         chatNotificationSettingsCache[chatId] = settings
         val req = TdApi.SetChatNotificationSettings(chatId, settings)
@@ -4291,10 +4479,13 @@ class TelegramManager(
                 val revertedMuted = previousMuted
                 persistChatMuted(chatId, revertedMuted)
                 scope.launch(Dispatchers.Main) {
-                    _chats.value =
-                        _chats.value.map {
-                            if (it.id == chatId) it.copy(isMuted = revertedMuted) else it
+                    synchronized(chatMap) {
+                        val existing = chatMap[chatId]
+                        if (existing != null) {
+                            chatMap[chatId] = existing.copy(isMuted = revertedMuted)
                         }
+                    }
+                    _chats.value = synchronized(chatMap) { chatMap.values.toList() }
                     onResult?.invoke(revertedMuted)
                 }
             } else {
@@ -4921,6 +5112,7 @@ class TelegramManager(
         }
         val draftStr = chatDrafts[chat.id] ?: cloudDraft
 
+        val existingPinnedIds = existingModel?.getEffectivePinnedMessageIds() ?: emptyList()
         val newModel =
             ChatModel(
                 id = chat.id,
@@ -4939,7 +5131,8 @@ class TelegramManager(
                 isPremium = isPremium,
                 isMuted = isMutedChat,
                 draftText = draftStr,
-                pinnedMessageId = existingModel?.pinnedMessageId ?: 0L,
+                pinnedMessageId = existingModel?.pinnedMessageId ?: existingPinnedIds.lastOrNull() ?: 0L,
+                pinnedMessageIds = existingPinnedIds,
                 order = mainPosition?.order ?: existingModel?.order ?: 0L,
                 lastMessageDate = lastMsg?.date?.toLong() ?: existingModel?.lastMessageDate ?: 0L,
                 lastMessageId = lastMsg?.id ?: existingModel?.lastMessageId ?: 0L,
@@ -5167,6 +5360,58 @@ class TelegramManager(
         }
     }
 
+    private data class PollData(
+        val question: String = "",
+        val options: List<PollOption> = emptyList(),
+        val isAnonymous: Boolean = true,
+        val isClosed: Boolean = false,
+        val totalVoters: Int = 0,
+        val isQuiz: Boolean = false,
+        val correctOptionIndex: Int = -1,
+        val explanation: String = "",
+        val allowsMultipleAnswers: Boolean = false,
+    )
+
+    private fun extractPollData(content: TdApi.MessageContent?): PollData {
+        if (content !is TdApi.MessagePoll) return PollData()
+        val poll = content.poll ?: return PollData()
+        val questionText = poll.question?.text ?: ""
+        val optionsList =
+            poll.options?.map { opt ->
+                PollOption(
+                    text = opt.text?.text ?: "",
+                    voterCount = opt.voterCount,
+                    votePercentage = opt.votePercentage,
+                    isChosen = opt.isChosen,
+                )
+            } ?: emptyList()
+
+        var isQuizMode = false
+        var correctIndex = -1
+        var explanationText = ""
+
+        when (val pollType = poll.type) {
+            is TdApi.PollTypeQuiz -> {
+                isQuizMode = true
+                correctIndex = pollType.correctOptionIds?.firstOrNull() ?: -1
+                explanationText = pollType.explanation?.text ?: ""
+            }
+            else -> {}
+        }
+
+        return PollData(
+            question = questionText,
+            options = optionsList,
+            isAnonymous = poll.isAnonymous,
+            isClosed = poll.isClosed,
+            totalVoters = poll.totalVoterCount,
+            isQuiz = isQuizMode,
+            correctOptionIndex = correctIndex,
+            explanation = explanationText,
+            allowsMultipleAnswers = poll.allowsMultipleAnswers,
+        )
+    }
+
     private fun messageStatus(msg: TdApi.Message): MessageStatus =
         when {
             !msg.isOutgoing -> MessageStatus.READ
@@ -5234,6 +5479,7 @@ class TelegramManager(
         val mediaType = extractMediaType(msg.content)
         val mediaInfo = extractMediaFileInfo(msg.content)
         val stickerInfo = extractStickerInfo(msg.content)
+        val pollData = extractPollData(msg.content)
         val model =
             MessageModel(
                 id = msg.id,
@@ -5272,14 +5518,15 @@ class TelegramManager(
                     },
                 latitude = (msg.content as? TdApi.MessageLocation)?.location?.latitude ?: 0.0,
                 longitude = (msg.content as? TdApi.MessageLocation)?.location?.longitude ?: 0.0,
-                pollQuestion = (msg.content as? TdApi.MessagePoll)?.poll?.question?.text.orEmpty(),
-                pollOptions =
-                    (msg.content as? TdApi.MessagePoll)?.poll?.options?.map { option ->
-                        PollOption(option.text.text, option.voterCount, option.votePercentage, option.isChosen)
-                    }.orEmpty(),
-                pollIsAnonymous = (msg.content as? TdApi.MessagePoll)?.poll?.isAnonymous ?: true,
-                pollIsClosed = (msg.content as? TdApi.MessagePoll)?.poll?.isClosed ?: false,
-                pollTotalVoters = (msg.content as? TdApi.MessagePoll)?.poll?.totalVoterCount ?: 0,
+                pollQuestion = pollData.question,
+                pollOptions = pollData.options,
+                pollIsAnonymous = pollData.isAnonymous,
+                pollIsClosed = pollData.isClosed,
+                pollTotalVoters = pollData.totalVoters,
+                pollIsQuiz = pollData.isQuiz,
+                pollCorrectOptionIndex = pollData.correctOptionIndex,
+                pollExplanation = pollData.explanation,
+                pollAllowsMultipleAnswers = pollData.allowsMultipleAnswers,
                 messageThreadId = (msg.topicId as? TdApi.MessageTopicForum)?.forumTopicId?.toLong() ?: 0L,
                 replyToMessageId = (msg.replyTo as? TdApi.MessageReplyToMessage)?.messageId ?: 0L,
                 replyToPreview =
@@ -5355,6 +5602,8 @@ class TelegramManager(
                     chatTitle = chatTitle,
                     senderName = model.senderName,
                     messageText = model.text,
+                    isSoundMuted = isChatSoundMuted(msg.chatId),
+                    customSoundUri = getChatSoundUri(msg.chatId),
                 )
             }
         }
@@ -5363,12 +5612,24 @@ class TelegramManager(
     private fun handleMessagesList(msgs: Array<TdApi.Message>) {
         if (msgs.isEmpty()) return
         val chatId = msgs.first().chatId
-        val list = msgs.reversed().filterNot { it.schedulingState != null || replacedMessageIds.containsKey(it.chatId to it.id) }.map { toMessageModel(it) }
+        val existing = _messages.value[chatId].orEmpty()
+        val existingMap = existing.associateBy { it.id }
+        val chat = _chats.value.find { it.id == chatId }
+        val pinnedIds = chat?.getEffectivePinnedMessageIds() ?: emptyList()
+
+        val list =
+            msgs.reversed()
+                .filterNot { it.schedulingState != null || replacedMessageIds.containsKey(it.chatId to it.id) }
+                .map { msg ->
+                    val model = toMessageModel(msg)
+                    val wasPinned = existingMap[msg.id]?.isPinned == true || pinnedIds.contains(msg.id) || msg.isPinned
+                    if (wasPinned) model.copy(isPinned = true) else model
+                }
+
         val unresolvedReplyIds = mutableSetOf<Long>()
         _messages.update { current ->
-            val existing = current[chatId].orEmpty()
-            // Live updates already in memory take precedence over a history response.
-            val rawMerged = (existing + list).distinctBy { it.id }.sortedBy { it.id }
+            val currentExisting = current[chatId].orEmpty()
+            val rawMerged = (currentExisting + list).distinctBy { it.id }.sortedBy { it.id }
             val byId = rawMerged.associateBy { it.id }
             val merged =
                 rawMerged.map { item ->
@@ -5388,10 +5649,32 @@ class TelegramManager(
                         }
                     item.copy(mediaFilePath = resolvedPath, replyToPreview = resolvedPreview)
                 }
-            if (merged == existing) current else current + (chatId to merged)
+            if (merged == currentExisting) current else current + (chatId to merged)
         }
+
+        syncPinnedMessagesToChat(chatId, chat)
+
         unresolvedReplyIds.forEach { replyId ->
             resolveReplyPreviewAsync(chatId, replyId)
+        }
+    }
+
+    private fun syncPinnedMessagesToChat(chatId: Long, chat: ChatModel?) {
+        if (chat == null) return
+        val allPinnedMsgIds = _messages.value[chatId].orEmpty().filter { it.isPinned }.map { it.id }
+        if (allPinnedMsgIds.isNotEmpty()) {
+            val updatedPinnedIds = (chat.getEffectivePinnedMessageIds() + allPinnedMsgIds).distinct()
+            if (updatedPinnedIds != chat.pinnedMessageIds) {
+                synchronized(chatMap) {
+                    val existingChat = chatMap[chatId] ?: chat
+                    chatMap[chatId] =
+                        existingChat.copy(
+                            pinnedMessageIds = updatedPinnedIds,
+                            pinnedMessageId = updatedPinnedIds.lastOrNull() ?: existingChat.pinnedMessageId,
+                        )
+                }
+                _chats.value = synchronized(chatMap) { chatMap.values.toList() }
+            }
         }
     }
 

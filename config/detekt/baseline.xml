@@ -11,6 +11,7 @@
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (requestCode == REQ_PHONE_PERM &amp;&amp; grantResults.isNotEmpty() &amp;&amp; grantResults[0] == PackageManager.PERMISSION_GRANTED) { if (currentScreen == Screen.LOGIN) { showLoginScreen(telegramManager.authState.value) } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) { if ((rvResults.adapter?.itemCount ?: 0) &gt; 0) { focusResultAt(0) return true } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog.&lt;no name provided&gt;$if (!isMessageLoading &amp;&amp; messageNextOffset.isNotEmpty() &amp;&amp; totalItemCount &lt; maxResultsLimit) { if (visibleItemCount + firstVisibleItem &gt;= totalItemCount - 2) { loadMoreMessageResults() } }</ID>
+    <ID>CollapsibleIfStatements:TelegramManager.kt$TelegramManager$if (settings != null) { if (!settings.useDefaultSound &amp;&amp; settings.soundId == 0L) { return true } }</ID>
     <ID>ComplexCondition:BootReceiver.kt$BootReceiver$action == Intent.ACTION_BOOT_COMPLETED || action == "android.intent.action.QUICKBOOT_POWERON" || action == "com.htc.intent.action.QUICKBOOT_POWERON" || action == Intent.ACTION_MY_PACKAGE_REPLACED</ID>
     <ID>ComplexCondition:ChatExportManager.kt$ChatExportManager$(localPath.isNullOrBlank() || !File(localPath).exists()) &amp;&amp; msg.mediaFileId != 0 &amp;&amp; fileDownloader != null</ID>
     <ID>ComplexCondition:ChatExportProgressDialog.kt$ChatExportProgressDialog$currentFormat != null &amp;&amp; currentScope != null &amp;&amp; currentTelegramManager != null &amp;&amp; currentOnComplete != null</ID>
@@ -325,6 +326,7 @@
     <ID>NestedBlockDepth:SymbolsDialog.kt$SymbolsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:AdbReporter.kt$AdbReporter$private fun readTailLines( file: File, maxLines: Int, ): List&lt;String&gt;</ID>
     <ID>ReturnCount:ChatExportDialog.kt$ChatExportDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>ReturnCount:ChatNotificationSettingsDialog.kt$ChatNotificationSettingsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:KeypadInputEngine.kt$KeypadInputEngine$fun handleKeyEvent( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:KeypadInputEngine.kt$KeypadInputEngine$private fun isSentenceBoundary( text: CharSequence, targetIndex: Int, ): Boolean</ID>
     <ID>ReturnCount:KeypadTextDialog.kt$KeypadTextDialog$override fun dispatchKeyEvent(event: KeyEvent): Boolean</ID>
@@ -404,8 +406,13 @@
     <ID>TooManyFunctions:StorageManager.kt$StorageManager</ID>
     <ID>TooManyFunctions:TelegramManager.kt$TelegramManager : ResultHandler</ID>
     <ID>UnusedImports:PollDialogTest.kt$import org.junit.Assert.assertFalse</ID>
+    <ID>UnusedParameter:MainActivity.kt$MainActivity$isCurrentlyMuted: Boolean</ID>
     <ID>UnusedParameter:TelegramManager.kt$TelegramManager$replyToPreview: String = ""</ID>
     <ID>UnusedPrivateProperty:AdbReporter.kt$AdbReporter$signal</ID>
     <ID>UnusedPrivateProperty:ChatExportDialog.kt$ChatExportDialog$private val chatId: Long</ID>
+    <ID>UnusedPrivateProperty:MainActivity.kt$MainActivity.Companion$private const val MUTE_1_HOUR_SEC = 3600</ID>
+    <ID>UnusedPrivateProperty:MainActivity.kt$MainActivity.Companion$private const val MUTE_2_DAYS_SEC = 172800</ID>
+    <ID>UnusedPrivateProperty:MainActivity.kt$MainActivity.Companion$private const val MUTE_8_HOURS_SEC = 28800</ID>
+    <ID>UnusedPrivateProperty:MainActivity.kt$MainActivity.Companion$private const val MUTE_FOREVER_SEC = Int.MAX_VALUE</ID>
   </CurrentIssues>
 </SmellBaseline>
