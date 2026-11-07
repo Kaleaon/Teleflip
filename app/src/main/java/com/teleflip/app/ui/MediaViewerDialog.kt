@@ -132,7 +132,7 @@ class MediaViewerDialog(
             tvCaption?.visibility = View.GONE
         }
 
-        val filePath = message.mediaFilePath
+        val filePath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, message.mediaFilePath) ?: message.mediaFilePath
         val fileExists = !filePath.isNullOrBlank() && File(filePath).exists()
 
         when (message.mediaType) {
@@ -371,12 +371,13 @@ class MediaViewerDialog(
 
     internal fun startProgressTracking() {
         stopProgressTracking()
-        progressJob = dialogScope.launch {
-            while (isActive) {
-                updateProgressUI()
-                delay(250L)
+        progressJob =
+            dialogScope.launch {
+                while (isActive) {
+                    updateProgressUI()
+                    delay(250L)
+                }
             }
-        }
     }
 
     internal fun stopProgressTracking() {
