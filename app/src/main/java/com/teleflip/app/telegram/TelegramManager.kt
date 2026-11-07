@@ -287,6 +287,10 @@ class TelegramManager(
     private val prefMutedChatsKey = "teleflip_muted_chat_ids"
     private val prefMutedSoundChatsKey = "teleflip_muted_sound_chat_ids"
     private val prefChatSoundUriPrefix = "teleflip_chat_sound_uri_"
+    private val prefSavedStickersKey = "teleflip_saved_stickers"
+    private val prefSavedGifsKey = "teleflip_saved_gifs"
+    private val localSavedStickers = java.util.concurrent.CopyOnWriteArrayList<StickerItem>()
+    private val localSavedGifs = java.util.concurrent.CopyOnWriteArrayList<SavedGifItem>()
     val fileDownloadWaiters =
         java.util.concurrent.ConcurrentHashMap<Int, CopyOnWriteArrayList<CompletableDeferred<String?>>>()
 
@@ -1535,10 +1539,129 @@ class TelegramManager(
         }
     }
 
+    fun getLocalSavedStickers(): List<StickerItem> {
+        val set = prefs.getStringSet(prefSavedStickersKey, emptySet()) ?: emptySet()
+        val list = set.mapNotNull { entry ->
+            val parts = entry.split("::")
+            if (parts.size < 4) return@mapNotNull null
+            val it = parts.iterator()
+            val id = it.next().toIntOrNull() ?: return@mapNotNull null
+            val emoji = it.next()
+            val path = it.next().ifBlank { null }
+            val setName = it.next()
+            StickerItem(id, emoji, path, setName)
+        }
+        return (localSavedStickers + list).distinctBy { it.fileId }
+    }
+
+    fun addLocalSavedSticker(item: StickerItem) {
+        localSavedStickers.add(item)
+        val currentSet = prefs.getStringSet(prefSavedStickersKey, emptySet())?.toMutableSet() ?: mutableSetOf()
+        currentSet.add("${item.fileId}::${item.emoji}::${item.filePath.orEmpty()}::${item.setName}")
+        prefs.edit().putStringSet(prefSavedStickersKey, currentSet).apply()
+    }
+
+    fun getLocalSavedGifs(): List<SavedGifItem> {
+        val set = prefs.getStringSet(prefSavedGifsKey, emptySet()) ?: emptySet()
+        val list = set.mapNotNull { entry ->
+            val parts = entry.split("::")
+            if (parts.size < 4) return@mapNotNull null
+            val it = parts.iterator()
+            val id = it.next().toIntOrNull() ?: return@mapNotNull null
+            val path = it.next().ifBlank { null }
+            val dur = it.next().toIntOrNull() ?: 0
+            val caption = it.next()
+            SavedGifItem(id, path, dur, caption)
+        }
+        return (localSavedGifs + list).distinctBy { it.fileId }
+    }
+
+    fun addLocalSavedGif(item: SavedGifItem) {
+        localSavedGifs.add(item)
+        val currentSet = prefs.getStringSet(prefSavedGifsKey, emptySet())?.toMutableSet() ?: mutableSetOf()
+        currentSet.add("${item.fileId}::${item.filePath.orEmpty()}::${item.durationSeconds}::${item.caption}")
+        prefs.edit().putStringSet(prefSavedGifsKey, currentSet).apply()
+    }
+
+    fun saveSticker(
+        fileId: Int,
+        emoji: String = "",
+        setName: String = "",
+        filePath: String? = null,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val item = StickerItem(fileId, emoji, filePath, setName)
+        addLocalSavedSticker(item)
+        val client = tdClient
+        if (client != null && fileId > 0) {
+            client.send(TdApi.AddFavoriteSticker(TdApi.InputFileId(fileId))) { result ->
+                val success = result is TdApi.Ok
+                scope.launch(Dispatchers.Main) { onResult?.invoke(success) }
+            }
+        } else {
+            onResult?.invoke(true)
+        }
+    }
+
+    fun saveGif(
+        fileId: Int,
+        duration: Int = 0,
+        caption: String = "",
+        filePath: String? = null,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val item = SavedGifItem(fileId, filePath, duration, caption)
+        addLocalSavedGif(item)
+        val client = tdClient
+        if (client != null && fileId > 0) {
+            client.send(TdApi.AddSavedAnimation(TdApi.InputFileId(fileId))) { result ->
+                val success = result is TdApi.Ok
+                scope.launch(Dispatchers.Main) { onResult?.invoke(success) }
+            }
+        } else {
+            onResult?.invoke(true)
+        }
+    }
+
+    fun loadSavedStickers(onResult: (List<StickerItem>) -> Unit) {
+        val client = tdClient
+        val localList = getLocalSavedStickers()
+        if (client == null) {
+            onResult(localList)
+            return
+        }
+        client.send(TdApi.GetFavoriteStickers()) { obj ->
+            val remoteList = mutableListOf<StickerItem>()
+            if (obj is TdApi.Stickers) {
+                for (st in obj.stickers) {
+                    val path =
+                        if (st.sticker.local.isDownloadingCompleted && st.sticker.local.path.isNotBlank()) {
+                            st.sticker.local.path
+                        } else {
+                            null
+                        }
+                    remoteList.add(
+                        StickerItem(
+                            fileId = st.sticker.id,
+                            emoji = st.emoji,
+                            filePath = path,
+                            setName = "Favorites",
+                        ),
+                    )
+                }
+            }
+            val merged = (remoteList + localList).distinctBy { it.fileId }
+            scope.launch(Dispatchers.Main) {
+                onResult(merged)
+            }
+        }
+    }
+
     fun loadSavedGifs(onResult: (List<SavedGifItem>) -> Unit) {
         val client = tdClient
+        val localList = getLocalSavedGifs()
         if (client == null) {
-            onResult(emptyList())
+            onResult(localList)
             return
         }
         client.send(TdApi.GetSavedAnimations()) { obj ->
@@ -1565,8 +1688,9 @@ class TelegramManager(
                     )
                 }
             }
+            val merged = (list + localList).distinctBy { it.fileId }
             scope.launch(Dispatchers.Main) {
-                onResult(list)
+                onResult(merged)
             }
         }
     }
@@ -4276,6 +4400,16 @@ class TelegramManager(
 
     fun setNetworkType(type: TdApi.NetworkType) {
         tdClient?.send(TdApi.SetNetworkType(type)) { /* no-op */ }
+    }
+
+    fun toggleChatMute(
+        chatId: Long,
+        currentMuted: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val newMuted = !currentMuted
+        val muteFor = if (newMuted) 31536000 else 0
+        setChatNotificationMute(chatId, muteFor, onResult)
     }
 
     fun setChatNotificationMute(
