@@ -2,8 +2,11 @@ package com.teleflip.app.media
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -21,6 +24,77 @@ class VoicePlayer(private val context: Context) {
 
     private var progressRunnable: Runnable? = null
     private var currentOnStateChanged: ((PlayerState) -> Unit)? = null
+
+    internal var audioManager: AudioManager? = null
+    private val activeAudioManager: AudioManager?
+        get() = audioManager ?: (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
+
+    internal var audioFocusRequest: AudioFocusRequest? = null
+    internal var sdkVersion: Int = Build.VERSION.SDK_INT
+
+    internal val audioFocusChangeListener =
+        AudioManager.OnAudioFocusChangeListener { focusChange ->
+            when (focusChange) {
+                AudioManager.AUDIOFOCUS_LOSS -> {
+                    stop()
+                }
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
+                -> {
+                    pause()
+                }
+            }
+        }
+
+    internal fun requestAudioFocus(): Boolean {
+        val am = activeAudioManager ?: return true
+        return try {
+            if (sdkVersion >= Build.VERSION_CODES.O) {
+                val focusRequest =
+                    AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                        .setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .build(),
+                        )
+                        .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                        .build()
+                audioFocusRequest = focusRequest
+                am.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            } else {
+                @Suppress("DEPRECATION")
+                val res =
+                    am.requestAudioFocus(
+                        audioFocusChangeListener,
+                        AudioManager.STREAM_MUSIC,
+                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
+                    )
+                res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error requesting audio focus: ${e.message}")
+            false
+        }
+    }
+
+    internal fun abandonAudioFocus() {
+        val am = activeAudioManager ?: return
+        try {
+            if (sdkVersion >= Build.VERSION_CODES.O) {
+                val req = audioFocusRequest
+                if (req != null) {
+                    am.abandonAudioFocusRequest(req)
+                    audioFocusRequest = null
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                am.abandonAudioFocus(audioFocusChangeListener)
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error abandoning audio focus: ${e.message}")
+        }
+    }
 
     var currentSpeed: Float = 1.0f
         private set
@@ -119,6 +193,14 @@ class VoicePlayer(private val context: Context) {
                     )
                     setOnPreparedListener { mp ->
                         try {
+                            if (!requestAudioFocus()) {
+                                Log.e(tag, "Audio focus request denied")
+                                currentState = PlayerState.ERROR
+                                onStateChanged?.invoke(PlayerState.ERROR)
+                                stop()
+                                onError?.invoke()
+                                return@setOnPreparedListener
+                            }
                             mp.start()
                             applyPlaybackSpeed()
                             currentState = PlayerState.PLAYING
@@ -137,6 +219,7 @@ class VoicePlayer(private val context: Context) {
                         currentPlayingPath = null
                         currentState = PlayerState.COMPLETED
                         onStateChanged?.invoke(PlayerState.COMPLETED)
+                        abandonAudioFocus()
                         onCompletion()
                     }
                     setOnErrorListener { _, what, extra ->
@@ -173,6 +256,7 @@ class VoicePlayer(private val context: Context) {
                 stopProgressTimer()
                 currentState = PlayerState.PAUSED
                 currentOnStateChanged?.invoke(PlayerState.PAUSED)
+                abandonAudioFocus()
             } catch (e: Exception) {
                 Log.e(tag, "Error pausing mediaPlayer: ${e.message}")
             }
@@ -180,6 +264,7 @@ class VoicePlayer(private val context: Context) {
     }
 
     fun stop() {
+        abandonAudioFocus()
         stopProgressTimer()
         val player = mediaPlayer
         mediaPlayer = null
