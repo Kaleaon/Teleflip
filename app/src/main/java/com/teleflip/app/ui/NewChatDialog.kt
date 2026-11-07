@@ -2,13 +2,12 @@ package com.teleflip.app.ui
 
 import android.content.Context
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
+import androidx.core.widget.doAfterTextChanged
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 
@@ -110,27 +109,9 @@ class NewChatDialog(
         btnSecret?.onFocusChangeListener = focusListener
         btnCancel?.onFocusChangeListener = focusListener
 
-        input?.addTextChangedListener(
-            object : TextWatcher {
-                override fun beforeTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    count: Int,
-                    after: Int,
-                ) {}
-
-                override fun onTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    before: Int,
-                    count: Int,
-                ) {
-                    updateSoftkeys()
-                }
-
-                override fun afterTextChanged(s: Editable?) {}
-            },
-        )
+        input?.doAfterTextChanged {
+            updateSoftkeys()
+        }
 
         btnDirect?.requestFocus()
         updateSoftkeys()
