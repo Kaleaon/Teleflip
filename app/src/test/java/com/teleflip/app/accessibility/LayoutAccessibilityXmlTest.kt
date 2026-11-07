@@ -100,6 +100,8 @@ class LayoutAccessibilityXmlTest {
                         "@+id/liv_poll_opt1",
                         "@+id/liv_poll_opt2",
                         "@+id/liv_poll_opt3",
+                        "@+id/liv_poll_opt4",
+                        "@+id/liv_poll_explanation",
                     ),
                 "dialog_new_chat.xml" to listOf("@+id/liv_new_chat_input"),
                 "dialog_proxy_settings.xml" to
