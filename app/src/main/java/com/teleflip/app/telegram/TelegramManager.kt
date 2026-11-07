@@ -3484,6 +3484,8 @@ class TelegramManager(
         fromChatId: Long,
         toChatId: Long,
         messageId: Long,
+        sendCopy: Boolean = false,
+        removeCaption: Boolean = false,
         onComplete: ((Boolean) -> Unit)? = null,
     ) {
         val client = tdClient
@@ -3498,6 +3500,8 @@ class TelegramManager(
                     this.chatId = toChatId
                     this.fromChatId = fromChatId
                     this.messageIds = longArrayOf(messageId)
+                    this.sendCopy = sendCopy
+                    this.removeCaption = removeCaption
                 }
             client.send(req) { result ->
                 val success = result is TdApi.Messages
