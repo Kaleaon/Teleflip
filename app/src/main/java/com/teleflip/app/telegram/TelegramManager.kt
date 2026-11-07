@@ -1062,7 +1062,11 @@ class TelegramManager(
         }
     }
 
-    private fun updateLocalPinnedState(chatId: Long, messageId: Long, newPinned: Boolean) {
+    private fun updateLocalPinnedState(
+        chatId: Long,
+        messageId: Long,
+        newPinned: Boolean,
+    ) {
         _messages.update { current ->
             val chatMsgs =
                 (current[chatId] ?: emptyList()).map { msg ->
@@ -4278,6 +4282,16 @@ class TelegramManager(
         tdClient?.send(TdApi.SetNetworkType(type)) { /* no-op */ }
     }
 
+    fun toggleChatMute(
+        chatId: Long,
+        currentMuted: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val newMuted = !currentMuted
+        val muteFor = if (newMuted) 31536000 else 0
+        setChatNotificationMute(chatId, muteFor, onResult)
+    }
+
     fun setChatNotificationMute(
         chatId: Long,
         muteForSeconds: Int,
@@ -5537,7 +5551,10 @@ class TelegramManager(
         }
     }
 
-    private fun syncPinnedMessagesToChat(chatId: Long, chat: ChatModel?) {
+    private fun syncPinnedMessagesToChat(
+        chatId: Long,
+        chat: ChatModel?,
+    ) {
         if (chat == null) return
         val allPinnedMsgIds = _messages.value[chatId].orEmpty().filter { it.isPinned }.map { it.id }
         if (allPinnedMsgIds.isNotEmpty()) {

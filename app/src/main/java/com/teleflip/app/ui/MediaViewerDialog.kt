@@ -43,7 +43,7 @@ class MediaViewerDialog(
     private var tvZoomBadge: TextView? = null
     private var tvStatus: TextView? = null
     private var tvCaption: TextView? = null
-    private var tvHint: TextView? = null
+    internal var softkeyManager: SoftkeyManager? = null
     private var layoutProgress: View? = null
     private var pbProgress: ProgressBar? = null
     private var tvTime: TextView? = null
@@ -87,7 +87,13 @@ class MediaViewerDialog(
         vvVideo = findViewById(R.id.vv_viewer_video)
         tvStatus = findViewById(R.id.tv_viewer_status)
         tvCaption = findViewById(R.id.tv_viewer_caption)
-        tvHint = findViewById(R.id.tv_viewer_controls_hint)
+        val softkeyBar = findViewById<View>(R.id.softkey_bar)
+        val tvLeft = findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
+        if (tvLeft != null && tvCenter != null && tvRight != null) {
+            softkeyManager = SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight)
+        }
         layoutProgress = findViewById(R.id.layout_viewer_progress)
         pbProgress = findViewById(R.id.pb_viewer_progress)
         tvTime = findViewById(R.id.tv_viewer_time)
@@ -139,34 +145,38 @@ class MediaViewerDialog(
             MediaType.VIDEO, MediaType.ANIMATION -> {
                 val isGif = message.mediaType == MediaType.ANIMATION
                 tvTitle?.text = if (isGif) "🎞️ GIF Viewer" else "📹 Video Player"
-                tvHint?.text = "[OK] Play/Pause • [◄/►] ±5s • [3] Speed • [LSK] Restart • [1] Save • [RSK] Back"
                 tvZoomBadge?.text = if (isGif) "LOOP" else formatSpeedLabel(playbackSpeed)
+                updateSoftkeysForVideo()
                 setupVideoOrGif(filePath, fileExists, isGif)
             }
             MediaType.STICKER -> {
                 val emoji = message.stickerEmoji.ifBlank { "Sticker" }
                 tvTitle?.text = "🎨 $emoji Viewer"
-                tvHint?.text = "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
                 if (message.stickerFormat == "webm") {
-                    tvHint?.text = "[OK] Play/Pause • [LSK] Restart • [1] Save • [RSK] Back"
+                    updateSoftkeysForVideo()
                     setupVideoOrGif(filePath, fileExists, true)
                 } else {
+                    updateSoftkeysForPhoto()
                     setupPhoto(filePath, fileExists)
                 }
             }
             MediaType.PAID_MEDIA -> {
                 if (message.isPaidMediaLocked) {
                     tvTitle?.text = "🔒 Locked Media (⭐ ${message.starCount} Stars)"
-                    tvHint?.text = "Unlock this media from the conversation • [RSK] Back"
+                    updateSoftkeysForLocked()
                 } else {
                     tvTitle?.text = "🔓 Unlocked Paid Media"
-                    tvHint?.text = if (isVideoMedia) "[OK] Play/Pause • [◄/►] ±5s • [3] Speed • [LSK] Restart • [1] Save • [RSK] Back" else "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
+                    if (isVideoMedia) {
+                        updateSoftkeysForVideo()
+                    } else {
+                        updateSoftkeysForPhoto()
+                    }
                 }
                 if (isVideoMedia) setupVideoOrGif(filePath, fileExists, false) else setupPhoto(filePath, fileExists)
             }
             else -> {
                 tvTitle?.text = "📷 Photo Viewer"
-                tvHint?.text = "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
+                updateSoftkeysForPhoto()
                 setupPhoto(filePath, fileExists)
             }
         }
@@ -244,6 +254,7 @@ class MediaViewerDialog(
             startProgressTracking()
             val playingDesc = context.getString(R.string.cd_video_state_playing)
             vvVideo?.let { ViewCompat.setStateDescription(it, playingDesc) }
+            updateSoftkeysForVideo()
         }
         vvVideo?.setOnCompletionListener {
             stopProgressTracking()
@@ -254,11 +265,14 @@ class MediaViewerDialog(
                 tvZoomBadge?.text = "Ended ■"
                 val endedDesc = context.getString(R.string.cd_video_state_ended)
                 vvVideo?.let { ViewCompat.setStateDescription(it, endedDesc) }
+                updateSoftkeysForVideo()
             }
         }
         vvVideo?.setOnErrorListener { _, _, _ ->
             stopProgressTracking()
             layoutProgress?.visibility = View.GONE
+            isVideoPlaying = false
+            updateSoftkeysForVideo()
             if (isLoopingGif) {
                 vvVideo?.visibility = View.GONE
                 ivPhoto?.visibility = View.VISIBLE
@@ -371,12 +385,13 @@ class MediaViewerDialog(
 
     internal fun startProgressTracking() {
         stopProgressTracking()
-        progressJob = dialogScope.launch {
-            while (isActive) {
-                updateProgressUI()
-                delay(250L)
+        progressJob =
+            dialogScope.launch {
+                while (isActive) {
+                    updateProgressUI()
+                    delay(250L)
+                }
             }
-        }
     }
 
     internal fun stopProgressTracking() {
@@ -421,6 +436,7 @@ class MediaViewerDialog(
             tvZoomBadge?.text = "Paused ⏸"
             val pausedDesc = context.getString(R.string.cd_video_state_paused)
             ViewCompat.setStateDescription(vv, pausedDesc)
+            updateSoftkeysForVideo()
         } else {
             vv.start()
             isVideoPlaying = true
@@ -429,7 +445,52 @@ class MediaViewerDialog(
             tvZoomBadge?.text = "Playing ▶"
             val playingDesc = context.getString(R.string.cd_video_state_playing)
             ViewCompat.setStateDescription(vv, playingDesc)
+            updateSoftkeysForVideo()
         }
+    }
+
+    private fun restartVideo() {
+        vvVideo?.seekTo(0)
+        vvVideo?.start()
+        isVideoPlaying = true
+        updateSpeedBadge()
+        updateProgressUI(currentMs = 0, totalMs = vvVideo?.duration ?: 0)
+        startProgressTracking()
+        updateSoftkeysForVideo()
+    }
+
+    private fun updateSoftkeysForPhoto() {
+        softkeyManager?.update(
+            left = "Zoom",
+            center = "Zoom",
+            right = "Back",
+            onLeft = { cycleZoomIn() },
+            onCenter = { cycleZoomIn() },
+            onRight = { dismiss() },
+        )
+    }
+
+    private fun updateSoftkeysForLocked() {
+        softkeyManager?.update(
+            left = "",
+            center = "",
+            right = "Back",
+            onLeft = null,
+            onCenter = null,
+            onRight = { dismiss() },
+        )
+    }
+
+    private fun updateSoftkeysForVideo() {
+        val centerLabel = if (isVideoPlaying) "Pause" else "Play"
+        softkeyManager?.update(
+            left = "Restart",
+            center = centerLabel,
+            right = "Back",
+            onLeft = { restartVideo() },
+            onCenter = { toggleVideoPlayback() },
+            onRight = { dismiss() },
+        )
     }
 
     private fun seekVideoBy(deltaMs: Int) {
@@ -459,6 +520,10 @@ class MediaViewerDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
+            return true
+        }
+
         if (isBackOrRightSoftKey(keyCode)) {
             dismiss()
             return true
@@ -480,12 +545,10 @@ class MediaViewerDialog(
                     return true
                 }
                 SoftkeyUtils.isSoftLeftKey(keyCode) || keyCode == KeyEvent.KEYCODE_0 -> {
-                    vvVideo?.seekTo(0)
-                    vvVideo?.start()
-                    isVideoPlaying = true
-                    updateSpeedBadge()
-                    updateProgressUI(currentMs = 0, totalMs = vvVideo?.duration ?: 0)
-                    startProgressTracking()
+                    restartVideo()
+                    return true
+                }
+                keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN -> {
                     return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_4 -> {
@@ -512,16 +575,20 @@ class MediaViewerDialog(
                     return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_UP -> {
-                    if (panBy(0f, panStepPx)) return true
+                    panBy(0f, panStepPx)
+                    return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (panBy(0f, -panStepPx)) return true
+                    panBy(0f, -panStepPx)
+                    return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (panBy(panStepPx, 0f)) return true
+                    panBy(panStepPx, 0f)
+                    return true
                 }
                 keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (panBy(-panStepPx, 0f)) return true
+                    panBy(-panStepPx, 0f)
+                    return true
                 }
             }
         }
