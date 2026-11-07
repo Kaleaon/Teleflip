@@ -415,6 +415,7 @@ class TelegramManager(
 
     companion object {
         const val DEFAULT_CHAT_BATCH_SIZE = 10
+        const val MUTE_FOR_ONE_YEAR_SECONDS = 31536000
         private val DEFAULT_CUSTOM_EMOJIS =
             mapOf(
                 "custom_emoji_1001" to StickerItem(fileId = 1001, emoji = "⭐", filePath = null, setName = "Custom Emoji 1001"),
@@ -1146,7 +1147,11 @@ class TelegramManager(
         }
     }
 
-    private fun updateLocalPinnedState(chatId: Long, messageId: Long, newPinned: Boolean) {
+    private fun updateLocalPinnedState(
+        chatId: Long,
+        messageId: Long,
+        newPinned: Boolean,
+    ) {
         _messages.update { current ->
             val chatMsgs =
                 (current[chatId] ?: emptyList()).map { msg ->
@@ -4378,6 +4383,21 @@ class TelegramManager(
         tdClient?.send(TdApi.SetNetworkType(type)) { /* no-op */ }
     }
 
+    fun toggleChatMute(
+        chatId: Long,
+        currentMuted: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(currentMuted)
+            return
+        }
+        val newMuted = !currentMuted
+        val muteFor = if (newMuted) MUTE_FOR_ONE_YEAR_SECONDS else 0
+        setChatNotificationMute(chatId, muteFor, onResult)
+    }
+
     fun setChatNotificationMute(
         chatId: Long,
         muteForSeconds: Int,
@@ -5655,7 +5675,10 @@ class TelegramManager(
         }
     }
 
-    private fun syncPinnedMessagesToChat(chatId: Long, chat: ChatModel?) {
+    private fun syncPinnedMessagesToChat(
+        chatId: Long,
+        chat: ChatModel?,
+    ) {
         if (chat == null) return
         val allPinnedMsgIds = _messages.value[chatId].orEmpty().filter { it.isPinned }.map { it.id }
         if (allPinnedMsgIds.isNotEmpty()) {
