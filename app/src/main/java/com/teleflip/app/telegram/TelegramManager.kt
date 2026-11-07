@@ -132,15 +132,6 @@ class TelegramManager(
     fun getChatIdForSupergroup(supergroupId: Long): Long {
         val cached = supergroupToChatIdMap[supergroupId]
         if (cached != null) return cached
-        val found =
-            pendingChats.values.find {
-                (it as? TdApi.Chat)?.type is TdApi.ChatTypeSupergroup &&
-                    ((it as TdApi.Chat).type as TdApi.ChatTypeSupergroup).supergroupId == supergroupId
-            } as? TdApi.Chat
-        if (found != null) {
-            supergroupToChatIdMap[supergroupId] = found.id
-            return found.id
-        }
         val chatModel =
             _chats.value.find {
                 (it.chatType == ChatType.GROUP || it.chatType == ChatType.CHANNEL)
