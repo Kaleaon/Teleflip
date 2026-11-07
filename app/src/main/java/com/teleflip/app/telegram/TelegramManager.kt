@@ -351,6 +351,7 @@ class TelegramManager(
 
     companion object {
         const val DEFAULT_CHAT_BATCH_SIZE = 10
+        private const val MUTE_FOREVER_SECONDS = 31536000
         private val DEFAULT_CUSTOM_EMOJIS =
             mapOf(
                 "custom_emoji_1001" to StickerItem(fileId = 1001, emoji = "⭐", filePath = null, setName = "Custom Emoji 1001"),
@@ -4277,6 +4278,21 @@ class TelegramManager(
 
     fun setNetworkType(type: TdApi.NetworkType) {
         tdClient?.send(TdApi.SetNetworkType(type)) { /* no-op */ }
+    }
+
+    fun toggleChatMute(
+        chatId: Long,
+        currentMuted: Boolean,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult?.invoke(currentMuted)
+            return
+        }
+        val newMuted = !currentMuted
+        val muteFor = if (newMuted) MUTE_FOREVER_SECONDS else 0
+        setChatNotificationMute(chatId, muteFor, onResult)
     }
 
     fun setChatNotificationMute(
