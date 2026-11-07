@@ -68,8 +68,6 @@ class KeypadInputEngine(
                     updateModeIndicator()
                 } else {
                     commitCurrentChar()
-                } else {
-                    updateModeIndicator()
                 }
                 externalFocusListener?.onFocusChange(v, hasFocus)
             }
