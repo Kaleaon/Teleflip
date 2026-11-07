@@ -22,6 +22,7 @@ import coil.imageLoader
 import coil.request.Disposable
 import coil.request.ImageRequest
 import com.teleflip.app.R
+import com.teleflip.app.accessibility.AccessibilityActionManager
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
@@ -34,6 +35,7 @@ class MessageAdapter(
     private val onMessageAction: ((MessageModel) -> Unit)? = null,
     private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
     private val customEmojiResolver: ((String) -> String?)? = null,
+    private val onMessageAccessibilityAction: ((actionId: Int, message: MessageModel) -> Boolean)? = null,
     private val onQuoteClick: ((Long) -> Unit)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     companion object {
@@ -202,6 +204,7 @@ class MessageAdapter(
     override fun onViewRecycled(holder: MessageViewHolder) {
         super.onViewRecycled(holder)
         holder.clearImage()
+        AccessibilityActionManager.clearActions(holder.itemView)
     }
 
     inner class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -358,15 +361,23 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    val statusTag =
+                    val icon = if (message.pollIsQuiz) "💡" else "📊"
+                    val actionLabel =
                         if (message.pollIsClosed) {
                             "Closed"
-                        } else if (message.pollIsAnonymous) {
-                            "Anonymous Poll"
+                        } else if (message.pollIsQuiz) {
+                            "Press OK to Answer"
                         } else {
-                            "Public Poll"
+                            "Press OK to Vote"
                         }
-                    tvMedia.text = "📊 [$statusTag • Press OK to Vote]"
+                    val modeTag =
+                        when {
+                            message.pollIsQuiz -> "Quiz Mode"
+                            message.pollAllowsMultipleAnswers -> "Multiple Choice"
+                            message.pollIsAnonymous -> "Anonymous Poll"
+                            else -> "Public Poll"
+                        }
+                    tvMedia.text = "$icon [$modeTag • $actionLabel]"
                 }
                 MediaType.PAID_MEDIA -> {
                     tvMedia.visibility = View.VISIBLE
@@ -442,10 +453,24 @@ class MessageAdapter(
             if (message.mediaType == MediaType.POLL && message.pollOptions.isNotEmpty()) {
                 val pollBody =
                     buildString {
-                        appendLine(message.pollQuestion.ifBlank { message.text })
+                        val headerPrefix = if (message.pollIsQuiz && !message.pollQuestion.startsWith("💡")) "💡 Quiz: " else ""
+                        appendLine("$headerPrefix${message.pollQuestion.ifBlank { message.text }}")
                         message.pollOptions.forEachIndexed { idx, opt ->
-                            val mark = if (opt.isChosen) "[✓]" else "[ ]"
+                            val isCorrect = message.pollIsQuiz && idx == message.pollCorrectOptionIndex
+                            val mark =
+                                when {
+                                    opt.isChosen && isCorrect -> "[✓ Correct]"
+                                    opt.isChosen -> "[✓]"
+                                    isCorrect && (opt.isChosen || message.pollOptions.any { it.isChosen } || message.pollIsClosed) -> "[Correct Answer]"
+                                    else -> "[ ]"
+                                }
                             appendLine("${idx + 1}. $mark ${opt.text} (${opt.votePercentage}% • ${opt.voterCount})")
+                        }
+                        if (message.pollAllowsMultipleAnswers && !message.pollIsQuiz) {
+                            appendLine("Multiple answers allowed")
+                        }
+                        if (message.pollIsQuiz && message.pollExplanation.isNotBlank()) {
+                            appendLine("Explanation: ${message.pollExplanation}")
                         }
                         append("Total votes: ${message.pollTotalVoters}")
                     }
@@ -590,6 +615,10 @@ class MessageAdapter(
 
             itemView.setOnClickListener {
                 onMessageAction?.invoke(message)
+            }
+
+            AccessibilityActionManager.bindActions(itemView, message) { actionId, item ->
+                onMessageAccessibilityAction?.invoke(actionId, item) ?: false
             }
         }
 

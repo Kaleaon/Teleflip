@@ -10,11 +10,13 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.R
+import com.teleflip.app.accessibility.AccessibilityActionManager
 import com.teleflip.app.model.ChatModel
 
 class ChatListAdapter(
     private val onChatFocused: ((ChatModel) -> Unit)? = null,
     private val onChatSelected: (ChatModel) -> Unit,
+    private val onChatAction: ((actionId: Int, chat: ChatModel) -> Boolean)? = null,
 ) : ListAdapter<ChatModel, ChatListAdapter.ChatViewHolder>(ChatDiffCallback()) {
     private var attachedRecyclerView: RecyclerView? = null
 
@@ -116,6 +118,7 @@ class ChatListAdapter(
     override fun onViewRecycled(holder: ChatViewHolder) {
         super.onViewRecycled(holder)
         holder.clearImage()
+        AccessibilityActionManager.clearActions(holder.itemView)
     }
 
     inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -192,6 +195,15 @@ class ChatListAdapter(
 
             itemView.setOnClickListener {
                 onChatSelected(chat)
+            }
+
+            AccessibilityActionManager.bindActions(itemView, chat) { actionId, item ->
+                if (actionId == R.id.action_chat_open) {
+                    onChatSelected(item)
+                    true
+                } else {
+                    onChatAction?.invoke(actionId, item) ?: false
+                }
             }
         }
 
