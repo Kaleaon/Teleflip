@@ -5,14 +5,19 @@ import android.content.SharedPreferences
 import com.teleflip.app.model.ActiveCall
 import com.teleflip.app.model.ChatModel
 import com.teleflip.app.model.ChatType
+import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
+import org.mockito.Mockito.atLeastOnce
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 
 class TelegramFeaturesTest {
     private lateinit var telegramManager: TelegramManager
@@ -59,6 +64,48 @@ class TelegramFeaturesTest {
             forwardSuccess = success
         }
         assertEquals(false, forwardSuccess)
+    }
+
+    @Test
+    fun testForwardMessageWithFlagsAndActiveClient() {
+        val mockClient = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(mockClient)
+
+        // Test default parameters
+        telegramManager.forwardMessage(fromChatId = 2L, toChatId = 3L, messageId = 201L)
+
+        val captor1 = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        verify(mockClient, atLeastOnce()).send(captor1.capture(), Mockito.any())
+
+        val forwardReq1 = captor1.allValues.filterIsInstance<TdApi.ForwardMessages>().first()
+        assertEquals(3L, forwardReq1.chatId)
+        assertEquals(2L, forwardReq1.fromChatId)
+        assertEquals(1, forwardReq1.messageIds.size)
+        assertEquals(201L, forwardReq1.messageIds[0])
+        assertFalse("sendCopy should be false by default", forwardReq1.sendCopy)
+        assertFalse("removeCaption should be false by default", forwardReq1.removeCaption)
+
+        // Test custom parameters: sendCopy = true, removeCaption = true
+        val mockClient2 = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(mockClient2)
+
+        telegramManager.forwardMessage(
+            fromChatId = 2L,
+            toChatId = 4L,
+            messageId = 301L,
+            sendCopy = true,
+            removeCaption = true,
+        )
+
+        val captor2 = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        verify(mockClient2, atLeastOnce()).send(captor2.capture(), Mockito.any())
+
+        val forwardReq2 = captor2.allValues.filterIsInstance<TdApi.ForwardMessages>().first()
+        assertEquals(4L, forwardReq2.chatId)
+        assertEquals(2L, forwardReq2.fromChatId)
+        assertEquals(301L, forwardReq2.messageIds[0])
+        assertTrue("sendCopy should be true when passed", forwardReq2.sendCopy)
+        assertTrue("removeCaption should be true when passed", forwardReq2.removeCaption)
     }
 
     @Test
