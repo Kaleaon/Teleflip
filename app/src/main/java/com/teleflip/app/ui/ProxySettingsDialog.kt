@@ -16,7 +16,6 @@ import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.model.ProxyType
 import com.teleflip.app.storage.ProxyStorage
 import com.teleflip.app.telegram.TelegramManager
-import kotlinx.coroutines.launch
 
 @Suppress("MagicNumber", "LongMethod", "ComplexMethod")
 class ProxySettingsDialog(
@@ -160,7 +159,7 @@ class ProxySettingsDialog(
 
                 telegramManager.pingProxy(proxy) { latencyMs ->
                     val statusText = if (proxy.isEnabled) " [ACTIVE]" else ""
-                    val pingText = if (latencyMs != null) " • ${latencyMs} ms" else " • Offline"
+                    val pingText = if (latencyMs != null) " • $latencyMs ms" else " • Offline"
                     titleTv.text = "• [${proxy.type.name}] ${proxy.server}:${proxy.port}$statusText$pingText"
                 }
 

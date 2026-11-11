@@ -71,6 +71,7 @@
     <ID>CyclomaticComplexMethod:TelegramFeatureMenus.kt$TelegramFeatureMenus$fun buttons(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun fetchCustomEmojiStickers(onResult: (List&lt;StickerItem&gt;) -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleDeepLinkProxy( uri: android.net.Uri, callback: ((Boolean, String) -&gt; Unit)? = null, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun parseProxyUri(uri: Uri): ProxyItem?</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
@@ -250,11 +251,11 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$3000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300_000</ID>
-    <ID>MagicNumber:TelegramManager.kt$TelegramManager$31536000</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$32</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$4</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$40</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$4000L</ID>
+    <ID>MagicNumber:TelegramManager.kt$TelegramManager$443</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$50</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$500</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$5000L</ID>
