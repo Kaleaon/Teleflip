@@ -46,7 +46,6 @@ import com.teleflip.app.export.ExportFormat
 import com.teleflip.app.input.InputMode
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.location.LocationHelper
-import com.teleflip.app.ui.ProxySettingsDialog
 import com.teleflip.app.media.VoicePlayer
 import com.teleflip.app.media.VoiceRecorder
 import com.teleflip.app.model.ActiveCall
@@ -78,6 +77,7 @@ import com.teleflip.app.ui.MessageAdapter
 import com.teleflip.app.ui.NewChatDialog
 import com.teleflip.app.ui.OptionsMenuDialog
 import com.teleflip.app.ui.PollDialog
+import com.teleflip.app.ui.ProxySettingsDialog
 import com.teleflip.app.ui.SoftkeyManager
 import com.teleflip.app.ui.SoftkeyUtils
 import com.teleflip.app.ui.SymbolsDialog
@@ -5736,58 +5736,59 @@ class MainActivity : AppCompatActivity() {
 
             val targetView = focusedView ?: currentFocus
             val clickAction: () -> Unit = { targetView?.performClick() }
-            val (leftLabel, leftAction) = when (targetView?.id) {
-                R.id.layout_profile_phone_row, R.id.btn_profile_cell_call -> {
-                    Pair("Dial", clickAction)
-                }
-                R.id.layout_profile_username_row -> {
-                    Pair("Copy", clickAction)
-                }
-                R.id.layout_profile_bio_row -> {
-                    Pair("Select", clickAction)
-                }
-                R.id.btn_profile_tg_call -> {
-                    Pair("Call", clickAction)
-                }
-                R.id.btn_profile_secret_chat -> {
-                    Pair("Start", clickAction)
-                }
-                R.id.btn_profile_self_destruct -> {
-                    Pair("Set", clickAction)
-                }
-                R.id.btn_profile_members, R.id.btn_profile_forum_topics -> {
-                    Pair("View", clickAction)
-                }
-                R.id.btn_profile_send_msg -> {
-                    Pair("Open", clickAction)
-                }
-                R.id.btn_profile_toggle_mute -> {
-                    val isMuted = currentProfile?.isMuted ?: false
-                    val label = if (isMuted) "Unmute" else "Mute"
-                    Pair(label, clickAction)
-                }
-                R.id.btn_profile_block_user -> {
-                    Pair("Block", clickAction)
-                }
-                R.id.btn_profile_search -> {
-                    Pair("Search", clickAction)
-                }
-                R.id.btn_profile_export_history -> {
-                    Pair("Export", clickAction)
-                }
-                else -> {
-                    val defaultLabel = if (chat.chatType == ChatType.DIRECT) "Call" else "Select"
-                    val defaultAction: () -> Unit = {
-                        if (chat.chatType == ChatType.DIRECT) {
-                            val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
-                            initiateAudioCall(userId)
-                        } else {
-                            targetView?.performClick()
-                        }
+            val (leftLabel, leftAction) =
+                when (targetView?.id) {
+                    R.id.layout_profile_phone_row, R.id.btn_profile_cell_call -> {
+                        Pair("Dial", clickAction)
                     }
-                    Pair(defaultLabel, defaultAction)
+                    R.id.layout_profile_username_row -> {
+                        Pair("Copy", clickAction)
+                    }
+                    R.id.layout_profile_bio_row -> {
+                        Pair("Select", clickAction)
+                    }
+                    R.id.btn_profile_tg_call -> {
+                        Pair("Call", clickAction)
+                    }
+                    R.id.btn_profile_secret_chat -> {
+                        Pair("Start", clickAction)
+                    }
+                    R.id.btn_profile_self_destruct -> {
+                        Pair("Set", clickAction)
+                    }
+                    R.id.btn_profile_members, R.id.btn_profile_forum_topics -> {
+                        Pair("View", clickAction)
+                    }
+                    R.id.btn_profile_send_msg -> {
+                        Pair("Open", clickAction)
+                    }
+                    R.id.btn_profile_toggle_mute -> {
+                        val isMuted = currentProfile?.isMuted ?: false
+                        val label = if (isMuted) "Unmute" else "Mute"
+                        Pair(label, clickAction)
+                    }
+                    R.id.btn_profile_block_user -> {
+                        Pair("Block", clickAction)
+                    }
+                    R.id.btn_profile_search -> {
+                        Pair("Search", clickAction)
+                    }
+                    R.id.btn_profile_export_history -> {
+                        Pair("Export", clickAction)
+                    }
+                    else -> {
+                        val defaultLabel = if (chat.chatType == ChatType.DIRECT) "Call" else "Select"
+                        val defaultAction: () -> Unit = {
+                            if (chat.chatType == ChatType.DIRECT) {
+                                val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+                                initiateAudioCall(userId)
+                            } else {
+                                targetView?.performClick()
+                            }
+                        }
+                        Pair(defaultLabel, defaultAction)
+                    }
                 }
-            }
 
             softkeyManager.update(
                 left = leftLabel,
@@ -5802,22 +5803,23 @@ class MainActivity : AppCompatActivity() {
             updateActiveCallOverlay()
         }
 
-        val allProfileViews = listOfNotNull(
-            rowPhone,
-            rowUsername,
-            rowBio,
-            btnTgCall,
-            btnCellCall,
-            btnSecretChat,
-            btnSelfDestruct,
-            btnMembers,
-            btnForumTopics,
-            btnSendMsg,
-            btnToggleMute,
-            btnBlock,
-            btnSearch,
-            btnExportHistory
-        )
+        val allProfileViews =
+            listOfNotNull(
+                rowPhone,
+                rowUsername,
+                rowBio,
+                btnTgCall,
+                btnCellCall,
+                btnSecretChat,
+                btnSelfDestruct,
+                btnMembers,
+                btnForumTopics,
+                btnSendMsg,
+                btnToggleMute,
+                btnBlock,
+                btnSearch,
+                btnExportHistory,
+            )
 
         fun updateFocusChains() {
             rebuildProfileFocusChain(allProfileViews)

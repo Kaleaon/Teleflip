@@ -8,7 +8,6 @@
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (SoftkeyUtils.isSoftRightKey(keyCode)) { if (softkeyManager.handleKeyEvent(keyCode, event)) return true }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_DPAD_UP) { if (vh != null) { val pos = vh.adapterPosition if (pos &gt; 0) { focusChatAt(pos - 1) return true } else if (pos == 0) { focusSelectedTabView() return true } } }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_ENDCALL &amp;&amp; event.action == KeyEvent.ACTION_DOWN) { if (telegramManager.hasOngoingCall) { telegramManager.endCurrentCall() return true } }</ID>
-    <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (requestCode == REQ_PHONE_PERM &amp;&amp; grantResults.isNotEmpty() &amp;&amp; grantResults[0] == PackageManager.PERMISSION_GRANTED) { if (currentScreen == Screen.LOGIN) { showLoginScreen(telegramManager.authState.value) } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (SoftkeyUtils.isCenterKey(keyCode)) { if ((rvResults.adapter?.itemCount ?: 0) &gt; 0) { focusResultAt(0) return true } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (SoftkeyUtils.isCenterKey(keyCode)) { if (handleCenterPress()) { return true } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog.&lt;no name provided&gt;$if (!isMessageLoading &amp;&amp; messageNextOffset.isNotEmpty() &amp;&amp; totalItemCount &lt; maxResultsLimit) { if (visibleItemCount + firstVisibleItem &gt;= totalItemCount - 2) { loadMoreMessageResults() } }</ID>
@@ -72,6 +71,7 @@
     <ID>CyclomaticComplexMethod:TelegramFeatureMenus.kt$TelegramFeatureMenus$fun buttons(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun fetchCustomEmojiStickers(onResult: (List&lt;StickerItem&gt;) -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleDeepLinkProxy( uri: android.net.Uri, callback: ((Boolean, String) -&gt; Unit)? = null, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun syncContacts(onComplete: ((Boolean, Int) -&gt; Unit)? = null)</ID>
@@ -238,6 +238,7 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$10000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1024L</ID>
+    <ID>MagicNumber:TelegramManager.kt$TelegramManager$1080</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$120</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1200L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1500L</ID>
@@ -249,11 +250,11 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$3000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300_000</ID>
-    <ID>MagicNumber:TelegramManager.kt$TelegramManager$31536000</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$32</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$4</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$40</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$4000L</ID>
+    <ID>MagicNumber:TelegramManager.kt$TelegramManager$443</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$50</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$500</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$5000L</ID>
