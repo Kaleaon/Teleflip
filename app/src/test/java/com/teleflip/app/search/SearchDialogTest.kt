@@ -261,14 +261,13 @@ class SearchDialogTest {
         dialog.show()
 
         val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
-        val tabChats = dialog.findViewById<TextView>(R.id.tab_search_chats)
         assertTrue(etSearchInput.hasFocus())
 
         val dpadDownEvent = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN, 0)
         val handled = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_DOWN, dpadDownEvent)
 
         assertTrue(handled)
-        assertTrue("Tab chats should have focus when search results are empty", tabChats.hasFocus())
+        assertTrue("Search input should retain focus when search results are empty", etSearchInput.hasFocus())
 
         dialog.dismiss()
     }

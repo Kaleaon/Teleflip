@@ -24,22 +24,23 @@ class ProfileFocusAndSoftkeyTest {
         val file = getLayoutFile("view_profile.xml")
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
 
-        val targetIds = listOf(
-            "@+id/layout_profile_phone_row",
-            "@+id/layout_profile_username_row",
-            "@+id/layout_profile_bio_row",
-            "@+id/btn_profile_tg_call",
-            "@+id/btn_profile_cell_call",
-            "@+id/btn_profile_secret_chat",
-            "@+id/btn_profile_self_destruct",
-            "@+id/btn_profile_members",
-            "@+id/btn_profile_forum_topics",
-            "@+id/btn_profile_send_msg",
-            "@+id/btn_profile_toggle_mute",
-            "@+id/btn_profile_block_user",
-            "@+id/btn_profile_search",
-            "@+id/btn_profile_export_history"
-        )
+        val targetIds =
+            listOf(
+                "@+id/layout_profile_phone_row",
+                "@+id/layout_profile_username_row",
+                "@+id/layout_profile_bio_row",
+                "@+id/btn_profile_tg_call",
+                "@+id/btn_profile_cell_call",
+                "@+id/btn_profile_secret_chat",
+                "@+id/btn_profile_self_destruct",
+                "@+id/btn_profile_members",
+                "@+id/btn_profile_forum_topics",
+                "@+id/btn_profile_send_msg",
+                "@+id/btn_profile_toggle_mute",
+                "@+id/btn_profile_block_user",
+                "@+id/btn_profile_search",
+                "@+id/btn_profile_export_history",
+            )
 
         for (id in targetIds) {
             val node = findNodeById(doc, id)
@@ -60,18 +61,21 @@ class ProfileFocusAndSoftkeyTest {
 
     @Test
     fun testFocusChainBypassesHiddenViews() {
-        val v1 = mock(View::class.java).apply {
-            `when`(id).thenReturn(101)
-            `when`(visibility).thenReturn(View.VISIBLE)
-        }
-        val v2 = mock(View::class.java).apply {
-            `when`(id).thenReturn(102)
-            `when`(visibility).thenReturn(View.GONE) // Hidden
-        }
-        val v3 = mock(View::class.java).apply {
-            `when`(id).thenReturn(103)
-            `when`(visibility).thenReturn(View.VISIBLE)
-        }
+        val v1 =
+            mock(View::class.java).apply {
+                `when`(id).thenReturn(101)
+                `when`(visibility).thenReturn(View.VISIBLE)
+            }
+        val v2 =
+            mock(View::class.java).apply {
+                `when`(id).thenReturn(102)
+                `when`(visibility).thenReturn(View.GONE) // Hidden
+            }
+        val v3 =
+            mock(View::class.java).apply {
+                `when`(id).thenReturn(103)
+                `when`(visibility).thenReturn(View.VISIBLE)
+            }
 
         val allViews = listOf(v1, v2, v3)
         rebuildFocusChain(allViews)
