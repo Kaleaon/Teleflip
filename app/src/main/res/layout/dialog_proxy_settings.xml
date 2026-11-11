@@ -290,6 +290,20 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:nextFocusUp="@+id/btn_proxy_save_enable"
+                android:nextFocusDown="@+id/btn_auto_failover_toggle"
+                android:layout_marginBottom="6dp" />
+
+            <Button
+                android:id="@+id/btn_auto_failover_toggle"
+                android:layout_width="match_parent"
+                android:layout_height="38dp"
+                android:text="🔄 Auto Failover: Enabled"
+                android:textColor="@color/focus_highlight_gold"
+                android:textSize="12sp"
+                android:background="@drawable/bg_item_selector"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusUp="@+id/btn_proxy_disable"
                 android:nextFocusDown="@+id/btn_proxy_close"
                 android:layout_marginBottom="8dp" />
 
@@ -321,7 +335,7 @@
                 android:background="@drawable/bg_item_selector"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:nextFocusUp="@+id/btn_proxy_disable"
+                android:nextFocusUp="@+id/btn_auto_failover_toggle"
                 android:layout_marginTop="4dp" />
 
         </LinearLayout>
