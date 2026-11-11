@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.model.ProxyType
 import com.teleflip.app.storage.ProxyStorage
+import kotlinx.coroutines.runBlocking
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
@@ -179,5 +180,150 @@ class ProxyManagerTest {
         handleMethod.invoke(telegramManager, TdApi.ConnectionStateReady())
 
         assertEquals("Online via Proxy", telegramManager.connectionState.value)
+    }
+
+    @Test
+    fun testPingProxyDispatchesTdApiPingProxy() {
+        val mockClient = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(mockClient)
+
+        val proxy = ProxyItem(server = "ping.proxy.com", port = 1080, type = ProxyType.SOCKS5)
+
+        val queryCaptor = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        val answer = org.mockito.stubbing.Answer { invocation ->
+            val resultHandler = invocation.getArgument(1) as Client.ResultHandler
+            resultHandler.onResult(TdApi.Seconds(0.150))
+            null
+        }
+        org.mockito.Mockito.doAnswer(answer).`when`(mockClient).send(queryCaptor.capture(), any())
+
+        var pingMs: Long? = null
+        runBlocking {
+            pingMs = telegramManager.pingProxy(proxy)
+        }
+
+        assertNotNull(pingMs)
+        assertEquals(150L, pingMs)
+
+        val query = queryCaptor.value
+        assertTrue("Captured function should be TdApi.PingProxy", query is TdApi.PingProxy)
+        val pingQuery = query as TdApi.PingProxy
+        assertEquals("ping.proxy.com", pingQuery.proxy.server)
+        assertEquals(1080, pingQuery.proxy.port)
+    }
+
+    @Test
+    fun testAutoProxyFailoverSelectsLowestLatencyProxy() {
+        ProxyStorage.saveProxy(
+            context,
+            ProxyItem(server = "slow.proxy.com", port = 1080, type = ProxyType.SOCKS5, isEnabled = false),
+        )
+        ProxyStorage.saveProxy(
+            context,
+            ProxyItem(server = "fast.proxy.com", port = 1080, type = ProxyType.SOCKS5, isEnabled = false),
+        )
+
+        val mockClient = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(mockClient)
+
+        val answer = org.mockito.stubbing.Answer { invocation ->
+            val function = invocation.getArgument<TdApi.Function<*>>(0)
+            val resultHandler = invocation.getArgument<Client.ResultHandler>(1)
+            if (function is TdApi.PingProxy) {
+                if (function.proxy.server == "slow.proxy.com") {
+                    resultHandler.onResult(TdApi.Seconds(0.500))
+                } else if (function.proxy.server == "fast.proxy.com") {
+                    resultHandler.onResult(TdApi.Seconds(0.100))
+                }
+            } else if (function is TdApi.AddProxy) {
+                resultHandler.onResult(TdApi.AddedProxy().apply { id = function.proxy.port })
+            } else if (function is TdApi.EnableProxy) {
+                resultHandler.onResult(TdApi.Ok())
+            }
+            null
+        }
+        org.mockito.Mockito.doAnswer(answer).`when`(mockClient).send(any(), any())
+
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var selectedProxy: ProxyItem? = null
+        var selectedLatency: Long? = null
+
+        telegramManager.runAutoProxyFailover { proxy, latency ->
+            selectedProxy = proxy
+            selectedLatency = latency
+            latch.countDown()
+        }
+
+        assertTrue(latch.await(4, java.util.concurrent.TimeUnit.SECONDS))
+        assertNotNull(selectedProxy)
+        assertEquals("fast.proxy.com", selectedProxy?.server)
+        assertEquals(100L, selectedLatency)
+        assertEquals(selectedProxy?.id, ProxyStorage.getEnabledProxy(context)?.id)
+        assertNotNull(telegramManager.failoverStatus.value)
+        assertTrue(telegramManager.failoverStatus.value!!.contains("Auto-selected Proxy"))
+    }
+
+    @Test
+    fun testAutoProxyFailoverDisabledManualOverride() {
+        ProxyStorage.setAutoProxyFailoverEnabled(context, false)
+        assertFalse(ProxyStorage.isAutoProxyFailoverEnabled(context))
+
+        ProxyStorage.saveProxy(
+            context,
+            ProxyItem(server = "test.proxy.com", port = 1080, type = ProxyType.SOCKS5),
+        )
+
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var callbackExecuted = false
+
+        telegramManager.runAutoProxyFailover { proxy, _ ->
+            callbackExecuted = true
+            assertNull(proxy)
+            latch.countDown()
+        }
+
+        assertTrue(latch.await(2, java.util.concurrent.TimeUnit.SECONDS))
+        assertTrue(callbackExecuted)
+        assertEquals("Auto failover disabled in settings", telegramManager.failoverStatus.value)
+    }
+
+    @Test
+    fun testDeepLinkProxyAutoVerificationAndActivation() {
+        val mockClient = mock(Client::class.java)
+        telegramManager.setTdClientForTesting(mockClient)
+
+        val answer = org.mockito.stubbing.Answer { invocation ->
+            val function = invocation.getArgument<TdApi.Function<*>>(0)
+            val resultHandler = invocation.getArgument<Client.ResultHandler>(1)
+            if (function is TdApi.PingProxy) {
+                resultHandler.onResult(TdApi.Seconds(0.120))
+            } else if (function is TdApi.AddProxy) {
+                resultHandler.onResult(TdApi.AddedProxy().apply { id = 101 })
+            } else if (function is TdApi.EnableProxy) {
+                resultHandler.onResult(TdApi.Ok())
+            }
+            null
+        }
+        org.mockito.Mockito.doAnswer(answer).`when`(mockClient).send(any(), any())
+
+        val uri = android.net.Uri.parse("tg://proxy?server=deeplink.proxy.org&port=1080&user=testuser&pass=testpass")
+
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var successResult = false
+
+        telegramManager.handleDeepLinkProxy(uri) { success, _ ->
+            successResult = success
+            latch.countDown()
+        }
+
+        assertTrue(latch.await(4, java.util.concurrent.TimeUnit.SECONDS))
+        assertTrue(successResult)
+
+        val enabled = ProxyStorage.getEnabledProxy(context)
+        assertNotNull(enabled)
+        assertEquals("deeplink.proxy.org", enabled?.server)
+        assertEquals(1080, enabled?.port)
+        assertEquals("testuser", enabled?.username)
+        assertTrue(telegramManager.failoverStatus.value!!.contains("Proxy deep-link activated"))
     }
 }

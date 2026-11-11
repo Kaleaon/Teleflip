@@ -42,6 +42,7 @@
         android:textStyle="bold"
         android:background="@drawable/bg_button_selector"
         android:focusable="true"
+        android:focusableInTouchMode="true"
         android:layout_marginBottom="5dp" />
 
     <Button
@@ -53,6 +54,7 @@
         android:textSize="13sp"
         android:background="@drawable/bg_item_selector"
         android:focusable="true"
+        android:focusableInTouchMode="true"
         android:layout_marginBottom="5dp" />
 
     <Button
@@ -64,6 +66,7 @@
         android:textSize="13sp"
         android:background="@drawable/bg_item_selector"
         android:focusable="true"
+        android:focusableInTouchMode="true"
         android:layout_marginBottom="5dp" />
 
     <Button
@@ -75,6 +78,7 @@
         android:textSize="13sp"
         android:background="@drawable/bg_item_selector"
         android:focusable="true"
+        android:focusableInTouchMode="true"
         android:layout_marginBottom="5dp" />
 
     <Button
@@ -86,6 +90,7 @@
         android:textSize="13sp"
         android:background="@drawable/bg_item_selector"
         android:focusable="true"
+        android:focusableInTouchMode="true"
         android:layout_marginBottom="5dp" />
 
     <Button
@@ -96,6 +101,10 @@
         android:textColor="@color/text_secondary"
         android:textSize="12sp"
         android:background="@drawable/bg_item_selector"
-        android:focusable="true" />
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:layout_marginBottom="6dp" />
+
+    <include layout="@layout/layout_softkeys" />
 
 </LinearLayout>
