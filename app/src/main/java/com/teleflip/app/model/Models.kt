@@ -184,10 +184,15 @@ data class SlowModeState(
     val delaySeconds: Int = 0,
     val expiresAtEpochMs: Long = 0L,
 ) {
+    companion object {
+        private const val MILLIS_PER_SECOND = 1000L
+        private const val CEILING_ROUNDING_OFFSET_MS = 999L
+    }
+
     fun remainingSeconds(currentTimeMs: Long = System.currentTimeMillis()): Int {
         if (expiresAtEpochMs <= currentTimeMs) return 0
         val diffMs = expiresAtEpochMs - currentTimeMs
-        return ((diffMs + 999) / 1000).toInt()
+        return ((diffMs + CEILING_ROUNDING_OFFSET_MS) / MILLIS_PER_SECOND).toInt()
     }
 
     val isActive: Boolean
