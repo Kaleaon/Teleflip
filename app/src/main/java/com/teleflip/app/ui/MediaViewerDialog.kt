@@ -405,12 +405,13 @@ class MediaViewerDialog(
 
     internal fun startProgressTracking() {
         stopProgressTracking()
-        progressJob = dialogScope.launch {
-            while (isActive) {
-                updateProgressUI()
-                delay(250L)
+        progressJob =
+            dialogScope.launch {
+                while (isActive) {
+                    updateProgressUI()
+                    delay(250L)
+                }
             }
-        }
     }
 
     internal fun stopProgressTracking() {
@@ -444,6 +445,7 @@ class MediaViewerDialog(
         val sec = totalSec % 60
         return String.format(Locale.US, "%02d:%02d", min, sec)
     }
+
     private fun toggleVideoPlayback() {
         val vv = vvVideo ?: return
         if (vv.isPlaying) {

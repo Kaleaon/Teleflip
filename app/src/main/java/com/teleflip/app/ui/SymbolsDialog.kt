@@ -152,6 +152,10 @@ class SymbolsDialog(
             }
         }
 
+        if (isBackOrRightSoftKey(keyCode)) {
+            dismiss()
+            return true
+        }
         return super.onKeyDown(keyCode, event)
     }
 

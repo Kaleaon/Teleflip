@@ -21,8 +21,13 @@ abstract class BaseDialog(
     context: Context,
     themeResId: Int = R.style.Theme_TeleFlip,
 ) : Dialog(context, themeResId) {
-    protected var softkeyManager: SoftkeyManager? = null
-        private set
+    var softkeyManager: SoftkeyManager? = null
+        protected set
+
+    override fun show() {
+        context.findMainActivity()?.captureFocusForDialog()
+        super.show()
+    }
 
     override fun onStart() {
         super.onStart()
@@ -80,11 +85,11 @@ abstract class BaseDialog(
         if (softkeyManager?.handleKeyEvent(event.keyCode, event) == true) {
             return true
         }
-        if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) {
+        val isBack = event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK
+        if (isBack) {
             onBackPressed()
-            return true
         }
-        return super.dispatchKeyEvent(event)
+        return isBack || super.dispatchKeyEvent(event)
     }
 
     override fun onKeyDown(
@@ -94,11 +99,11 @@ abstract class BaseDialog(
         if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
+        val isBack = keyCode == KeyEvent.KEYCODE_BACK
+        if (isBack) {
             onBackPressed()
-            return true
         }
-        return super.onKeyDown(keyCode, event)
+        return isBack || super.onKeyDown(keyCode, event)
     }
 
     protected fun isBackOrRightSoftKey(keyCode: Int): Boolean {
