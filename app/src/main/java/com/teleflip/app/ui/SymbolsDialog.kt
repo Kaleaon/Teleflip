@@ -37,10 +37,6 @@ class SymbolsDialog(
         setContentView(R.layout.dialog_symbols)
         setupDismissKeys()
 
-        val rv = findViewById<RecyclerView>(R.id.rv_symbols_grid)
-        rv?.layoutManager = GridLayoutManager(context, COLUMNS)
-        rv?.adapter = SymbolAdapter()
-
         setupSoftkeys(
             left = "Next",
             center = "Select",
@@ -49,6 +45,10 @@ class SymbolsDialog(
             onCenter = { selectFocusedSymbol() },
             onRight = { dismiss() },
         )
+
+        val rv = findViewById<RecyclerView>(R.id.rv_symbols_grid)
+        rv?.layoutManager = GridLayoutManager(context, COLUMNS)
+        rv?.adapter = SymbolAdapter()
 
         updatePage()
     }

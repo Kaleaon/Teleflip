@@ -23,6 +23,11 @@ abstract class BaseDialog(
     protected var softkeyManager: SoftkeyManager? = null
         private set
 
+    override fun show() {
+        context.findMainActivity()?.captureFocusForDialog()
+        super.show()
+    }
+
     override fun onStart() {
         super.onStart()
         context.findMainActivity()?.onDialogShown()

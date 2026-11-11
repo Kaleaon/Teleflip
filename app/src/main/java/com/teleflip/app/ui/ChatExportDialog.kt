@@ -77,12 +77,23 @@ class ChatExportDialog(
         }
 
         setupSoftkeys(
-            left = "",
-            center = "Download",
+            left = "Start",
+            center = "Toggle",
             right = "Cancel",
-            onCenter = { startExport() },
+            onLeft = { startExport() },
+            onCenter = {
+                val focused = currentFocus
+                if (focused != null && focused.isEnabled) {
+                    focused.performClick()
+                }
+            },
             onRight = { dismiss() },
         )
+
+        btnText?.requestFocus()
+        btnText?.post {
+            btnText?.requestFocus()
+        }
     }
 
     private fun toggleText() {
@@ -166,6 +177,22 @@ class ChatExportDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+            startExport()
+            return true
+        }
+        if (SoftkeyUtils.isCenterKey(keyCode)) {
+            val focused = currentFocus
+            if (focused != null && focused.isEnabled) {
+                focused.performClick()
+                return true
+            }
+        }
+        if (SoftkeyUtils.isSoftRightKey(keyCode)) {
+            dismiss()
+            return true
+        }
+
         when (keyCode) {
             KeyEvent.KEYCODE_1 -> {
                 toggleText()

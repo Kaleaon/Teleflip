@@ -171,6 +171,10 @@ class MediaViewerDialog(
             }
         }
 
+        setupViewerSoftkeys()
+    }
+
+    private fun setupViewerSoftkeys() {
         if (isVideoMedia) {
             setupSoftkeys(
                 left = "Restart",

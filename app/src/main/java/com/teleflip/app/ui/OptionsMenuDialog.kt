@@ -60,7 +60,6 @@ class OptionsMenuDialog(
             center = "Select",
             right = "Back",
             onCenter = {
-                val rv = findViewById<RecyclerView>(R.id.rv_menu_options)
                 val focused = currentFocus
                 val vh = focused?.let { rv?.findContainingViewHolder(it) }
                 if (vh != null) {

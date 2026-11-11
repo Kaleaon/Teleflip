@@ -112,7 +112,7 @@ class PollDialog(
                 layoutStep1?.visibility = View.VISIBLE
                 layoutStep2?.visibility = View.GONE
                 tvStepTitle?.text = "📊 Create Poll (Step 1/2)"
-                setupSoftkeys(
+                softkeyManager?.update(
                     left = "Clear",
                     center = "Next",
                     right = "Cancel",
@@ -123,9 +123,7 @@ class PollDialog(
                             focusedEdit.setText("")
                         }
                     },
-                    onCenter = {
-                        btnNext?.performClick()
-                    },
+                    onCenter = { btnNext?.performClick() },
                     onRight = {
                         engines.values.forEach { it.commitCurrentChar() }
                         dismiss()
@@ -149,7 +147,7 @@ class PollDialog(
                     layoutRegularSettings?.visibility = View.VISIBLE
                 }
 
-                setupSoftkeys(
+                softkeyManager?.update(
                     left = "Clear",
                     center = "Send",
                     right = "Back",
@@ -160,12 +158,12 @@ class PollDialog(
                             focusedEdit.setText("")
                         }
                     },
-                    onCenter = {
-                        btnSubmit?.performClick()
-                    },
+                    onCenter = { btnSubmit?.performClick() },
                     onRight = {
                         engines.values.forEach { it.commitCurrentChar() }
-                        btnBack?.performClick()
+                        currentStep = 1
+                        updateStepVisibility()
+                        etQuestion?.requestFocus()
                     },
                 )
             }
@@ -252,6 +250,36 @@ class PollDialog(
             }
         }
 
+        setupSoftkeys(
+            left = "Clear",
+            center = "Next",
+            right = "Cancel",
+            onLeft = {
+                val focusedEdit = currentFocus as? EditText
+                if (focusedEdit != null) {
+                    engines[focusedEdit.id]?.commitCurrentChar()
+                    focusedEdit.setText("")
+                }
+            },
+            onCenter = {
+                if (currentStep == 1) {
+                    btnNext?.performClick()
+                } else {
+                    btnSubmit?.performClick()
+                }
+            },
+            onRight = {
+                engines.values.forEach { it.commitCurrentChar() }
+                if (currentStep == 2) {
+                    currentStep = 1
+                    updateStepVisibility()
+                    etQuestion?.requestFocus()
+                } else {
+                    dismiss()
+                }
+            },
+        )
+
         updateStepVisibility()
         etQuestion?.requestFocus()
     }
@@ -259,16 +287,11 @@ class PollDialog(
     override fun onBackPressed() {
         engines.values.forEach { it.commitCurrentChar() }
         if (currentStep == 2) {
-            val btnBack = findViewById<Button>(R.id.btn_poll_back)
-            if (btnBack != null) {
-                btnBack.performClick()
-            } else {
-                currentStep = 1
-                findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
-                findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
-                findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
-                findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
-            }
+            currentStep = 1
+            findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
+            findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
+            findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
+            findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
         } else {
             dismiss()
         }
@@ -281,16 +304,11 @@ class PollDialog(
         if (isBackOrRightSoftKey(keyCode)) {
             engines.values.forEach { it.commitCurrentChar() }
             if (currentStep == 2) {
-                val btnBack = findViewById<Button>(R.id.btn_poll_back)
-                if (btnBack != null) {
-                    btnBack.performClick()
-                } else {
-                    currentStep = 1
-                    findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
-                    findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
-                    findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
-                    findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
-                }
+                currentStep = 1
+                findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
+                findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
+                findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
+                findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
             } else {
                 dismiss()
             }
