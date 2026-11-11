@@ -4434,21 +4434,6 @@ class TelegramManager(
         )
     }
 
-    fun toggleChatMute(
-        chatId: Long,
-        currentMuted: Boolean,
-        onResult: ((Boolean) -> Unit)? = null,
-    ) {
-        val client = tdClient
-        if (client == null) {
-            onResult?.invoke(currentMuted)
-            return
-        }
-        val newMuted = !currentMuted
-        val muteFor = if (newMuted) DEFAULT_MUTE_DURATION_SECONDS else 0
-        setChatNotificationMute(chatId, muteFor, onResult)
-    }
-
     fun setChatNotificationSettings(
         chatId: Long,
         muteForSeconds: Int,
@@ -6145,9 +6130,9 @@ class TelegramManager(
                 ProxyStorage.deleteProxy(context, proxyId)
                 ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
                 activeProxyId = added.id
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                callback?.invoke(true, null)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not enable proxy") }
+                callback?.invoke(false, e.message ?: "Could not enable proxy")
             }
         }
     }
@@ -6274,7 +6259,8 @@ class TelegramManager(
                     if (success) {
                         retryConnection()
                     }
-                    callback?.invoke(bestProxy, pingMs)
+                    val currentEnabled = ProxyStorage.getEnabledProxy(context) ?: bestProxy
+                    callback?.invoke(currentEnabled, pingMs)
                 }
             } else {
                 _failoverStatus.value = "🔴 Proxy failover: All stored proxies unreachable"
