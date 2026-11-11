@@ -190,11 +190,12 @@ class ProxyManagerTest {
         val proxy = ProxyItem(server = "ping.proxy.com", port = 1080, type = ProxyType.SOCKS5)
 
         val queryCaptor = ArgumentCaptor.forClass(TdApi.Function::class.java)
-        val answer = org.mockito.stubbing.Answer { invocation ->
-            val resultHandler = invocation.getArgument(1) as Client.ResultHandler
-            resultHandler.onResult(TdApi.Seconds(0.150))
-            null
-        }
+        val answer =
+            org.mockito.stubbing.Answer { invocation ->
+                val resultHandler = invocation.getArgument(1) as Client.ResultHandler
+                resultHandler.onResult(TdApi.Seconds(0.150))
+                null
+            }
         org.mockito.Mockito.doAnswer(answer).`when`(mockClient).send(queryCaptor.capture(), any())
 
         var pingMs: Long? = null
@@ -226,22 +227,23 @@ class ProxyManagerTest {
         val mockClient = mock(Client::class.java)
         telegramManager.setTdClientForTesting(mockClient)
 
-        val answer = org.mockito.stubbing.Answer { invocation ->
-            val function = invocation.getArgument<TdApi.Function<*>>(0)
-            val resultHandler = invocation.getArgument<Client.ResultHandler>(1)
-            if (function is TdApi.PingProxy) {
-                if (function.proxy.server == "slow.proxy.com") {
-                    resultHandler.onResult(TdApi.Seconds(0.500))
-                } else if (function.proxy.server == "fast.proxy.com") {
-                    resultHandler.onResult(TdApi.Seconds(0.100))
+        val answer =
+            org.mockito.stubbing.Answer { invocation ->
+                val function = invocation.getArgument<TdApi.Function<*>>(0)
+                val resultHandler = invocation.getArgument<Client.ResultHandler>(1)
+                if (function is TdApi.PingProxy) {
+                    if (function.proxy.server == "slow.proxy.com") {
+                        resultHandler.onResult(TdApi.Seconds(0.500))
+                    } else if (function.proxy.server == "fast.proxy.com") {
+                        resultHandler.onResult(TdApi.Seconds(0.100))
+                    }
+                } else if (function is TdApi.AddProxy) {
+                    resultHandler.onResult(TdApi.AddedProxy().apply { id = function.proxy.port })
+                } else if (function is TdApi.EnableProxy) {
+                    resultHandler.onResult(TdApi.Ok())
                 }
-            } else if (function is TdApi.AddProxy) {
-                resultHandler.onResult(TdApi.AddedProxy().apply { id = function.proxy.port })
-            } else if (function is TdApi.EnableProxy) {
-                resultHandler.onResult(TdApi.Ok())
+                null
             }
-            null
-        }
         org.mockito.Mockito.doAnswer(answer).`when`(mockClient).send(any(), any())
 
         val latch = java.util.concurrent.CountDownLatch(1)
@@ -254,7 +256,12 @@ class ProxyManagerTest {
             latch.countDown()
         }
 
-        assertTrue(latch.await(4, java.util.concurrent.TimeUnit.SECONDS))
+        val deadline = System.currentTimeMillis() + 4000
+        while (latch.count > 0 && System.currentTimeMillis() < deadline) {
+            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            Thread.sleep(50)
+        }
+        assertTrue(latch.await(0, java.util.concurrent.TimeUnit.SECONDS))
         assertNotNull(selectedProxy)
         assertEquals("fast.proxy.com", selectedProxy?.server)
         assertEquals(100L, selectedLatency)
@@ -292,18 +299,19 @@ class ProxyManagerTest {
         val mockClient = mock(Client::class.java)
         telegramManager.setTdClientForTesting(mockClient)
 
-        val answer = org.mockito.stubbing.Answer { invocation ->
-            val function = invocation.getArgument<TdApi.Function<*>>(0)
-            val resultHandler = invocation.getArgument<Client.ResultHandler>(1)
-            if (function is TdApi.PingProxy) {
-                resultHandler.onResult(TdApi.Seconds(0.120))
-            } else if (function is TdApi.AddProxy) {
-                resultHandler.onResult(TdApi.AddedProxy().apply { id = 101 })
-            } else if (function is TdApi.EnableProxy) {
-                resultHandler.onResult(TdApi.Ok())
+        val answer =
+            org.mockito.stubbing.Answer { invocation ->
+                val function = invocation.getArgument<TdApi.Function<*>>(0)
+                val resultHandler = invocation.getArgument<Client.ResultHandler>(1)
+                if (function is TdApi.PingProxy) {
+                    resultHandler.onResult(TdApi.Seconds(0.120))
+                } else if (function is TdApi.AddProxy) {
+                    resultHandler.onResult(TdApi.AddedProxy().apply { id = 101 })
+                } else if (function is TdApi.EnableProxy) {
+                    resultHandler.onResult(TdApi.Ok())
+                }
+                null
             }
-            null
-        }
         org.mockito.Mockito.doAnswer(answer).`when`(mockClient).send(any(), any())
 
         val uri = android.net.Uri.parse("tg://proxy?server=deeplink.proxy.org&port=1080&user=testuser&pass=testpass")
@@ -316,7 +324,12 @@ class ProxyManagerTest {
             latch.countDown()
         }
 
-        assertTrue(latch.await(4, java.util.concurrent.TimeUnit.SECONDS))
+        val deadline = System.currentTimeMillis() + 4000
+        while (latch.count > 0 && System.currentTimeMillis() < deadline) {
+            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            Thread.sleep(50)
+        }
+        assertTrue(latch.await(0, java.util.concurrent.TimeUnit.SECONDS))
         assertTrue(successResult)
 
         val enabled = ProxyStorage.getEnabledProxy(context)
