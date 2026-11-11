@@ -43,13 +43,16 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.export.ExportFormat
+import com.teleflip.app.input.InputMode
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.location.LocationHelper
+import com.teleflip.app.ui.ProxySettingsDialog
 import com.teleflip.app.media.VoicePlayer
 import com.teleflip.app.media.VoiceRecorder
 import com.teleflip.app.model.ActiveCall
 import com.teleflip.app.model.CallState
 import com.teleflip.app.model.ChatModel
+import com.teleflip.app.model.ChatProfile
 import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
@@ -218,6 +221,10 @@ class MainActivity : AppCompatActivity() {
     // Login State
     private var etLoginInput: EditText? = null
     private var loginInputEngine: KeypadInputEngine? = null
+    private var qrGenerationJob: Job? = null
+
+    // Settings State
+    private val settingsInputEngines = mutableMapOf<Int, KeypadInputEngine>()
 
     // Passcode Lock State
     internal var passcodeEntry: String = ""
@@ -327,6 +334,12 @@ class MainActivity : AppCompatActivity() {
 
         pendingTargetChatId = intent?.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L) ?: 0L
 
+        intent?.data?.let { uri ->
+            if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
+                telegramManager.handleDeepLinkProxy(uri)
+            }
+        }
+
         if (PasscodeManager.isLocked(this)) {
             showPasscodeUnlockScreen()
         } else if (pendingTargetChatId != 0L) {
@@ -344,6 +357,16 @@ class MainActivity : AppCompatActivity() {
                         avatarLetters = "TG",
                     )
             openConversation(targetChat)
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent?.data?.let { uri ->
+            if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
+                telegramManager.handleDeepLinkProxy(uri)
+            }
         }
     }
 
@@ -515,6 +538,21 @@ class MainActivity : AppCompatActivity() {
             telegramManager.isAuthQueryInProgressFlow.collectLatest { inProgress ->
                 if (currentScreen == Screen.LOGIN) {
                     updateLoginProgressState(inProgress)
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            telegramManager.failoverStatus.collectLatest { failoverMsg ->
+                if (!failoverMsg.isNullOrBlank() && currentScreen == Screen.LOGIN) {
+                    val tvStatus = findViewById<TextView>(R.id.tv_login_status)
+                    tvStatus?.text = failoverMsg
+                    if (failoverMsg.startsWith("🟢")) {
+                        tvStatus?.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.focus_highlight_gold))
+                    } else if (failoverMsg.startsWith("🔴") || failoverMsg.startsWith("⚠️")) {
+                        tvStatus?.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_error))
+                    }
+                    tvStatus?.announceForAccessibility(failoverMsg)
                 }
             }
         }
@@ -732,6 +770,7 @@ class MainActivity : AppCompatActivity() {
     private fun commitActiveInputEngines() {
         composeInputEngine?.commitCurrentChar()
         loginInputEngine?.commitCurrentChar()
+        settingsInputEngines.values.forEach { it.commitCurrentChar() }
     }
 
     // =========================================================================
@@ -1203,11 +1242,20 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, msg, if (isError) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
     }
 
-    private var activeDialogCount = 0
-    private var savedFocusView: View? = null
+    @VisibleForTesting
+    internal var activeDialogCount = 0
+
+    @VisibleForTesting
+    internal var savedFocusView: View? = null
+
+    fun captureFocusForDialog() {
+        if (activeDialogCount == 0 && savedFocusView == null) {
+            savedFocusView = currentFocus ?: window?.decorView?.findFocus()
+        }
+    }
 
     fun onDialogShown() {
-        if (activeDialogCount == 0) {
+        if (activeDialogCount == 0 && savedFocusView == null) {
             savedFocusView = currentFocus ?: window?.decorView?.findFocus()
         }
         activeDialogCount++
@@ -1222,10 +1270,19 @@ class MainActivity : AppCompatActivity() {
             softkeyManager.setSoftkeyBarVisible(true)
             val targetView = savedFocusView
             savedFocusView = null
-            targetView?.post {
-                if (targetView.isAttachedToWindow) {
+            val postContainer = targetView?.takeIf { it.isAttachedToWindow } ?: mainContainer
+            postContainer.post {
+                if (targetView != null && targetView.isAttachedToWindow) {
                     targetView.requestFocus()
                     targetView.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED)
+                } else {
+                    val fallbackView =
+                        rvChats?.takeIf { it.isAttachedToWindow && it.visibility == View.VISIBLE }
+                            ?: mainContainer.takeIf { it.isAttachedToWindow }
+                    fallbackView?.isFocusable = true
+                    fallbackView?.isFocusableInTouchMode = true
+                    fallbackView?.requestFocus()
+                    fallbackView?.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED)
                 }
             }
         }
@@ -4485,7 +4542,14 @@ class MainActivity : AppCompatActivity() {
         val btnForgotPassword = view.findViewById<Button>(R.id.btn_forgot_password)
         val btnResetAccount = view.findViewById<Button>(R.id.btn_reset_account)
         val btnUseSim = view.findViewById<Button>(R.id.btn_use_sim_number)
+        val btnProxySettings = view.findViewById<Button>(R.id.btn_login_proxy_settings)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
+
+        btnProxySettings?.setOnClickListener {
+            ProxySettingsDialog(this, telegramManager) {
+                updateLoginConnectionState(telegramManager.connectionState.value)
+            }.show()
+        }
 
         btnQrLogin?.setOnClickListener {
             telegramManager.requestQrCodeLogin()
@@ -4508,6 +4572,8 @@ class MainActivity : AppCompatActivity() {
         }
         btnForgotPassword?.visibility = View.GONE
         btnResetAccount?.visibility = View.GONE
+
+        qrGenerationJob?.cancel()
 
         when (state) {
             is AuthState.WaitPhoneNumber -> {
@@ -4564,10 +4630,13 @@ class MainActivity : AppCompatActivity() {
                 btnUseSim?.visibility = View.GONE
                 btnQrLogin?.visibility = View.GONE
 
-                val qrBitmap = com.teleflip.app.ui.QrCodeGenerator.generateQrCodeBitmap(state.link)
-                if (qrBitmap != null) {
-                    ivQrCode?.setImageBitmap(qrBitmap)
-                }
+                qrGenerationJob =
+                    lifecycleScope.launch {
+                        val qrBitmap = com.teleflip.app.ui.QrCodeGenerator.generateQrCodeBitmapAsync(state.link)
+                        if (qrBitmap != null) {
+                            ivQrCode?.setImageBitmap(qrBitmap)
+                        }
+                    }
 
                 if (state.errorMessage != null) {
                     val errorMessage = "⚠️ Error: ${state.errorMessage}"
@@ -4781,7 +4850,11 @@ class MainActivity : AppCompatActivity() {
             onRight = { finish() },
         )
 
-        etLoginInput?.requestFocus()
+        if (layoutInputContainer?.visibility == View.VISIBLE) {
+            etLoginInput?.requestFocus()
+        } else if (state is AuthState.WaitOtherDeviceConfirmation) {
+            btnPhoneLogin?.requestFocus()
+        }
     }
 
     private fun updateLoginConnectionState(status: String) {
@@ -5170,15 +5243,46 @@ class MainActivity : AppCompatActivity() {
             telegramManager.syncContactsEnabled = newState
             updateSyncContactsLabel(newState)
             if (newState) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                val hasPerm =
+                    ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.READ_CONTACTS,
+                    ) == PackageManager.PERMISSION_GRANTED
+                if (hasPerm) {
                     telegramManager.syncContacts()
                     showToast("Contact sync enabled")
                 } else {
-                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_CONTACTS), REQ_PHONE_PERM)
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.READ_CONTACTS),
+                        REQ_PHONE_PERM,
+                    )
                 }
             } else {
                 showToast("Contact sync disabled")
             }
+        }
+
+        settingsInputEngines.clear()
+        val tvSettingsInputMode = view.findViewById<TextView>(R.id.tv_settings_input_mode)
+        listOfNotNull(etId, etHash).forEach { field ->
+            val engine =
+                KeypadInputEngine(
+                    editText = field,
+                    modeIndicator = tvSettingsInputMode,
+                    timeoutMs = telegramManager.keypadTimeoutMs,
+                    onSymbolRequested = {
+                        com.teleflip.app.ui.SymbolsDialog(this) { sym ->
+                            settingsInputEngines[field.id]?.insertSymbol(sym)
+                        }.show()
+                    },
+                )
+            if (field.id == R.id.et_api_id) {
+                engine.setMode(InputMode.NUMERIC)
+            } else if (field.id == R.id.et_api_hash) {
+                engine.setMode(InputMode.LOWER)
+            }
+            settingsInputEngines[field.id] = engine
         }
 
         etId.setText(telegramManager.apiId.toString())
@@ -5203,6 +5307,7 @@ class MainActivity : AppCompatActivity() {
             val selIndex = spTimeout.selectedItemPosition
             if (selIndex in timeoutValues.indices) {
                 telegramManager.keypadTimeoutMs = timeoutValues[selIndex]
+                settingsInputEngines.values.forEach { it.timeoutMs = timeoutValues[selIndex] }
             }
             val idStr = etId.text.toString().trim()
             val hashStr = etHash.text.toString().trim()
@@ -5579,6 +5684,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun rebuildProfileFocusChain(allViews: List<View>) {
+        val visibleViews = allViews.filter { it.visibility == View.VISIBLE }
+        for (i in visibleViews.indices) {
+            val curr = visibleViews[i]
+            val prev = visibleViews.getOrNull(i - 1)
+            val next = visibleViews.getOrNull(i + 1)
+            curr.nextFocusUpId = prev?.id ?: curr.id
+            curr.nextFocusDownId = next?.id ?: curr.id
+        }
+    }
+
     private fun renderProfileScreen(chat: ChatModel) {
         commitActiveInputEngines()
         currentScreen = Screen.PROFILE
@@ -5608,8 +5724,137 @@ class MainActivity : AppCompatActivity() {
         val btnForumTopics = view.findViewById<Button>(R.id.btn_profile_forum_topics)
         val btnSendMsg = view.findViewById<Button>(R.id.btn_profile_send_msg)
         val btnToggleMute = view.findViewById<Button>(R.id.btn_profile_toggle_mute)
+        val btnBlock = view.findViewById<Button>(R.id.btn_profile_block_user)
         val btnSearch = view.findViewById<Button>(R.id.btn_profile_search)
         val btnExportHistory = view.findViewById<Button>(R.id.btn_profile_export_history)
+
+        var currentProfile: ChatProfile? = null
+
+        fun updateSoftkeys(focusedView: View?) {
+            val backAction = {
+                if (activeChat != null && activeChat?.id == chat.id) {
+                    openConversation(chat)
+                } else {
+                    showChatListScreen()
+                }
+            }
+
+            val targetView = focusedView ?: currentFocus
+            val clickAction: () -> Unit = { targetView?.performClick() }
+            val (leftLabel, leftAction) = when (targetView?.id) {
+                R.id.layout_profile_phone_row, R.id.btn_profile_cell_call -> {
+                    Pair("Dial", clickAction)
+                }
+                R.id.layout_profile_username_row -> {
+                    Pair("Copy", clickAction)
+                }
+                R.id.layout_profile_bio_row -> {
+                    Pair("Select", clickAction)
+                }
+                R.id.btn_profile_tg_call -> {
+                    Pair("Call", clickAction)
+                }
+                R.id.btn_profile_secret_chat -> {
+                    Pair("Start", clickAction)
+                }
+                R.id.btn_profile_self_destruct -> {
+                    Pair("Set", clickAction)
+                }
+                R.id.btn_profile_members, R.id.btn_profile_forum_topics -> {
+                    Pair("View", clickAction)
+                }
+                R.id.btn_profile_send_msg -> {
+                    Pair("Open", clickAction)
+                }
+                R.id.btn_profile_toggle_mute -> {
+                    val isMuted = currentProfile?.isMuted ?: false
+                    val label = if (isMuted) "Unmute" else "Mute"
+                    Pair(label, clickAction)
+                }
+                R.id.btn_profile_block_user -> {
+                    Pair("Block", clickAction)
+                }
+                R.id.btn_profile_search -> {
+                    Pair("Search", clickAction)
+                }
+                R.id.btn_profile_export_history -> {
+                    Pair("Export", clickAction)
+                }
+                else -> {
+                    val defaultLabel = if (chat.chatType == ChatType.DIRECT) "Call" else "Select"
+                    val defaultAction: () -> Unit = {
+                        if (chat.chatType == ChatType.DIRECT) {
+                            val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+                            initiateAudioCall(userId)
+                        } else {
+                            targetView?.performClick()
+                        }
+                    }
+                    Pair(defaultLabel, defaultAction)
+                }
+            }
+
+            softkeyManager.update(
+                left = leftLabel,
+                center = "Select",
+                right = "Back",
+                onLeft = leftAction,
+                onCenter = {
+                    targetView?.performClick() ?: currentFocus?.performClick()
+                },
+                onRight = backAction,
+            )
+            updateActiveCallOverlay()
+        }
+
+        val allProfileViews = listOfNotNull(
+            rowPhone,
+            rowUsername,
+            rowBio,
+            btnTgCall,
+            btnCellCall,
+            btnSecretChat,
+            btnSelfDestruct,
+            btnMembers,
+            btnForumTopics,
+            btnSendMsg,
+            btnToggleMute,
+            btnBlock,
+            btnSearch,
+            btnExportHistory
+        )
+
+        fun updateFocusChains() {
+            rebuildProfileFocusChain(allProfileViews)
+        }
+
+        allProfileViews.forEach { v ->
+            v.setOnFocusChangeListener { focusedView, hasFocus ->
+                if (hasFocus) {
+                    updateSoftkeys(focusedView)
+                }
+            }
+        }
+
+        rowUsername?.setOnClickListener {
+            val usernameText = tvUsername?.text?.toString() ?: ""
+            if (usernameText.isNotBlank()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Username", usernameText)
+                clipboard.setPrimaryClip(clip)
+                showToast("Username copied to clipboard")
+            }
+        }
+
+        rowBio?.setOnClickListener {
+            val bioText = tvBio?.text?.toString() ?: ""
+            if (bioText.isNotBlank()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Bio", bioText)
+                clipboard.setPrimaryClip(clip)
+                showToast("Bio copied to clipboard")
+            }
+        }
 
         btnExportHistory?.setOnClickListener {
             showChatExportFormatDialog(chat.id, chat.title)
@@ -5660,30 +5905,11 @@ class MainActivity : AppCompatActivity() {
             tvBioLabel.text = "Group / Channel Info"
         }
 
-        softkeyManager.update(
-            left = if (chat.chatType == ChatType.DIRECT) "Call" else "Select",
-            center = "Select",
-            right = "Back",
-            onLeft = {
-                if (chat.chatType == ChatType.DIRECT) {
-                    val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
-                    initiateAudioCall(userId)
-                }
-            },
-            onCenter = {
-                currentFocus?.performClick()
-            },
-            onRight = {
-                if (activeChat != null && activeChat?.id == chat.id) {
-                    openConversation(chat)
-                } else {
-                    showChatListScreen()
-                }
-            },
-        )
-        updateActiveCallOverlay()
+        updateFocusChains()
+        updateSoftkeys(currentFocus)
 
         telegramManager.loadChatProfile(chat.id) { profile ->
+            currentProfile = profile
             tvTitle.text = profile.title
             tvStatus.text = profile.statusText
             tvPremium.visibility = if (profile.isPremium) View.VISIBLE else View.GONE
@@ -5724,11 +5950,13 @@ class MainActivity : AppCompatActivity() {
             btnToggleMute.text = if (profile.isMuted) "🔔 Notifications: Muted" else "🔔 Notifications: Sound"
             btnToggleMute.setOnClickListener {
                 showChatMuteDialog(profile.chatId, profile.isMuted, profile.title) { newMuted ->
+                    val updatedProfile = currentProfile?.copy(isMuted = newMuted) ?: profile
+                    currentProfile = updatedProfile
                     btnToggleMute.text = if (newMuted) "🔔 Notifications: Muted" else "🔔 Notifications: Sound"
+                    updateSoftkeys(btnToggleMute)
                 }
             }
 
-            val btnBlock = view.findViewById<Button>(R.id.btn_profile_block_user)
             if (chat.chatType == ChatType.DIRECT) {
                 btnBlock?.visibility = View.VISIBLE
                 btnBlock?.setOnClickListener {
@@ -5751,10 +5979,24 @@ class MainActivity : AppCompatActivity() {
             btnSearch.setOnClickListener {
                 showSearchDialog()
             }
+
+            updateFocusChains()
+            val focused = currentFocus
+            if (focused == null || focused.visibility != View.VISIBLE) {
+                val initialFocusTarget = allProfileViews.firstOrNull { it.visibility == View.VISIBLE } ?: btnSendMsg
+                initialFocusTarget?.post {
+                    initialFocusTarget.requestFocus()
+                    updateSoftkeys(initialFocusTarget)
+                }
+            } else {
+                updateSoftkeys(focused)
+            }
         }
 
-        btnSendMsg?.post {
-            btnSendMsg.requestFocus()
+        val initialFocusTarget = allProfileViews.firstOrNull { it.visibility == View.VISIBLE } ?: btnSendMsg
+        initialFocusTarget?.post {
+            initialFocusTarget.requestFocus()
+            updateSoftkeys(initialFocusTarget)
         }
     }
 
@@ -5972,11 +6214,27 @@ class MainActivity : AppCompatActivity() {
                     keyCode == KeyEvent.KEYCODE_POUND ||
                     keyCode == KeyEvent.KEYCODE_DEL ||
                     keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-            if (isInputKey) {
+            if (isInputKey && etLoginInput?.isShown == true) {
                 if (etLoginInput?.hasFocus() != true) {
                     etLoginInput?.requestFocus()
                 }
                 if (loginInputEngine?.handleKeyEvent(keyCode, event) == true) {
+                    return true
+                }
+            }
+        }
+
+        // In Settings: Route keypad keys to settings input engine matching focused field
+        if (currentScreen == Screen.SETTINGS) {
+            val focusedView =
+                currentFocus
+                    ?: settingsInputEngines.keys
+                        .mapNotNull { findViewById<View>(it) }
+                        .firstOrNull { it.hasFocus() }
+            val focusedId = focusedView?.id
+            if (focusedId != null) {
+                val engine = settingsInputEngines[focusedId]
+                if (engine != null && engine.handleKeyEvent(keyCode, event)) {
                     return true
                 }
             }

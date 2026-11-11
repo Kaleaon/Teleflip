@@ -38,6 +38,9 @@ class KeypadInputEngine(
     var isSymbolPickerEnabled: Boolean = true
 
     private var lastKeyCode = -1
+
+    val hasPendingInput: Boolean
+        get() = lastKeyCode != -1
     private var charIndex = 0
     private var lastKeyTime = 0L
     private var expectedSelection = -1
@@ -64,10 +67,10 @@ class KeypadInputEngine(
         val externalFocusListener = editText.onFocusChangeListener
         editText.onFocusChangeListener =
             View.OnFocusChangeListener { v, hasFocus ->
-                if (!hasFocus) {
-                    commitCurrentChar()
-                } else {
+                if (hasFocus) {
                     updateModeIndicator()
+                } else {
+                    commitCurrentChar()
                 }
                 externalFocusListener?.onFocusChange(v, hasFocus)
             }
