@@ -6114,17 +6114,22 @@ class TelegramManager(
         }
     }
 
+    private suspend fun enableProxyInternal(proxyId: Int): ProxyItem? {
+        val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
+        val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
+        ProxyStorage.deleteProxy(context, proxyId)
+        val updated = ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
+        activeProxyId = added.id
+        return updated
+    }
+
     fun enableProxy(
         proxyId: Int,
         callback: ((Boolean, String?) -> Unit)? = null,
     ) {
         scope.launch {
             try {
-                val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
-                val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
-                ProxyStorage.deleteProxy(context, proxyId)
-                ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
-                activeProxyId = added.id
+                enableProxyInternal(proxyId)
                 withContext(Dispatchers.Main) { callback?.invoke(true, null) }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not enable proxy") }
@@ -6250,11 +6255,16 @@ class TelegramManager(
                     "Selected best proxy: ${bestProxy.server}:${bestProxy.port} with latency ${pingMs}ms",
                 )
 
-                enableProxy(bestProxy.id) { success, _ ->
-                    if (success) {
+                try {
+                    val updatedProxy = enableProxyInternal(bestProxy.id)
+                    if (updatedProxy != null) {
                         retryConnection()
+                        callback?.invoke(updatedProxy, pingMs)
+                    } else {
+                        callback?.invoke(null, null)
                     }
-                    callback?.invoke(bestProxy, pingMs)
+                } catch (_: Exception) {
+                    callback?.invoke(null, null)
                 }
             } else {
                 _failoverStatus.value = "🔴 Proxy failover: All stored proxies unreachable"
@@ -6302,16 +6312,15 @@ class TelegramManager(
         scope.launch {
             val ping = pingProxy(savedProxy, timeoutMs = 3000L)
             if (ping != null) {
-                enableProxy(savedProxy.id) { success, err ->
-                    if (success) {
-                        val msg = "🟢 Proxy deep-link activated: ${savedProxy.server}:${savedProxy.port} (${ping}ms)"
-                        _failoverStatus.value = msg
-                        callback?.invoke(true, msg)
-                    } else {
-                        val msg = "🔴 Failed to enable deep-link proxy: ${err ?: "Unknown error"}"
-                        _failoverStatus.value = msg
-                        callback?.invoke(false, msg)
-                    }
+                try {
+                    enableProxyInternal(savedProxy.id)
+                    val msg = "🟢 Proxy deep-link activated: ${savedProxy.server}:${savedProxy.port} (${ping}ms)"
+                    _failoverStatus.value = msg
+                    callback?.invoke(true, msg)
+                } catch (e: Exception) {
+                    val msg = "🔴 Failed to enable deep-link proxy: ${e.message ?: "Unknown error"}"
+                    _failoverStatus.value = msg
+                    callback?.invoke(false, msg)
                 }
             } else {
                 val msg = "🔴 Deep-link proxy failed latency ping test: ${savedProxy.server}:${savedProxy.port}"
