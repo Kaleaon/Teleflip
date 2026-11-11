@@ -90,6 +90,7 @@
             android:background="@drawable/bg_item_selector"
             android:padding="10dp"
             android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/layout_profile_phone_row"
             android:nextFocusDown="@id/layout_profile_username_row"
             android:layout_marginBottom="8dp">
@@ -120,6 +121,7 @@
             android:background="@drawable/bg_item_selector"
             android:padding="10dp"
             android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/layout_profile_phone_row"
             android:nextFocusDown="@id/layout_profile_bio_row"
             android:layout_marginBottom="8dp">
@@ -150,6 +152,7 @@
             android:background="@drawable/bg_item_selector"
             android:padding="10dp"
             android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/layout_profile_username_row"
             android:nextFocusDown="@id/btn_profile_tg_call"
             android:layout_marginBottom="12dp">
@@ -191,6 +194,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/layout_profile_bio_row"
             android:nextFocusDown="@id/btn_profile_cell_call"
             android:layout_marginBottom="6dp" />
@@ -203,6 +208,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_tg_call"
             android:nextFocusDown="@id/btn_profile_secret_chat"
             android:layout_marginBottom="6dp" />
@@ -215,6 +222,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_cell_call"
             android:nextFocusDown="@id/btn_profile_self_destruct"
             android:layout_marginBottom="6dp" />
@@ -227,6 +236,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_secret_chat"
             android:nextFocusDown="@id/btn_profile_members"
             android:layout_marginBottom="6dp" />
@@ -239,6 +250,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_self_destruct"
             android:nextFocusDown="@id/btn_profile_forum_topics"
             android:visibility="gone"
@@ -252,6 +265,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_members"
             android:nextFocusDown="@id/btn_profile_send_msg"
             android:visibility="gone"
@@ -265,6 +280,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_forum_topics"
             android:nextFocusDown="@id/btn_profile_toggle_mute"
             android:layout_marginBottom="6dp" />
@@ -277,6 +294,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_send_msg"
             android:nextFocusDown="@id/btn_profile_block_user"
             android:layout_marginBottom="6dp" />
@@ -289,6 +308,8 @@
             android:textColor="@color/text_error"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_toggle_mute"
             android:nextFocusDown="@id/btn_profile_search"
             android:visibility="gone"
@@ -302,6 +323,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_block_user"
             android:nextFocusDown="@id/btn_profile_export_history"
             android:layout_marginBottom="6dp" />
@@ -314,6 +337,8 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:nextFocusUp="@id/btn_profile_search"
             android:nextFocusDown="@id/btn_profile_export_history"
             android:layout_marginBottom="12dp" />

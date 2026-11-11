@@ -10,21 +10,86 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.R
+import com.teleflip.app.accessibility.AccessibilityActionManager
 import com.teleflip.app.model.ChatModel
 
 class ChatListAdapter(
     private val onChatFocused: ((ChatModel) -> Unit)? = null,
     private val onChatSelected: (ChatModel) -> Unit,
+    private val onChatAction: ((actionId: Int, chat: ChatModel) -> Boolean)? = null,
 ) : ListAdapter<ChatModel, ChatListAdapter.ChatViewHolder>(ChatDiffCallback()) {
-    override fun submitList(newItems: List<ChatModel>?) {
-        super.submitList(if (newItems != null) ArrayList(newItems) else null)
+    private var attachedRecyclerView: RecyclerView? = null
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        attachedRecyclerView = recyclerView
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        if (attachedRecyclerView == recyclerView) {
+            attachedRecyclerView = null
+        }
     }
 
     override fun submitList(
         newItems: List<ChatModel>?,
         commitCallback: Runnable?,
     ) {
-        super.submitList(if (newItems != null) ArrayList(newItems) else null, commitCallback)
+        val rv = attachedRecyclerView
+        var focusedChatId: Long? = null
+        var oldPos = -1
+
+        if (rv != null && rv.hasFocus()) {
+            val focusedChild = rv.focusedChild
+            if (focusedChild != null) {
+                oldPos = rv.getChildAdapterPosition(focusedChild)
+                if (oldPos in 0 until currentList.size) {
+                    focusedChatId = getItem(oldPos)?.id
+                }
+            }
+        }
+
+        val itemsCopy = if (newItems != null) ArrayList(newItems) else null
+
+        super.submitList(
+            itemsCopy,
+            Runnable {
+                if (rv != null && focusedChatId != null) {
+                    val list = currentList
+                    var targetPos = list.indexOfFirst { it.id == focusedChatId }
+                    if (targetPos == -1 && list.isNotEmpty() && oldPos != -1) {
+                        targetPos = oldPos.coerceIn(0, list.size - 1)
+                    }
+
+                    if (targetPos != -1 && list.isNotEmpty()) {
+                        rv.post {
+                            rv.scrollToPosition(targetPos)
+                            val vh = rv.findViewHolderForAdapterPosition(targetPos)
+                            if (vh != null) {
+                                vh.itemView.requestFocus()
+                            } else {
+                                val listener =
+                                    object : RecyclerView.OnChildAttachStateChangeListener {
+                                        override fun onChildViewAttachedToWindow(view: View) {
+                                            if (rv.getChildAdapterPosition(view) == targetPos) {
+                                                view.requestFocus()
+                                                rv.removeOnChildAttachStateChangeListener(this)
+                                            }
+                                        }
+
+                                        override fun onChildViewDetachedFromWindow(view: View) {
+                                            // no-op
+                                        }
+                                    }
+                                rv.addOnChildAttachStateChangeListener(listener)
+                            }
+                        }
+                    }
+                }
+                commitCallback?.run()
+            },
+        )
     }
 
     fun getItemAt(position: Int): ChatModel? {
@@ -53,6 +118,7 @@ class ChatListAdapter(
     override fun onViewRecycled(holder: ChatViewHolder) {
         super.onViewRecycled(holder)
         holder.clearImage()
+        AccessibilityActionManager.clearActions(holder.itemView)
     }
 
     inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -129,6 +195,15 @@ class ChatListAdapter(
 
             itemView.setOnClickListener {
                 onChatSelected(chat)
+            }
+
+            AccessibilityActionManager.bindActions(itemView, chat) { actionId, item ->
+                if (actionId == R.id.action_chat_open) {
+                    onChatSelected(item)
+                    true
+                } else {
+                    onChatAction?.invoke(actionId, item) ?: false
+                }
             }
         }
 

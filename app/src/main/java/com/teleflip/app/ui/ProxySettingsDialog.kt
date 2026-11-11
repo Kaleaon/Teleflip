@@ -10,9 +10,12 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import com.teleflip.app.R
+import com.teleflip.app.input.InputMode
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.model.ProxyType
+import com.teleflip.app.storage.ProxyStorage
 import com.teleflip.app.telegram.TelegramManager
+import kotlinx.coroutines.launch
 
 @Suppress("MagicNumber", "LongMethod", "ComplexMethod")
 class ProxySettingsDialog(
@@ -42,8 +45,23 @@ class ProxySettingsDialog(
         val layoutMtproto = findViewById<LinearLayout>(R.id.layout_mtproto_credentials)
         val btnSaveEnable = findViewById<Button>(R.id.btn_proxy_save_enable)
         val btnDisable = findViewById<Button>(R.id.btn_proxy_disable)
+        val btnAutoFailoverToggle = findViewById<Button>(R.id.btn_auto_failover_toggle)
         val btnClose = findViewById<Button>(R.id.btn_proxy_close)
         val containerSaved = findViewById<LinearLayout>(R.id.layout_saved_proxies_container)
+
+        fun updateAutoFailoverButton() {
+            val autoEnabled = ProxyStorage.isAutoProxyFailoverEnabled(context)
+            btnAutoFailoverToggle?.text = if (autoEnabled) "🔄 Auto Failover: Enabled" else "⏸️ Auto Failover: Disabled (Manual)"
+            btnAutoFailoverToggle?.setTextColor(context.getColor(if (autoEnabled) R.color.focus_highlight_gold else R.color.text_secondary))
+        }
+
+        btnAutoFailoverToggle?.setOnClickListener {
+            val current = ProxyStorage.isAutoProxyFailoverEnabled(context)
+            ProxyStorage.setAutoProxyFailoverEnabled(context, !current)
+            updateAutoFailoverButton()
+            Toast.makeText(context, if (!current) "Auto failover enabled" else "Auto failover disabled (manual mode)", Toast.LENGTH_SHORT).show()
+        }
+        updateAutoFailoverButton()
 
         val editTexts = listOfNotNull(etServer, etPort, etUsername, etPassword, etSecret)
         editTexts.forEach { field ->
@@ -56,6 +74,9 @@ class ProxySettingsDialog(
                         SymbolsDialog(context) { sym -> engines[field.id]?.insertSymbol(sym) }.show()
                     },
                 )
+        }
+        etPort?.id?.let { portId ->
+            engines[portId]?.setMode(InputMode.NUMERIC)
         }
 
         fun updateTypeSelection(type: ProxyType) {
@@ -123,6 +144,13 @@ class ProxySettingsDialog(
                         textSize = 13f
                     }
                 row.addView(titleTv)
+
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    val pingMs = telegramManager.pingProxy(proxy, timeoutMs = 2000L)
+                    val pingStr = if (pingMs != null) " [${pingMs}ms]" else " [Offline]"
+                    val statusText = if (proxy.isEnabled) " [ACTIVE]" else ""
+                    titleTv.text = "• [${proxy.type.name}] ${proxy.server}:${proxy.port}$statusText$pingStr"
+                }
 
                 val buttonLayout =
                     LinearLayout(context).apply {
@@ -240,17 +268,49 @@ class ProxySettingsDialog(
             }
         }
 
-        btnClose?.setOnClickListener { dismiss() }
+        btnClose?.setOnClickListener {
+            engines.values.forEach { it.commitCurrentChar() }
+            dismiss()
+        }
     }
 
-    private fun setupDismissKeys() {
-        setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN && isBackOrRightSoftKey(keyCode)) {
-                dismiss()
-                true
-            } else {
-                false
+    override fun dismiss() {
+        engines.values.forEach { it.commitCurrentChar() }
+        super.dismiss()
+    }
+
+    override fun onBackPressed() {
+        engines.values.forEach { it.commitCurrentChar() }
+        dismiss()
+    }
+
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (isBackOrRightSoftKey(keyCode)) {
+            engines.values.forEach { it.commitCurrentChar() }
+            dismiss()
+            return true
+        }
+
+        val focusedEdit = currentFocus as? EditText
+        if (focusedEdit != null) {
+            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+                engines[focusedEdit.id]?.commitCurrentChar()
+                focusedEdit.setText("")
+                return true
+            }
+            val isInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL
+            if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
+                return true
             }
         }
+
+        return super.onKeyDown(keyCode, event)
     }
 }

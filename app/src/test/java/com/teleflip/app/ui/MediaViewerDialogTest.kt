@@ -7,6 +7,7 @@ import android.media.PlaybackParams
 import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -425,6 +426,33 @@ class MediaViewerDialogTest {
     }
 
     @Test
+    fun testProgressLayoutVisibility_videoAndAnimation_visibleWhenFileExists() {
+        val sampleVideoFile = tempFolder.newFile("sample_video.mp4")
+        FileOutputStream(sampleVideoFile).use { it.write("fake video content".toByteArray()) }
+
+        val videoMessage =
+            MessageModel(
+                id = 10,
+                chatId = 100,
+                senderName = "Test",
+                text = "Video test",
+                time = "10:00 AM",
+                isOutbound = false,
+                mediaType = MediaType.VIDEO,
+                mediaFilePath = sampleVideoFile.absolutePath,
+            )
+
+        val dialog = MediaViewerDialog(context, videoMessage, {}, {})
+        dialog.show()
+
+        val layoutProgress = dialog.findViewById<View>(R.id.layout_viewer_progress)
+        assertNotNull(layoutProgress)
+        assertEquals(View.VISIBLE, layoutProgress.visibility)
+
+        dialog.dismiss()
+    }
+
+    @Test
     fun openViewerUsesDownloadedPathWithoutBeingReopened() {
         val pending = samplePhotoMessage.copy(mediaFileId = 7, mediaFilePath = null)
         val updates = kotlinx.coroutines.flow.MutableStateFlow(mapOf(100L to listOf(pending)))
@@ -442,12 +470,168 @@ class MediaViewerDialogTest {
     }
 
     @Test
+    fun testProgressLayoutVisibility_photoAndSticker_gone() {
+        val photoMessage =
+            MessageModel(
+                id = 11,
+                chatId = 100,
+                senderName = "Test",
+                text = "Photo test",
+                time = "10:00 AM",
+                isOutbound = false,
+                mediaType = MediaType.PHOTO,
+                mediaFilePath = samplePhotoFile.absolutePath,
+            )
+
+        val dialog = MediaViewerDialog(context, photoMessage, {}, {})
+        dialog.show()
+
+        val layoutProgress = dialog.findViewById<View>(R.id.layout_viewer_progress)
+        assertNotNull(layoutProgress)
+        assertEquals(View.GONE, layoutProgress.visibility)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testFormatTimeMs_formatsMinutesAndSecondsAccurately() {
+        val message = createTestMessage(MediaType.VIDEO)
+        val dialog = MediaViewerDialog(context, message, {}, {})
+
+        assertEquals("00:00", dialog.formatTimeMs(0))
+        assertEquals("00:05", dialog.formatTimeMs(5000))
+        assertEquals("01:05", dialog.formatTimeMs(65000))
+        assertEquals("10:00", dialog.formatTimeMs(600000))
+        assertEquals("00:00", dialog.formatTimeMs(-1000))
+    }
+
+    @Test
+    fun testUpdateProgressUI_withValidDuration_updatesProgressBarAndText() {
+        val message = createTestMessage(MediaType.VIDEO)
+        val dialog = MediaViewerDialog(context, message, {}, {})
+        dialog.show()
+
+        val pb = dialog.findViewById<ProgressBar>(R.id.pb_viewer_progress)
+        val tv = dialog.findViewById<TextView>(R.id.tv_viewer_time)
+
+        dialog.updateProgressUI(currentMs = 15000, totalMs = 60000)
+
+        assertEquals(60000, pb.max)
+        assertEquals(15000, pb.progress)
+        assertEquals("00:15 / 01:00", tv.text.toString())
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testUpdateProgressUI_withZeroOrNegativeDuration_showsFallback() {
+        val message = createTestMessage(MediaType.VIDEO)
+        val dialog = MediaViewerDialog(context, message, {}, {})
+        dialog.show()
+
+        val pb = dialog.findViewById<ProgressBar>(R.id.pb_viewer_progress)
+        val tv = dialog.findViewById<TextView>(R.id.tv_viewer_time)
+
+        dialog.updateProgressUI(currentMs = 0, totalMs = 0)
+
+        assertEquals(100, pb.max)
+        assertEquals(0, pb.progress)
+        assertEquals("0:00 / 0:00", tv.text.toString())
+
+        dialog.updateProgressUI(currentMs = 5000, totalMs = -1)
+
+        assertEquals(100, pb.max)
+        assertEquals(0, pb.progress)
+        assertEquals("0:00 / 0:00", tv.text.toString())
+
+        dialog.dismiss()
+    }
+
+    @Test
     fun webmStickerUsesVideoDownloadPath() {
         val pending = samplePhotoMessage.copy(mediaType = MediaType.STICKER, mediaFileId = 7, mediaFilePath = null, stickerFormat = "webm")
         val dialog = MediaViewerDialog(context, pending, {}, {})
         dialog.show()
         val status = dialog.findViewById<TextView>(R.id.tv_viewer_status)
         assertTrue(status.text.toString().contains("video/GIF"))
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testFooterActionButtonsExistAndAreFocusable() {
+        val dialog = MediaViewerDialog(context, samplePhotoMessage, {}, {})
+        dialog.show()
+
+        val btnZoomIn = dialog.findViewById<View>(R.id.btn_zoom_in)
+        val btnZoomOut = dialog.findViewById<View>(R.id.btn_zoom_out)
+        val btnPanLeft = dialog.findViewById<View>(R.id.btn_pan_left)
+        val btnPanRight = dialog.findViewById<View>(R.id.btn_pan_right)
+        val btnReset = dialog.findViewById<View>(R.id.btn_reset)
+        val btnSave = dialog.findViewById<View>(R.id.btn_save)
+
+        assertNotNull(btnZoomIn)
+        assertNotNull(btnZoomOut)
+        assertNotNull(btnPanLeft)
+        assertNotNull(btnPanRight)
+        assertNotNull(btnReset)
+        assertNotNull(btnSave)
+
+        assertTrue(btnZoomIn.isFocusable)
+        assertTrue(btnZoomOut.isFocusable)
+        assertTrue(btnPanLeft.isFocusable)
+        assertTrue(btnPanRight.isFocusable)
+        assertTrue(btnReset.isFocusable)
+        assertTrue(btnSave.isFocusable)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testFooterActionButtonsPerformZoomPanResetSave() {
+        var savedMessage: MessageModel? = null
+        val dialog = MediaViewerDialog(context, samplePhotoMessage, { savedMessage = it }, {})
+        dialog.show()
+
+        val btnZoomIn = dialog.findViewById<View>(R.id.btn_zoom_in)
+        val btnZoomOut = dialog.findViewById<View>(R.id.btn_zoom_out)
+        val btnPanLeft = dialog.findViewById<View>(R.id.btn_pan_left)
+        val btnPanRight = dialog.findViewById<View>(R.id.btn_pan_right)
+        val btnReset = dialog.findViewById<View>(R.id.btn_reset)
+        val btnSave = dialog.findViewById<View>(R.id.btn_save)
+
+        // Initial state
+        assertEquals(1.0f, dialog.zoomLevel)
+        assertEquals(0f, dialog.panX)
+
+        // Click Zoom In
+        btnZoomIn.performClick()
+        assertEquals(1.5f, dialog.zoomLevel)
+
+        // Click Pan Left
+        btnPanLeft.performClick()
+        assertEquals(48f, dialog.panX)
+
+        // Click Pan Right
+        btnPanRight.performClick()
+        assertEquals(0f, dialog.panX)
+
+        // Click Reset
+        btnPanLeft.performClick()
+        assertEquals(48f, dialog.panX)
+        btnReset.performClick()
+        assertEquals(1.0f, dialog.zoomLevel)
+        assertEquals(0f, dialog.panX)
+
+        // Click Zoom Out
+        btnZoomIn.performClick()
+        assertEquals(1.5f, dialog.zoomLevel)
+        btnZoomOut.performClick()
+        assertEquals(1.0f, dialog.zoomLevel)
+
+        // Click Save
+        btnSave.performClick()
+        assertEquals(samplePhotoMessage.id, savedMessage?.id)
+
         dialog.dismiss()
     }
 }
