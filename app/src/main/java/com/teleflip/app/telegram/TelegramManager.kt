@@ -6052,11 +6052,12 @@ class TelegramManager(
     ) {
         scope.launch {
             try {
+                ProxyStorage.enableProxy(context, proxyId)
                 val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
-                val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
-                ProxyStorage.deleteProxy(context, proxyId)
-                ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
-                activeProxyId = added.id
+                val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, ""))
+                if (added is TdApi.AddedProxy) {
+                    activeProxyId = added.id
+                }
                 callback?.invoke(true, null)
             } catch (e: Exception) {
                 callback?.invoke(false, e.message ?: "Could not enable proxy")
