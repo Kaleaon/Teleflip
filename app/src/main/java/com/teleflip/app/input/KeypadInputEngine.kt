@@ -38,6 +38,9 @@ class KeypadInputEngine(
     var isSymbolPickerEnabled: Boolean = true
 
     private var lastKeyCode = -1
+
+    val hasPendingInput: Boolean
+        get() = lastKeyCode != -1
     private var charIndex = 0
     private var lastKeyTime = 0L
     private var expectedSelection = -1
