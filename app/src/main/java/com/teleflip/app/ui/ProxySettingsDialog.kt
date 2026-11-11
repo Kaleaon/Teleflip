@@ -14,7 +14,9 @@ import com.teleflip.app.input.InputMode
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.model.ProxyType
+import com.teleflip.app.storage.ProxyStorage
 import com.teleflip.app.telegram.TelegramManager
+import kotlinx.coroutines.launch
 
 @Suppress("MagicNumber", "LongMethod", "ComplexMethod")
 class ProxySettingsDialog(
@@ -45,8 +47,23 @@ class ProxySettingsDialog(
         val layoutMtproto = findViewById<LinearLayout>(R.id.layout_mtproto_credentials)
         val btnSaveEnable = findViewById<Button>(R.id.btn_proxy_save_enable)
         val btnDisable = findViewById<Button>(R.id.btn_proxy_disable)
+        val btnAutoFailoverToggle = findViewById<Button>(R.id.btn_auto_failover_toggle)
         val btnClose = findViewById<Button>(R.id.btn_proxy_close)
         val containerSaved = findViewById<LinearLayout>(R.id.layout_saved_proxies_container)
+
+        fun updateAutoFailoverButton() {
+            val autoEnabled = ProxyStorage.isAutoProxyFailoverEnabled(context)
+            btnAutoFailoverToggle?.text = if (autoEnabled) "🔄 Auto Failover: Enabled" else "⏸️ Auto Failover: Disabled (Manual)"
+            btnAutoFailoverToggle?.setTextColor(context.getColor(if (autoEnabled) R.color.focus_highlight_gold else R.color.text_secondary))
+        }
+
+        btnAutoFailoverToggle?.setOnClickListener {
+            val current = ProxyStorage.isAutoProxyFailoverEnabled(context)
+            ProxyStorage.setAutoProxyFailoverEnabled(context, !current)
+            updateAutoFailoverButton()
+            Toast.makeText(context, if (!current) "Auto failover enabled" else "Auto failover disabled (manual mode)", Toast.LENGTH_SHORT).show()
+        }
+        updateAutoFailoverButton()
 
         val editTexts = listOfNotNull(etServer, etPort, etUsername, etPassword, etSecret)
         editTexts.forEach { field ->
