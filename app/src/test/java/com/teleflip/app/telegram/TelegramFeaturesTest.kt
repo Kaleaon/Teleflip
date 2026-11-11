@@ -217,4 +217,18 @@ class TelegramFeaturesTest {
         assertEquals("Telegram News", profileLoaded?.title)
         assertEquals("Details unavailable", profileLoaded?.statusText)
     }
+
+    @Test
+    fun testToggleChatMuteWithoutActiveClient() {
+        var toggledResult: Boolean? = null
+        telegramManager.toggleChatMute(1L, currentMuted = false) { newMuted ->
+            toggledResult = newMuted
+        }
+        assertEquals(false, toggledResult)
+
+        telegramManager.toggleChatMute(1L, currentMuted = true) { newMuted ->
+            toggledResult = newMuted
+        }
+        assertEquals(true, toggledResult)
+    }
 }
