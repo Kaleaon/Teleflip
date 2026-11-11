@@ -357,6 +357,7 @@ class TelegramManager(
     var chatBatchSize: Int = DEFAULT_CHAT_BATCH_SIZE
 
     companion object {
+        private const val DEFAULT_MUTE_DURATION_SECONDS = 31536000
         const val DEFAULT_CHAT_BATCH_SIZE = 10
         const val DEFAULT_MUTE_DURATION_SECONDS = 31_536_000
         private val DEFAULT_CUSTOM_EMOJIS =
