@@ -35,10 +35,10 @@ class MessageAdapter(
     private val onMessageAction: ((MessageModel) -> Unit)? = null,
     private val onTranscribeClick: ((MessageModel) -> Unit)? = null,
     private val customEmojiResolver: ((String) -> String?)? = null,
-    private val onReplyQuoteClick: ((MessageModel) -> Unit)? = null,
-    private val onReactionsClick: ((MessageModel) -> Unit)? = null,
     private val onMessageAccessibilityAction: ((actionId: Int, message: MessageModel) -> Boolean)? = null,
     private val onQuoteClick: ((Long) -> Unit)? = null,
+    private val onReplyQuoteClick: ((MessageModel) -> Unit)? = null,
+    private val onReactionsClick: ((MessageModel) -> Unit)? = null,
 ) : ListAdapter<MessageModel, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
     companion object {
         const val PAYLOAD_PLAYBACK_STATE = "PAYLOAD_PLAYBACK_STATE"
@@ -278,7 +278,6 @@ class MessageAdapter(
                 tvForwarded?.visibility = View.GONE
             }
 
-            val hasReply = message.replyToPreview.isNotBlank() || message.replyToMessageId != 0L
             if (message.replyToPreview.isNotBlank()) {
                 tvReplyQuote?.visibility = View.VISIBLE
                 val text = "↩ ${message.replyToPreview}"
@@ -294,16 +293,16 @@ class MessageAdapter(
                 tvReplyQuote?.contentDescription = null
             }
 
-            if (hasReply) {
+            if (message.replyToMessageId != 0L || !message.replyToPreview.isNullOrBlank()) {
                 tvReplyQuote?.isFocusable = true
                 tvReplyQuote?.isClickable = true
                 tvReplyQuote?.setOnClickListener {
+                    onQuoteClick?.invoke(message.replyToMessageId)
                     onReplyQuoteClick?.invoke(message)
-                    if (message.replyToMessageId != 0L) {
-                        onQuoteClick?.invoke(message.replyToMessageId)
-                    }
                 }
             } else {
+                tvReplyQuote?.isFocusable = false
+                tvReplyQuote?.isClickable = false
                 tvReplyQuote?.setOnClickListener(null)
             }
 
@@ -525,6 +524,8 @@ class MessageAdapter(
 
             if (message.reactions.isNotEmpty()) {
                 tvReactions?.visibility = View.VISIBLE
+                tvReactions?.isFocusable = true
+                tvReactions?.isClickable = true
                 tvReactions?.contentDescription = "Reactions: ${message.reactions.joinToString(", ")}"
                 tvReactions?.setOnClickListener {
                     onReactionsClick?.invoke(message)
@@ -588,6 +589,8 @@ class MessageAdapter(
                 tvReactions?.text = ssb
             } else {
                 tvReactions?.visibility = View.GONE
+                tvReactions?.isFocusable = false
+                tvReactions?.isClickable = false
                 tvReactions?.contentDescription = null
                 tvReactions?.setOnClickListener(null)
             }

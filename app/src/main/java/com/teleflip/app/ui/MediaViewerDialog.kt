@@ -102,6 +102,13 @@ class MediaViewerDialog(
         pbProgress = findViewById(R.id.pb_viewer_progress)
         tvTime = findViewById(R.id.tv_viewer_time)
 
+        findViewById<View>(R.id.btn_zoom_in)?.setOnClickListener { cycleZoomIn() }
+        findViewById<View>(R.id.btn_zoom_out)?.setOnClickListener { zoomOut() }
+        findViewById<View>(R.id.btn_pan_left)?.setOnClickListener { panBy(panStepPx, 0f) }
+        findViewById<View>(R.id.btn_pan_right)?.setOnClickListener { panBy(-panStepPx, 0f) }
+        findViewById<View>(R.id.btn_reset)?.setOnClickListener { resetZoomAndPan() }
+        findViewById<View>(R.id.btn_save)?.setOnClickListener { onSaveMedia(message) }
+
         btnZoomIn = findViewById(R.id.btn_viewer_zoom_in)
         btnZoomOut = findViewById(R.id.btn_viewer_zoom_out)
         btnReset = findViewById(R.id.btn_viewer_reset)
@@ -128,13 +135,6 @@ class MediaViewerDialog(
         btnRewind?.contentDescription = "Rewind 5 seconds"
         btnFastForward?.contentDescription = "Fast forward 5 seconds"
         btnSpeed?.contentDescription = "Change playback speed"
-
-        findViewById<View>(R.id.btn_zoom_in)?.setOnClickListener { cycleZoomIn() }
-        findViewById<View>(R.id.btn_zoom_out)?.setOnClickListener { zoomOut() }
-        findViewById<View>(R.id.btn_pan_left)?.setOnClickListener { panBy(panStepPx, 0f) }
-        findViewById<View>(R.id.btn_pan_right)?.setOnClickListener { panBy(-panStepPx, 0f) }
-        findViewById<View>(R.id.btn_reset)?.setOnClickListener { resetZoomAndPan() }
-        findViewById<View>(R.id.btn_save)?.setOnClickListener { onSaveMedia(message) }
 
         renderMedia()
         dialogScope.launch {
@@ -172,30 +172,7 @@ class MediaViewerDialog(
         val filePath = message.mediaFilePath
         val fileExists = !filePath.isNullOrBlank() && File(filePath).exists()
 
-        val isVideoMode = message.mediaType == MediaType.VIDEO || message.mediaType == MediaType.ANIMATION
-        if (isVideoMode) {
-            btnZoomIn?.visibility = View.GONE
-            btnZoomOut?.visibility = View.GONE
-            btnReset?.visibility = View.GONE
-
-            btnPlayPause?.visibility = View.VISIBLE
-            btnRewind?.visibility = View.VISIBLE
-            btnFastForward?.visibility = View.VISIBLE
-            btnSpeed?.visibility = View.VISIBLE
-            btnSave?.visibility = View.VISIBLE
-            updateVideoControlsState()
-        } else {
-            btnZoomIn?.visibility = View.VISIBLE
-            btnZoomOut?.visibility = View.VISIBLE
-            btnReset?.visibility = View.VISIBLE
-
-            btnPlayPause?.visibility = View.GONE
-            btnRewind?.visibility = View.GONE
-            btnFastForward?.visibility = View.GONE
-            btnSpeed?.visibility = View.GONE
-            btnSave?.visibility = View.VISIBLE
-            updatePhotoControlsState()
-        }
+        setupControlBarButtons()
 
         when (message.mediaType) {
             MediaType.VIDEO, MediaType.ANIMATION -> {
@@ -302,9 +279,9 @@ class MediaViewerDialog(
             isVideoPlaying = true
             applyPlaybackSpeed()
             updateSpeedBadge()
-            updateVideoControlsState()
             updateProgressUI()
             startProgressTracking()
+            updateVideoControlsState()
             val playingDesc = context.getString(R.string.cd_video_state_playing)
             vvVideo?.let { ViewCompat.setStateDescription(it, playingDesc) }
         }
@@ -521,6 +498,33 @@ class MediaViewerDialog(
         btnZoomIn?.let { ViewCompat.setStateDescription(it, zoomDesc) }
         btnZoomOut?.let { ViewCompat.setStateDescription(it, zoomDesc) }
         btnReset?.let { ViewCompat.setStateDescription(it, zoomDesc) }
+    }
+
+    private fun setupControlBarButtons() {
+        val isVideoMode = message.mediaType == MediaType.VIDEO || message.mediaType == MediaType.ANIMATION
+        if (isVideoMode) {
+            btnZoomIn?.visibility = View.GONE
+            btnZoomOut?.visibility = View.GONE
+            btnReset?.visibility = View.GONE
+
+            btnPlayPause?.visibility = View.VISIBLE
+            btnRewind?.visibility = View.VISIBLE
+            btnFastForward?.visibility = View.VISIBLE
+            btnSpeed?.visibility = View.VISIBLE
+            btnSave?.visibility = View.VISIBLE
+            updateVideoControlsState()
+        } else {
+            btnZoomIn?.visibility = View.VISIBLE
+            btnZoomOut?.visibility = View.VISIBLE
+            btnReset?.visibility = View.VISIBLE
+
+            btnPlayPause?.visibility = View.GONE
+            btnRewind?.visibility = View.GONE
+            btnFastForward?.visibility = View.GONE
+            btnSpeed?.visibility = View.GONE
+            btnSave?.visibility = View.VISIBLE
+            updatePhotoControlsState()
+        }
     }
 
     private fun seekVideoBy(deltaMs: Int) {
