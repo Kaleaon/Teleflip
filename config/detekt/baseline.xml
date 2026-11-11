@@ -8,7 +8,8 @@
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_DPAD_UP) { if (vh != null) { val pos = vh.adapterPosition if (pos &gt; 0) { focusChatAt(pos - 1) return true } else if (pos == 0) { focusSelectedTabView() return true } } }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_ENDCALL &amp;&amp; event.action == KeyEvent.ACTION_DOWN) { if (telegramManager.hasOngoingCall) { telegramManager.endCurrentCall() return true } }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (requestCode == REQ_PHONE_PERM &amp;&amp; grantResults.isNotEmpty() &amp;&amp; grantResults[0] == PackageManager.PERMISSION_GRANTED) { if (currentScreen == Screen.LOGIN) { showLoginScreen(telegramManager.authState.value) } }</ID>
-    <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) { if ((rvResults.adapter?.itemCount ?: 0) &gt; 0) { focusResultAt(0) return true } }</ID>
+    <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (SoftkeyUtils.isCenterKey(keyCode)) { if ((rvResults.adapter?.itemCount ?: 0) &gt; 0) { focusResultAt(0) return true } }</ID>
+    <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (SoftkeyUtils.isCenterKey(keyCode)) { if (handleCenterPress()) { return true } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog.&lt;no name provided&gt;$if (!isMessageLoading &amp;&amp; messageNextOffset.isNotEmpty() &amp;&amp; totalItemCount &lt; maxResultsLimit) { if (visibleItemCount + firstVisibleItem &gt;= totalItemCount - 2) { loadMoreMessageResults() } }</ID>
     <ID>CollapsibleIfStatements:TelegramManager.kt$TelegramManager$if (settings != null) { if (!settings.useDefaultSound &amp;&amp; settings.soundId == 0L) { return true } }</ID>
     <ID>ComplexCondition:BootReceiver.kt$BootReceiver$action == Intent.ACTION_BOOT_COMPLETED || action == "android.intent.action.QUICKBOOT_POWERON" || action == "com.htc.intent.action.QUICKBOOT_POWERON" || action == Intent.ACTION_MY_PACKAGE_REPLACED</ID>
@@ -73,6 +74,7 @@
     <ID>CyclomaticComplexMethod:TelegramFeatureMenus.kt$TelegramFeatureMenus$fun buttons(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun fetchCustomEmojiStickers(onResult: (List&lt;StickerItem&gt;) -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleDeepLinkProxy( uri: android.net.Uri, callback: ((Boolean, String) -&gt; Unit)? = null, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun updateUserCache(user: TdApi.User)</ID>
@@ -239,6 +241,7 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$10000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1024L</ID>
+    <ID>MagicNumber:TelegramManager.kt$TelegramManager$1080</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$120</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1200L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1500L</ID>
@@ -255,6 +258,7 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$4</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$40</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$4000L</ID>
+    <ID>MagicNumber:TelegramManager.kt$TelegramManager$443</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$50</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$500</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$5000L</ID>
@@ -330,6 +334,7 @@
     <ID>NestedBlockDepth:MainActivity.kt$MainActivity$@android.annotation.SuppressLint("NewApi", "InlinedApi") private fun getDevicePhoneNumber(): String?</ID>
     <ID>NestedBlockDepth:MainActivity.kt$MainActivity$override fun dispatchKeyEvent(event: KeyEvent): Boolean</ID>
     <ID>NestedBlockDepth:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>NestedBlockDepth:SearchDialog.kt$SearchDialog$private fun handleCenterPress(): Boolean</ID>
     <ID>NestedBlockDepth:StorageManager.kt$StorageManager$private fun performSdCardDetection(context: Context): File?</ID>
     <ID>NestedBlockDepth:SymbolsDialog.kt$SymbolsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:AccessibilityActionManager.kt$AccessibilityActionManager$@Suppress("UNCHECKED_CAST") fun &lt;T : Any&gt; bindActions( view: View, item: T?, listener: AccessibilityActionListener&lt;T&gt;? = null, )</ID>
@@ -359,6 +364,7 @@
     <ID>ReturnCount:ProxySettingsDialog.kt$ProxySettingsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:ProxyStorage.kt$ProxyStorage$@Synchronized fun getProxies(context: Context): List&lt;ProxyItem&gt;</ID>
     <ID>ReturnCount:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>ReturnCount:SearchDialog.kt$SearchDialog$private fun handleCenterPress(): Boolean</ID>
     <ID>ReturnCount:SoftkeyManager.kt$SoftkeyManager$fun handleKeyEvent( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:SymbolsDialog.kt$SymbolsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:TeleFlipNotificationService.kt$TeleFlipNotificationService$private fun getTdNetworkType(cm: ConnectivityManager): TdApi.NetworkType</ID>
