@@ -33,6 +33,7 @@ object StatusMessageDispatcher {
         }
     }
 
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
     fun showStatus(
         view: View,
         message: String,

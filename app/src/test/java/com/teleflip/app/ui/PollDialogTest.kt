@@ -32,11 +32,11 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
+        val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
         val tvError = dialog.findViewById<TextView>(R.id.tv_poll_error)
         val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
 
-        btnSubmit.performClick()
+        btnNext.performClick()
 
         assertEquals(View.VISIBLE, tvError.visibility)
         assertEquals("Please enter a poll question", tvError.text.toString())
@@ -49,12 +49,12 @@ class PollDialogTest {
         dialog.show()
 
         val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
+        val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
         val tvError = dialog.findViewById<TextView>(R.id.tv_poll_error)
         val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
 
         etQuestion.setText("Sample Question")
-        btnSubmit.performClick()
+        btnNext.performClick()
 
         assertEquals(View.VISIBLE, tvError.visibility)
         assertEquals("Please enter at least 2 poll options", tvError.text.toString())
@@ -78,12 +78,14 @@ class PollDialogTest {
         val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
         val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
         val etOpt2 = dialog.findViewById<EditText>(R.id.et_poll_opt2)
+        val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
         val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
 
         etQuestion.setText("Favorite Color?")
         etOpt1.setText("Red")
         etOpt2.setText("Blue")
 
+        btnNext.performClick()
         btnSubmit.performClick()
 
         assertEquals("Favorite Color?", createdQuestion)

@@ -1,5 +1,6 @@
 package com.teleflip.app.ui
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -25,5 +26,25 @@ class QrCodeGeneratorTest {
     fun testGenerateQrCodeBitmapWithBlankTextReturnsNull() {
         val bitmap = QrCodeGenerator.generateQrCodeBitmap("  ", 256)
         assertNull("Bitmap should be null when text is blank", bitmap)
+    }
+
+    @Test
+    fun testGenerateQrCodeBitmapAsyncWithValidText() {
+        runBlocking {
+            val testLink = "tg://login?token=AQAA_test_token_123"
+            val bitmap = QrCodeGenerator.generateQrCodeBitmapAsync(testLink, 256)
+
+            assertNotNull("Bitmap should be generated asynchronously for valid text", bitmap)
+            assertEquals(256, bitmap?.width)
+            assertEquals(256, bitmap?.height)
+        }
+    }
+
+    @Test
+    fun testGenerateQrCodeBitmapAsyncWithBlankTextReturnsNull() {
+        runBlocking {
+            val bitmap = QrCodeGenerator.generateQrCodeBitmapAsync("  ", 256)
+            assertNull("Bitmap should be null asynchronously when text is blank", bitmap)
+        }
     }
 }

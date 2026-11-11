@@ -189,7 +189,6 @@ class PollDialog(
 
         btnBack?.setOnClickListener {
             engines.values.forEach { it.commitCurrentChar() }
-            clearDialogError()
             currentStep = 1
             updateStepVisibility()
             etQuestion?.requestFocus()
@@ -201,36 +200,23 @@ class PollDialog(
             val opts = getValidOptions()
             val explanation = etExplanation?.text?.toString()?.trim().orEmpty()
 
-            when {
-                question.isBlank() -> {
-                    currentStep = 1
-                    updateStepVisibility()
-                    showDialogError("Please enter a poll question", etQuestion)
-                }
-                opts.size < 2 -> {
-                    currentStep = 1
-                    updateStepVisibility()
-                    showDialogError("Please enter at least 2 poll options", etOpt1)
-                }
-                else -> {
-                    clearDialogError()
-                    dismiss()
-                    val safeCorrectIndex =
-                        if (isQuiz && opts.isNotEmpty()) {
-                            correctOptionIndex.coerceIn(0, opts.size - 1)
-                        } else {
-                            -1
-                        }
-                    onCreatePoll(
-                        question,
-                        opts,
-                        isAnonymous,
-                        isQuiz,
-                        safeCorrectIndex,
-                        if (isQuiz) explanation else "",
-                        if (!isQuiz) allowsMultipleAnswers else false,
-                    )
-                }
+            if (question.isNotBlank() && opts.size >= 2) {
+                dismiss()
+                val safeCorrectIndex =
+                    if (isQuiz && opts.isNotEmpty()) {
+                        correctOptionIndex.coerceIn(0, opts.size - 1)
+                    } else {
+                        -1
+                    }
+                onCreatePoll(
+                    question,
+                    opts,
+                    isAnonymous,
+                    isQuiz,
+                    safeCorrectIndex,
+                    if (isQuiz) explanation else "",
+                    if (!isQuiz) allowsMultipleAnswers else false,
+                )
             }
         }
 
@@ -241,7 +227,6 @@ class PollDialog(
     override fun onBackPressed() {
         engines.values.forEach { it.commitCurrentChar() }
         if (currentStep == 2) {
-            clearDialogError()
             currentStep = 1
             findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
             findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
@@ -259,7 +244,6 @@ class PollDialog(
         if (isBackOrRightSoftKey(keyCode)) {
             engines.values.forEach { it.commitCurrentChar() }
             if (currentStep == 2) {
-                clearDialogError()
                 currentStep = 1
                 findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
                 findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
