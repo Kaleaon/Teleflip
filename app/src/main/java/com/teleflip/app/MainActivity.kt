@@ -360,16 +360,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onNewIntent(intent: android.content.Intent?) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        intent?.data?.let { uri ->
-            if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
-                telegramManager.handleDeepLinkProxy(uri)
-            }
-        }
-    }
-
     override fun onStart() {
         super.onStart()
         PasscodeManager.onAppForegrounded(this)
@@ -433,6 +423,11 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        intent.data?.let { uri ->
+            if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
+                telegramManager.handleDeepLinkProxy(uri)
+            }
+        }
         val targetOpenChatId = intent.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L)
         if (targetOpenChatId != 0L) {
             pendingTargetChatId = targetOpenChatId
