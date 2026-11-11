@@ -21,8 +21,9 @@ class NewChatDialog(
     private val onStartSecretChat: (String) -> Unit = {},
 ) : BaseDialog(context) {
     private var etInput: EditText? = null
+    private var btnDirect: Button? = null
     private var keypadEngine: KeypadInputEngine? = null
-    private var softkeyManager: SoftkeyManager? = null
+    internal var softkeyManager: SoftkeyManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +49,7 @@ class NewChatDialog(
         }
 
         etInput = input
+        this.btnDirect = btnDirect
 
         if (input != null) {
             keypadEngine =
@@ -117,6 +119,15 @@ class NewChatDialog(
         updateSoftkeys()
     }
 
+    private fun handleCenterAction() {
+        val focused = window?.decorView?.findFocus() ?: currentFocus
+        if (focused is Button) {
+            focused.performClick()
+        } else {
+            btnDirect?.performClick()
+        }
+    }
+
     private fun updateSoftkeys() {
         val input = etInput
         if (input?.hasFocus() == true) {
@@ -129,7 +140,7 @@ class NewChatDialog(
                     input.setText("")
                 },
                 onCenter = {
-                    findViewById<Button>(R.id.btn_start_direct_chat)?.performClick()
+                    btnDirect?.performClick()
                 },
                 onRight = {
                     keypadEngine?.commitCurrentChar()
@@ -149,12 +160,7 @@ class NewChatDialog(
                     }
                 },
                 onCenter = {
-                    val focused = currentFocus
-                    if (focused != null && focused.isClickable) {
-                        focused.performClick()
-                    } else {
-                        findViewById<Button>(R.id.btn_start_direct_chat)?.performClick()
-                    }
+                    handleCenterAction()
                 },
                 onRight = {
                     keypadEngine?.commitCurrentChar()
@@ -162,6 +168,11 @@ class NewChatDialog(
                 },
             )
         }
+    }
+
+    override fun dismiss() {
+        keypadEngine?.commitCurrentChar()
+        super.dismiss()
     }
 
     override fun onBackPressed() {
@@ -189,6 +200,11 @@ class NewChatDialog(
             return true
         }
 
+        if (SoftkeyUtils.isCenterKey(keyCode) || keyCode == KeyEvent.KEYCODE_CALL) {
+            handleCenterAction()
+            return true
+        }
+
         val input = etInput
         val isInputKey =
             (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
@@ -201,6 +217,7 @@ class NewChatDialog(
                 return true
             }
         } else if (input?.hasFocus() != true && keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_5) {
+            keypadEngine?.commitCurrentChar()
             val query = input?.text?.toString()?.trim().orEmpty()
             dismiss()
             when (keyCode) {
