@@ -4,7 +4,6 @@ import android.content.Context
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import androidx.test.core.app.ApplicationProvider
 import com.teleflip.app.MainActivity
 import com.teleflip.app.R
@@ -49,8 +48,8 @@ class LoginKeypadDispatchTest {
 
         setAuthState(activity, AuthState.WaitPhoneNumber(null))
 
-        val etLoginInput = activity.findViewById<EditText>(R.id.et_login_input)
-        val inputContainer = activity.findViewById<View>(R.id.layout_login_input_container)
+        val inputContainer = activity.findViewById<LabeledInputView>(R.id.liv_login_input)
+        val etLoginInput = inputContainer.editText
         assertNotNull(etLoginInput)
         assertEquals("Input container should be VISIBLE in Phone mode", View.VISIBLE, inputContainer.visibility)
         assertTrue("etLoginInput should be shown in Phone Login mode", etLoginInput.isShown)
@@ -72,8 +71,8 @@ class LoginKeypadDispatchTest {
 
         setAuthState(activity, AuthState.WaitOtherDeviceConfirmation("tg://login?token=123"))
 
-        val etLoginInput = activity.findViewById<EditText>(R.id.et_login_input)
-        val inputContainer = activity.findViewById<View>(R.id.layout_login_input_container)
+        val inputContainer = activity.findViewById<LabeledInputView>(R.id.liv_login_input)
+        val etLoginInput = inputContainer.editText
         val btnPhoneLogin = activity.findViewById<Button>(R.id.btn_phone_login)
 
         assertNotNull(etLoginInput)
@@ -98,15 +97,15 @@ class LoginKeypadDispatchTest {
 
         // Enter QR mode
         setAuthState(activity, AuthState.WaitOtherDeviceConfirmation("tg://login?token=123"))
-        var etLoginInput = activity.findViewById<EditText>(R.id.et_login_input)
-        var inputContainer = activity.findViewById<View>(R.id.layout_login_input_container)
+        var inputContainer = activity.findViewById<LabeledInputView>(R.id.liv_login_input)
+        var etLoginInput = inputContainer.editText
         assertEquals("Input container should be GONE in QR mode", View.GONE, inputContainer.visibility)
         assertFalse("etLoginInput should not be shown in QR mode", etLoginInput.isShown)
 
         // Switch back to Phone mode
         setAuthState(activity, AuthState.WaitPhoneNumber(null))
-        etLoginInput = activity.findViewById(R.id.et_login_input)
-        inputContainer = activity.findViewById(R.id.layout_login_input_container)
+        inputContainer = activity.findViewById(R.id.liv_login_input)
+        etLoginInput = inputContainer.editText
 
         assertEquals("Input container should be VISIBLE after returning to Phone mode", View.VISIBLE, inputContainer.visibility)
         assertTrue("etLoginInput should be shown after returning to Phone mode", etLoginInput.isShown)

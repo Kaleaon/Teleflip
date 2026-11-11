@@ -16,6 +16,7 @@ import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.telegram.TelegramManager
+import com.teleflip.app.ui.LabeledInputView
 import com.teleflip.app.ui.SearchDialog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -204,7 +205,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<LabeledInputView>(R.id.liv_search_input).editText
         etSearchInput.setText("Hello")
         assertEquals("Hello", etSearchInput.text.toString())
 
@@ -242,7 +243,7 @@ class SearchDialogTest {
         assertEquals("Select", tvCenter.text.toString())
         assertEquals("Back", tvRight.text.toString())
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<LabeledInputView>(R.id.liv_search_input).editText
         etSearchInput.setText("Test Query")
 
         tvLeft.performClick()
@@ -259,7 +260,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<LabeledInputView>(R.id.liv_search_input).editText
         val tabChats = dialog.findViewById<TextView>(R.id.tab_search_chats)
         assertTrue(etSearchInput.hasFocus())
 

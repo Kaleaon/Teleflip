@@ -492,6 +492,12 @@ class SearchDialog(
                 val count = rvResults.adapter?.itemCount ?: 0
                 if (count > 0) {
                     focusResultAt(0)
+                } else {
+                    when (currentTab) {
+                        SearchTab.CHATS -> tabChats.requestFocus()
+                        SearchTab.CONTACTS -> tabContacts.requestFocus()
+                        SearchTab.MESSAGES -> tabMessages.requestFocus()
+                    }
                 }
                 return true
             }
