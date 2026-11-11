@@ -26,16 +26,16 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "w320dp-h533dp-hdpi", application = Application::class)
 class GifStickerPickerDialogTest {
-
     private lateinit var context: Application
     private lateinit var telegramManager: TelegramManager
     private val testChat = ChatModel(1001L, "Alice", "Hello", "10:00", 0, ChatType.DIRECT, "A")
 
     @Before
     fun setUp() {
-        context = ApplicationProvider.getApplicationContext<Application>().apply {
-            setTheme(R.style.Theme_TeleFlip)
-        }
+        context =
+            ApplicationProvider.getApplicationContext<Application>().apply {
+                setTheme(R.style.Theme_TeleFlip)
+            }
         telegramManager = TelegramManager(context)
     }
 
@@ -43,12 +43,13 @@ class GifStickerPickerDialogTest {
 
     @Test
     fun testDialogInitializesWithGifPack() {
-        val dialog = GifStickerPickerDialog(
-            context = context,
-            chat = testChat,
-            telegramManager = telegramManager,
-            initialIsGif = true,
-        )
+        val dialog =
+            GifStickerPickerDialog(
+                context = context,
+                chat = testChat,
+                telegramManager = telegramManager,
+                initialIsGif = true,
+            )
         dialog.show()
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
@@ -64,12 +65,13 @@ class GifStickerPickerDialogTest {
 
     @Test
     fun testDialogInitializesWithStickerPackWhenInitialIsGifFalse() {
-        val dialog = GifStickerPickerDialog(
-            context = context,
-            chat = testChat,
-            telegramManager = telegramManager,
-            initialIsGif = false,
-        )
+        val dialog =
+            GifStickerPickerDialog(
+                context = context,
+                chat = testChat,
+                telegramManager = telegramManager,
+                initialIsGif = false,
+            )
         dialog.show()
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
@@ -79,12 +81,13 @@ class GifStickerPickerDialogTest {
 
     @Test
     fun testSoftkeysCyclePacksForwardAndBackward() {
-        val dialog = GifStickerPickerDialog(
-            context = context,
-            chat = testChat,
-            telegramManager = telegramManager,
-            initialIsGif = true,
-        )
+        val dialog =
+            GifStickerPickerDialog(
+                context = context,
+                chat = testChat,
+                telegramManager = telegramManager,
+                initialIsGif = true,
+            )
         dialog.show()
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
@@ -111,12 +114,13 @@ class GifStickerPickerDialogTest {
 
     @Test
     fun testBackClosesDialogAndRightSoftkeyDoesNotClose() {
-        val dialog = GifStickerPickerDialog(
-            context = context,
-            chat = testChat,
-            telegramManager = telegramManager,
-            initialIsGif = true,
-        )
+        val dialog =
+            GifStickerPickerDialog(
+                context = context,
+                chat = testChat,
+                telegramManager = telegramManager,
+                initialIsGif = true,
+            )
         dialog.show()
         Shadows.shadowOf(Looper.getMainLooper()).idle()
         assertTrue(dialog.isShowing)
@@ -140,13 +144,14 @@ class GifStickerPickerDialogTest {
         )
 
         var sentGif: SavedGifItem? = null
-        val dialog = GifStickerPickerDialog(
-            context = context,
-            chat = testChat,
-            telegramManager = telegramManager,
-            initialIsGif = true,
-            onSendGif = { sentGif = it },
-        )
+        val dialog =
+            GifStickerPickerDialog(
+                context = context,
+                chat = testChat,
+                telegramManager = telegramManager,
+                initialIsGif = true,
+                onSendGif = { sentGif = it },
+            )
         dialog.show()
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
@@ -169,13 +174,14 @@ class GifStickerPickerDialogTest {
         )
 
         var sentSticker: StickerItem? = null
-        val dialog = GifStickerPickerDialog(
-            context = context,
-            chat = testChat,
-            telegramManager = telegramManager,
-            initialIsGif = false,
-            onSendSticker = { sentSticker = it },
-        )
+        val dialog =
+            GifStickerPickerDialog(
+                context = context,
+                chat = testChat,
+                telegramManager = telegramManager,
+                initialIsGif = false,
+                onSendSticker = { sentSticker = it },
+            )
         dialog.show()
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
@@ -190,12 +196,13 @@ class GifStickerPickerDialogTest {
 
     @Test
     fun testDpadNavigationInGrid() {
-        val dialog = GifStickerPickerDialog(
-            context = context,
-            chat = testChat,
-            telegramManager = telegramManager,
-            initialIsGif = false,
-        )
+        val dialog =
+            GifStickerPickerDialog(
+                context = context,
+                chat = testChat,
+                telegramManager = telegramManager,
+                initialIsGif = false,
+            )
         dialog.show()
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
@@ -278,12 +285,13 @@ class GifStickerPickerDialogTest {
     fun testGeneratePickerScreenshot() {
         telegramManager.saveGif(101, 3, "Party 🎉", null)
         telegramManager.saveSticker(202, "🔥", "Fire", null)
-        val dialog = GifStickerPickerDialog(
-            context = context,
-            chat = testChat,
-            telegramManager = telegramManager,
-            initialIsGif = true,
-        )
+        val dialog =
+            GifStickerPickerDialog(
+                context = context,
+                chat = testChat,
+                telegramManager = telegramManager,
+                initialIsGif = true,
+            )
         dialog.show()
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 

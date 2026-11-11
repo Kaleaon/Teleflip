@@ -43,7 +43,6 @@ class GifStickerPickerDialog(
     private val onSendSticker: ((StickerItem) -> Unit)? = null,
     private val onSendGif: ((SavedGifItem) -> Unit)? = null,
 ) : BaseDialog(context) {
-
     internal val packs = mutableListOf<PickerPack>()
     internal var currentPackIndex: Int = 0
         private set
@@ -60,31 +59,33 @@ class GifStickerPickerDialog(
     companion object {
         private const val GRID_COLUMNS = 3
 
-        private val REACTION_GIFS = listOf(
-            "🎉 Party / Celebration",
-            "👋 Hello / Wave",
-            "👏 Applause / Bravo",
-            "🤣 Laughing Out Loud",
-            "👍 Thumbs Up",
-            "🔥 Fire / Awesome",
-            "💃 Dance / Groove",
-            "🤝 Deal / Handshake",
-        )
+        private val REACTION_GIFS =
+            listOf(
+                "🎉 Party / Celebration",
+                "👋 Hello / Wave",
+                "👏 Applause / Bravo",
+                "🤣 Laughing Out Loud",
+                "👍 Thumbs Up",
+                "🔥 Fire / Awesome",
+                "💃 Dance / Groove",
+                "🤝 Deal / Handshake",
+            )
 
-        private val POPULAR_STICKERS = listOf(
-            "👍" to "Thumbs Up",
-            "❤️" to "Red Heart",
-            "😂" to "Laughing",
-            "🔥" to "Fire",
-            "🎉" to "Celebrate",
-            "🙏" to "Thank You",
-            "😎" to "Cool",
-            "🚀" to "Rocket",
-            "👏" to "Applause",
-            "💯" to "100",
-            "🤔" to "Thinking",
-            "😢" to "Crying",
-        )
+        private val POPULAR_STICKERS =
+            listOf(
+                "👍" to "Thumbs Up",
+                "❤️" to "Red Heart",
+                "😂" to "Laughing",
+                "🔥" to "Fire",
+                "🎉" to "Celebrate",
+                "🙏" to "Thank You",
+                "😎" to "Cool",
+                "🚀" to "Rocket",
+                "👏" to "Applause",
+                "💯" to "100",
+                "🤔" to "Thinking",
+                "😢" to "Crying",
+            )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,23 +105,25 @@ class GifStickerPickerDialog(
         val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
 
         if (tvLeft != null && tvCenter != null && tvRight != null) {
-            softkeyManager = SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight).apply {
-                update(
-                    left = "Prev",
-                    center = "Send",
-                    right = "Next",
-                    onLeft = { prevPack() },
-                    onCenter = { sendFocusedItem() },
-                    onRight = { nextPack() },
-                )
-            }
+            softkeyManager =
+                SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight).apply {
+                    update(
+                        left = "Prev",
+                        center = "Send",
+                        right = "Next",
+                        onLeft = { prevPack() },
+                        onCenter = { sendFocusedItem() },
+                        onRight = { nextPack() },
+                    )
+                }
         }
 
         val rv = findViewById<RecyclerView>(R.id.rv_picker_grid)
         rv?.layoutManager = GridLayoutManager(context, GRID_COLUMNS)
-        adapter = PickerGridAdapter(emptyList()) { item ->
-            sendItem(item)
-        }
+        adapter =
+            PickerGridAdapter(emptyList()) { item ->
+                sendItem(item)
+            }
         rv?.adapter = adapter
 
         updatePackDisplay()
@@ -132,77 +135,83 @@ class GifStickerPickerDialog(
 
         // 1. Saved GIFs Pack
         val localGifs = telegramManager.getLocalSavedGifs()
-        val savedGifItems = localGifs.mapIndexed { idx, gif ->
-            PickerItem(
-                id = "saved_gif_${gif.fileId}_$idx",
-                title = gif.caption.ifBlank { "GIF #${idx + 1}" },
-                filePath = gif.filePath,
-                fileId = gif.fileId,
-                isGif = true,
-                rawGif = gif,
-            )
-        }
+        val savedGifItems =
+            localGifs.mapIndexed { idx, gif ->
+                PickerItem(
+                    id = "saved_gif_${gif.fileId}_$idx",
+                    title = gif.caption.ifBlank { "GIF #${idx + 1}" },
+                    filePath = gif.filePath,
+                    fileId = gif.fileId,
+                    isGif = true,
+                    rawGif = gif,
+                )
+            }
         packs.add(PickerPack("Saved GIFs", isGif = true, items = savedGifItems))
 
         // 2. Popular Reaction GIFs Pack
-        val reactionItems = REACTION_GIFS.mapIndexed { idx, title ->
-            PickerItem(
-                id = "reaction_gif_$idx",
-                title = title,
-                isGif = true,
-            )
-        }
+        val reactionItems =
+            REACTION_GIFS.mapIndexed { idx, title ->
+                PickerItem(
+                    id = "reaction_gif_$idx",
+                    title = title,
+                    isGif = true,
+                )
+            }
         packs.add(PickerPack("Reaction GIFs", isGif = true, items = reactionItems))
 
         // 3. Saved Stickers Pack
         val localStickers = telegramManager.getLocalSavedStickers()
-        val savedStickerItems = localStickers.mapIndexed { idx, st ->
-            PickerItem(
-                id = "saved_sticker_${st.fileId}_$idx",
-                title = if (st.emoji.isNotBlank()) "${st.emoji} Sticker" else "Sticker #${idx + 1}",
-                emoji = st.emoji,
-                filePath = st.filePath,
-                fileId = st.fileId,
-                isGif = false,
-                rawSticker = st,
-            )
-        }
+        val savedStickerItems =
+            localStickers.mapIndexed { idx, st ->
+                PickerItem(
+                    id = "saved_sticker_${st.fileId}_$idx",
+                    title = if (st.emoji.isNotBlank()) "${st.emoji} Sticker" else "Sticker #${idx + 1}",
+                    emoji = st.emoji,
+                    filePath = st.filePath,
+                    fileId = st.fileId,
+                    isGif = false,
+                    rawSticker = st,
+                )
+            }
         packs.add(PickerPack("Saved Stickers", isGif = false, items = savedStickerItems))
 
         // 4. Popular Emoji Stickers Pack
-        val popularStickerItems = POPULAR_STICKERS.mapIndexed { idx, (emoji, name) ->
-            PickerItem(
-                id = "popular_sticker_$idx",
-                title = "$emoji $name",
-                emoji = emoji,
-                isGif = false,
-            )
-        }
+        val popularStickerItems =
+            POPULAR_STICKERS.mapIndexed { idx, (emoji, name) ->
+                PickerItem(
+                    id = "popular_sticker_$idx",
+                    title = "$emoji $name",
+                    emoji = emoji,
+                    isGif = false,
+                )
+            }
         packs.add(PickerPack("Popular Stickers", isGif = false, items = popularStickerItems))
 
         // Select initial pack index based on whether opened as GIF or Sticker
-        currentPackIndex = if (initialIsGif) {
-            0
-        } else {
-            val stickerIndex = packs.indexOfFirst { !it.isGif }
-            if (stickerIndex >= 0) stickerIndex else 0
-        }
+        currentPackIndex =
+            if (initialIsGif) {
+                0
+            } else {
+                val stickerIndex = packs.indexOfFirst { !it.isGif }
+                if (stickerIndex >= 0) stickerIndex else 0
+            }
     }
 
     private fun loadRemotePacks() {
         telegramManager.loadSavedGifs { gifs ->
             if (gifs.isNotEmpty()) {
                 val packIdx = packs.indexOfFirst { it.title == "Saved GIFs" }
-                val items = gifs.mapIndexed { idx, gif ->
-                    PickerItem(
-                        id = "saved_gif_${gif.fileId}_$idx",
-                        title = gif.caption.ifBlank { "GIF #${idx + 1}" },
-                        filePath = gif.filePath,
-                        fileId = gif.fileId,
-                        isGif = true,
-                        rawGif = gif,
-                    )
-                }
+                val items =
+                    gifs.mapIndexed { idx, gif ->
+                        PickerItem(
+                            id = "saved_gif_${gif.fileId}_$idx",
+                            title = gif.caption.ifBlank { "GIF #${idx + 1}" },
+                            filePath = gif.filePath,
+                            fileId = gif.fileId,
+                            isGif = true,
+                            rawGif = gif,
+                        )
+                    }
                 if (packIdx >= 0) {
                     packs[packIdx] = PickerPack("Saved GIFs", isGif = true, items = items)
                     if (currentPackIndex == packIdx) {
@@ -215,17 +224,18 @@ class GifStickerPickerDialog(
         telegramManager.loadSavedStickers { stickers ->
             if (stickers.isNotEmpty()) {
                 val packIdx = packs.indexOfFirst { it.title == "Saved Stickers" }
-                val items = stickers.mapIndexed { idx, st ->
-                    PickerItem(
-                        id = "saved_st_${st.fileId}_$idx",
-                        title = if (st.emoji.isNotBlank()) "${st.emoji} Sticker" else "Sticker #${idx + 1}",
-                        emoji = st.emoji,
-                        filePath = st.filePath,
-                        fileId = st.fileId,
-                        isGif = false,
-                        rawSticker = st,
-                    )
-                }
+                val items =
+                    stickers.mapIndexed { idx, st ->
+                        PickerItem(
+                            id = "saved_st_${st.fileId}_$idx",
+                            title = if (st.emoji.isNotBlank()) "${st.emoji} Sticker" else "Sticker #${idx + 1}",
+                            emoji = st.emoji,
+                            filePath = st.filePath,
+                            fileId = st.fileId,
+                            isGif = false,
+                            rawSticker = st,
+                        )
+                    }
                 if (packIdx >= 0) {
                     packs[packIdx] = PickerPack("Saved Stickers", isGif = false, items = items)
                     if (currentPackIndex == packIdx) {
@@ -237,20 +247,22 @@ class GifStickerPickerDialog(
 
         telegramManager.loadInstalledStickers { sets ->
             if (sets.isNotEmpty()) {
-                val installedPacks = sets.map { set ->
-                    val items = set.stickers.mapIndexed { idx, st ->
-                        PickerItem(
-                            id = "set_${set.id}_${st.fileId}_$idx",
-                            title = if (st.emoji.isNotBlank()) "${st.emoji} ${st.setName}" else "Sticker #${idx + 1}",
-                            emoji = st.emoji,
-                            filePath = st.filePath,
-                            fileId = st.fileId,
-                            isGif = false,
-                            rawSticker = st,
-                        )
+                val installedPacks =
+                    sets.map { set ->
+                        val items =
+                            set.stickers.mapIndexed { idx, st ->
+                                PickerItem(
+                                    id = "set_${set.id}_${st.fileId}_$idx",
+                                    title = if (st.emoji.isNotBlank()) "${st.emoji} ${st.setName}" else "Sticker #${idx + 1}",
+                                    emoji = st.emoji,
+                                    filePath = st.filePath,
+                                    fileId = st.fileId,
+                                    isGif = false,
+                                    rawSticker = st,
+                                )
+                            }
+                        PickerPack("📦 ${set.title}", isGif = false, items = items)
                     }
-                    PickerPack("📦 ${set.title}", isGif = false, items = items)
-                }
                 // Insert installed packs before Popular Stickers
                 val popularIdx = packs.indexOfLast { it.title == "Popular Stickers" }
                 val insertAt = if (popularIdx >= 0) popularIdx else packs.size
@@ -383,18 +395,23 @@ class GifStickerPickerDialog(
         private var items: List<PickerItem>,
         private val onItemClick: (PickerItem) -> Unit,
     ) : RecyclerView.Adapter<PickerGridAdapter.PickerViewHolder>() {
-
         fun submitItems(newItems: List<PickerItem>) {
             this.items = newItems
             notifyDataSetChanged()
         }
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PickerViewHolder {
+        override fun onCreateViewHolder(
+            parent: ViewGroup,
+            viewType: Int,
+        ): PickerViewHolder {
             val view = LayoutInflater.from(parent.context).inflate(R.layout.item_gif_sticker_picker, parent, false)
             return PickerViewHolder(view, onItemClick)
         }
 
-        override fun onBindViewHolder(holder: PickerViewHolder, position: Int) {
+        override fun onBindViewHolder(
+            holder: PickerViewHolder,
+            position: Int,
+        ) {
             holder.bind(items[position])
         }
 
