@@ -28,7 +28,7 @@ class NewChatDialogTest {
     }
 
     @Test
-    fun testInitialFocusOnDirectChatButton() {
+    fun testInitialFocusDefaultsToStartDirectChat() {
         val dialog =
             NewChatDialog(
                 context = context,
@@ -43,7 +43,7 @@ class NewChatDialogTest {
         val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
 
         assertTrue("Direct chat button should have focus initially", btnDirect.hasFocus())
-        assertFalse("Input should not have focus initially", etInput.hasFocus())
+        assertFalse("Input field should not have focus initially", etInput.hasFocus())
     }
 
     @Test
@@ -68,9 +68,67 @@ class NewChatDialogTest {
         assertNotNull("Center softkey view should be present", tvCenter)
         assertNotNull("Right softkey view should be present", tvRight)
 
-        assertEquals("Clear", tvLeft.text.toString())
+        assertEquals("", tvLeft.text.toString())
         assertEquals("Select", tvCenter.text.toString())
         assertEquals("Back", tvRight.text.toString())
+    }
+
+    @Test
+    fun testSoftkeyLabelsUpdateOnFocusChange() {
+        val dialog =
+            NewChatDialog(
+                context = context,
+                onStartChatByQuery = {},
+                onOpenSavedMessages = {},
+                onCreateGroup = {},
+                onCreateChannel = {},
+            )
+        dialog.show()
+
+        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
+
+        // Initially btn_start_direct_chat is focused and etInput is empty
+        assertEquals("", tvLeft.text.toString())
+        assertEquals("Select", tvCenter.text.toString())
+        assertEquals("Back", tvRight.text.toString())
+
+        // Add text to input field while button is focused
+        etInput.setText("UserQuery")
+        assertEquals("Clear Input", tvLeft.text.toString())
+
+        // Focus input field
+        etInput.requestFocus()
+        assertTrue("Input field should have focus", etInput.hasFocus())
+        assertEquals("Clear", tvLeft.text.toString())
+        assertEquals("Start", tvCenter.text.toString())
+        assertEquals("Back", tvRight.text.toString())
+    }
+
+    @Test
+    fun testCenterSoftkeyTriggersFocusedActionButton() {
+        var openSavedCalled = false
+        val dialog =
+            NewChatDialog(
+                context = context,
+                onStartChatByQuery = {},
+                onOpenSavedMessages = { openSavedCalled = true },
+                onCreateGroup = {},
+                onCreateChannel = {},
+            )
+        dialog.show()
+
+        val btnSaved = dialog.findViewById<Button>(R.id.btn_open_saved_messages)
+        btnSaved.requestFocus()
+        assertTrue(btnSaved.hasFocus())
+
+        val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        tvCenter.performClick()
+
+        assertTrue("Open Saved Messages should be called when Center softkey is clicked", openSavedCalled)
+        assertFalse("Dialog should be dismissed after action", dialog.isShowing)
     }
 
     @Test

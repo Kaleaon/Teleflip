@@ -67,6 +67,8 @@ android {
             all {
                 systemProperty 'robolectric.dependency.repo.id', 'google-maven'
                 systemProperty 'robolectric.dependency.repo.url', 'https://maven-central.storage-download.googleapis.com/maven2/'
+                maxHeapSize = '2048m'
+                forkEvery = 100
             }
         }
     }
