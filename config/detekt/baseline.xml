@@ -248,7 +248,6 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$3000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300_000</ID>
-    <ID>MagicNumber:TelegramManager.kt$TelegramManager$31536000</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$32</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$4</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$40</ID>
@@ -287,7 +286,6 @@
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (focusedChat != null) options.add(MenuOption(options.size + 1, if (focusedChat.isMarkedUnread) "Clear unread mark" else "Mark as unread") { featureMenus.unread(focusedChat) })</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (msg.formatting.orEmpty().any { it.kind == "url" }) options.add(MenuOption(options.size + 1, "Open a link in this message") { featureMenus.links(msg) })</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (msg.text.isNotBlank() || msg.mediaCaption.isNotBlank()) options.add(MenuOption(options.size + 1, "Translate message") { featureMenus.translate(msg) })</ID>
-    <ID>MaxLineLength:MediaViewerDialog.kt$MediaViewerDialog$tvHint?.text = if (isVideoMedia) "[OK] Play/Pause • [◄/►] ±5s • [3] Speed • [LSK] Restart • [1] Save • [RSK] Back" else "[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"</ID>
     <ID>MaxLineLength:MediaViewerDialog.kt$MediaViewerDialog$val captionMessage = if (message.mediaCaption.isNotBlank()) message.copy(text = message.mediaCaption, mediaCaption = "", mediaType = MediaType.NONE) else message</ID>
     <ID>MaxLineLength:MediaViewerDialog.kt$MediaViewerDialog$val needsRender = updated.mediaFilePath != message.mediaFilePath || updated.isPaidMediaLocked != message.isPaidMediaLocked || updated.mediaFileId != message.mediaFileId || updated.mediaMimeType != message.mediaMimeType || updated.mediaType != message.mediaType</ID>
     <ID>MaxLineLength:MessageTextFormatter.kt$MessageTextFormatter$val offset = if (message.mediaCaption.isNotEmpty() &amp;&amp; message.text.endsWith(message.mediaCaption)) message.text.length - message.mediaCaption.length else 0</ID>
