@@ -205,7 +205,7 @@ class ListFocusPreservationTest {
         assertTrue(etSearchInput.hasFocus())
         val dpadDown = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN, 0)
         dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_DOWN, dpadDown)
-        assertTrue("D-pad DOWN on empty results should move focus to active tab", tabChats.hasFocus())
+        assertTrue("D-pad DOWN on empty results should focus active tab", tabChats.hasFocus())
 
         // D-pad DOWN on empty search results when tab is focused keeps focus on tab
         tabChats.isFocusableInTouchMode = true
