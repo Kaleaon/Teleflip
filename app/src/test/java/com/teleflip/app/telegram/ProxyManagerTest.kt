@@ -6,9 +6,6 @@ import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.model.ProxyType
 import com.teleflip.app.storage.ProxyStorage
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import org.junit.Assert.assertEquals
@@ -26,7 +23,6 @@ import org.mockito.Mockito.verify
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.shadows.ShadowLooper
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ProxyManagerTest {
     private lateinit var context: Context
@@ -34,18 +30,12 @@ class ProxyManagerTest {
 
     @Before
     fun setUp() {
-        kotlinx.coroutines.Dispatchers.setMain(kotlinx.coroutines.test.UnconfinedTestDispatcher())
         context = ApplicationProvider.getApplicationContext()
         ProxyStorage.disableAllProxies(context)
         ProxyStorage.getProxies(context).forEach {
             ProxyStorage.deleteProxy(context, it.id)
         }
         telegramManager = TelegramManager(context)
-    }
-
-    @org.junit.After
-    fun tearDown() {
-        kotlinx.coroutines.Dispatchers.resetMain()
     }
 
     @Test
