@@ -5105,6 +5105,7 @@ class MainActivity : AppCompatActivity() {
 
         val etId = view.findViewById<EditText>(R.id.et_api_id)
         val etHash = view.findViewById<EditText>(R.id.et_api_hash)
+
         val spTimeout = view.findViewById<Spinner>(R.id.sp_keypad_timeout)
         val btnBgPush = view.findViewById<Button>(R.id.btn_toggle_bg_notifications)
         val btnEditProfile = view.findViewById<Button>(R.id.btn_edit_profile)
@@ -5266,13 +5267,14 @@ class MainActivity : AppCompatActivity() {
         spTimeout.setSelection(initialIndex)
 
         val doSave = {
+            commitActiveInputEngines()
             val selIndex = spTimeout.selectedItemPosition
             if (selIndex in timeoutValues.indices) {
                 telegramManager.keypadTimeoutMs = timeoutValues[selIndex]
                 settingsInputEngines.values.forEach { it.timeoutMs = timeoutValues[selIndex] }
             }
-            val idStr = etId.text.toString().trim()
-            val hashStr = etHash.text.toString().trim()
+            val idStr = etId?.text?.toString()?.trim().orEmpty()
+            val hashStr = etHash?.text?.toString()?.trim().orEmpty()
             if (idStr.isNotEmpty() && hashStr.isNotEmpty()) {
                 telegramManager.apiId = idStr.toIntOrNull() ?: telegramManager.apiId
                 telegramManager.apiHash = hashStr
