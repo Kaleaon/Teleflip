@@ -1664,6 +1664,21 @@ class MainActivity : AppCompatActivity() {
                         showToast("Quoted message not found")
                     }
                 },
+                onReplyQuoteClick = { quoteMsg ->
+                    val targetId = quoteMsg.replyToMessageId
+                    if (targetId != 0L) {
+                        val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                        if (pos >= 0) {
+                            rvMessages?.smoothScrollToPosition(pos)
+                            focusMessageAt(pos)
+                        } else {
+                            showToast("Quoted message not found")
+                        }
+                    }
+                },
+                onReactionsClick = { rxnMsg ->
+                    showReactionPickerDialog(rxnMsg)
+                },
             )
         rvMessages?.adapter = messageAdapter
 
