@@ -357,7 +357,6 @@ class TelegramManager(
     var chatBatchSize: Int = DEFAULT_CHAT_BATCH_SIZE
 
     companion object {
-        private const val DEFAULT_MUTE_DURATION_SECONDS = 31536000
         const val DEFAULT_CHAT_BATCH_SIZE = 10
         const val DEFAULT_MUTE_DURATION_SECONDS = 31_536_000
         private val DEFAULT_CUSTOM_EMOJIS =
@@ -4322,21 +4321,6 @@ class TelegramManager(
         )
     }
 
-    fun toggleChatMute(
-        chatId: Long,
-        currentMuted: Boolean,
-        onResult: ((Boolean) -> Unit)? = null,
-    ) {
-        val client = tdClient
-        if (client == null) {
-            onResult?.invoke(currentMuted)
-            return
-        }
-        val newMuted = !currentMuted
-        val muteFor = if (newMuted) 31536000 else 0
-        setChatNotificationMute(chatId, muteFor, onResult)
-    }
-
     fun setChatNotificationSettings(
         chatId: Long,
         muteForSeconds: Int,
@@ -6148,7 +6132,8 @@ class TelegramManager(
                     if (success) {
                         retryConnection()
                     }
-                    callback?.invoke(bestProxy, pingMs)
+                    val activeProxy = ProxyStorage.getEnabledProxy(context) ?: bestProxy
+                    callback?.invoke(activeProxy, pingMs)
                 }
             } else {
                 _failoverStatus.value = "🔴 Proxy failover: All stored proxies unreachable"
