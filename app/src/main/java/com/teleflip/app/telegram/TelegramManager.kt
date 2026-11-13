@@ -6241,8 +6241,8 @@ class TelegramManager(
                     if (success) {
                         retryConnection()
                     }
-                    val updatedProxy = ProxyStorage.getEnabledProxy(context) ?: bestProxy
-                    callback?.invoke(updatedProxy, pingMs)
+                    val activeProxy = ProxyStorage.getEnabledProxy(context) ?: bestProxy
+                    callback?.invoke(activeProxy, pingMs)
                 }
             } else {
                 _failoverStatus.value = "🔴 Proxy failover: All stored proxies unreachable"
