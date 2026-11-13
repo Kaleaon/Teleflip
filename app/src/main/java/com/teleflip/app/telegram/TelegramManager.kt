@@ -3510,25 +3510,72 @@ class TelegramManager(
         newType: com.teleflip.app.storage.StorageLocationType,
         onComplete: (Boolean, String) -> Unit,
     ) {
-        val oldDir = com.teleflip.app.storage.StorageManager.getFilesDirectory(context)
-        val success = com.teleflip.app.storage.StorageManager.setSelectedStorageType(context, newType)
-        if (!success) {
+        if (newType == com.teleflip.app.storage.StorageLocationType.SD_CARD &&
+            !com.teleflip.app.storage.StorageManager.isSdCardAvailable(context)
+        ) {
             onComplete(false, "Storage location is not available or not mounted")
             return
         }
-        val newDir = com.teleflip.app.storage.StorageManager.getFilesDirectory(context)
-        scope.launch(Dispatchers.IO) {
-            val copied = com.teleflip.app.storage.StorageManager.copyMediaFiles(oldDir, newDir)
-            val label =
-                if (newType == com.teleflip.app.storage.StorageLocationType.SD_CARD) {
-                    "MicroSD Card"
-                } else {
-                    "Internal Storage"
-                }
-            withContext(Dispatchers.Main) {
-                onComplete(true, "Storage switched to $label. Migrated $copied files.")
+
+        if (com.teleflip.app.storage.MediaMigrationWorker.isMigrationRunning) {
+            onComplete(false, "Media migration already in progress. Please wait.")
+            return
+        }
+
+        val currentType = com.teleflip.app.storage.StorageManager.getSelectedStorageType(context)
+        val oldDir = com.teleflip.app.storage.StorageManager.getFilesDirectoryForType(context, currentType)
+        val newDir = com.teleflip.app.storage.StorageManager.getFilesDirectoryForType(context, newType)
+
+        if (currentType != newType) {
+            val success = com.teleflip.app.storage.StorageManager.setSelectedStorageType(context, newType)
+            if (!success) {
+                onComplete(false, "Storage location is not available or not mounted")
+                return
             }
         }
+
+        // Restart TDLib with updated filesDirectory
+        val activeClient: Client?
+        synchronized(clientLock) {
+            activeClient = tdClient
+            if (activeClient == null && !isStartingClient) {
+                reconnectPending = false
+                start()
+            } else {
+                isClosingClient = true
+                reconnectPending = true
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        activeClient?.send(TdApi.Close(), this@TelegramManager)
+                    } catch (e: Throwable) {
+                        Log.w(tag, "Error closing client for storage switch: ${e.message}")
+                        synchronized(clientLock) {
+                            isClosingClient = false
+                            tdClient = null
+                        }
+                        start()
+                    }
+                }
+            }
+        }
+
+        // Enqueue background migration via WorkManager
+        if (oldDir.absolutePath != newDir.absolutePath) {
+            com.teleflip.app.storage.MediaMigrationWorker.enqueue(
+                context = context,
+                sourceDir = oldDir,
+                targetDir = newDir,
+                targetType = newType,
+            )
+        }
+
+        val label =
+            if (newType == com.teleflip.app.storage.StorageLocationType.SD_CARD) {
+                "MicroSD Card"
+            } else {
+                "Internal Storage"
+            }
+        onComplete(true, "Storage switched to $label. Background migration started.")
     }
 
     // =========================================================================
@@ -5816,12 +5863,31 @@ class TelegramManager(
 
     private fun localFilePath(file: TdApi.File): String? =
         file.local?.let { local ->
-            local.path.takeIf { local.isDownloadingCompleted && it.isNotBlank() && File(it).isFile }
+            val rawPath = local.path.takeIf { local.isDownloadingCompleted && it.isNotBlank() } ?: return@let null
+            val resolved = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, rawPath)
+            if (resolved != null && File(resolved).isFile) {
+                resolved
+            } else if (File(rawPath).isFile) {
+                rawPath
+            } else {
+                null
+            }
         }
 
     private fun resolveFile(f: TdApi.File?): Pair<Int, String?> {
         if (f == null) return Pair(0, null)
-        val path = localFilePath(f) ?: downloadedFilePaths[f.id]?.takeIf { File(it).isFile }
+        val candidatePath =
+            downloadedFilePaths[f.id]?.let {
+                val resolved = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, it)
+                if (resolved != null && File(resolved).isFile) {
+                    resolved
+                } else if (File(it).isFile) {
+                    it
+                } else {
+                    null
+                }
+            }
+        val path = localFilePath(f) ?: candidatePath
         if (path != null) return Pair(f.id, path)
         val fileBytes = if (f.expectedSize > 0) f.expectedSize else f.size
         if (f.local?.canBeDownloaded == true &&
@@ -5831,7 +5897,7 @@ class TelegramManager(
         ) {
             requestFileDownload(f.id)
         }
-        return Pair(f.id, downloadedFilePaths[f.id]?.takeIf { File(it).isFile })
+        return Pair(f.id, candidatePath)
     }
 
     fun deleteMessage(
@@ -5985,9 +6051,9 @@ class TelegramManager(
                 val result = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), enableNow, "")) as TdApi.AddedProxy
                 ProxyStorage.saveProxy(context, item.copy(id = result.id, isEnabled = enableNow))
                 if (enableNow) activeProxyId = result.id
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                callback?.invoke(true, null)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not add proxy") }
+                callback?.invoke(false, e.message ?: "Could not add proxy")
             }
         }
     }
@@ -6000,12 +6066,11 @@ class TelegramManager(
             try {
                 val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
                 val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
-                ProxyStorage.deleteProxy(context, proxyId)
-                ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
+                ProxyStorage.enableProxy(context, proxyId)
                 activeProxyId = added.id
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                callback?.invoke(true, null)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not enable proxy") }
+                callback?.invoke(false, e.message ?: "Could not enable proxy")
             }
         }
     }
@@ -6016,9 +6081,9 @@ class TelegramManager(
                 sendQuery(TdApi.DisableProxy())
                 ProxyStorage.disableAllProxies(context)
                 activeProxyId = 0
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                callback?.invoke(true, null)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not disable proxy") }
+                callback?.invoke(false, e.message ?: "Could not disable proxy")
             }
         }
     }
@@ -6033,9 +6098,9 @@ class TelegramManager(
                 sendQuery(TdApi.RemoveProxy(proxyId))
                 ProxyStorage.deleteProxy(context, proxyId)
                 if (activeProxyId == proxyId) activeProxyId = 0
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                callback?.invoke(true, null)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not delete proxy") }
+                callback?.invoke(false, e.message ?: "Could not delete proxy")
             }
         }
     }

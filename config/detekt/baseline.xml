@@ -37,6 +37,7 @@
     <ID>CyclomaticComplexMethod:ChatExportManager.kt$ChatExportManager$suspend fun exportChat( context: Context, chatId: Long, chatTitle: String, messages: List&lt;MessageModel&gt;, options: ChatExportOptions, fileDownloader: (suspend (fileId: Int) -&gt; String?)? = null, onProgress: ((ChatExportProgress) -&gt; Unit)? = null, ): Result&lt;File&gt;</ID>
     <ID>CyclomaticComplexMethod:ChatExportProgressDialog.kt$ChatExportProgressDialog$fun updateProgress(progress: ChatExportProgress)</ID>
     <ID>CyclomaticComplexMethod:ChatListAdapter.kt$ChatListAdapter.ChatViewHolder$fun bind( chat: ChatModel, position: Int, )</ID>
+    <ID>CyclomaticComplexMethod:FallbackMediaResolver.kt$FallbackMediaResolver$fun resolvePath( context: Context?, path: String?, ): String?</ID>
     <ID>CyclomaticComplexMethod:KeypadInputEngine.kt$KeypadInputEngine$fun handleKeyEvent( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:LocationHelper.kt$LocationHelper$@SuppressLint("MissingPermission") fun fetchCurrentLocation( onSuccess: (LocationInfo) -&gt; Unit, onError: (String) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$@android.annotation.SuppressLint("NewApi", "InlinedApi") private fun getDevicePhoneNumber(): String?</ID>
@@ -60,7 +61,9 @@
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun updateActiveCallOverlay()</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun updateInCallUI(call: ActiveCall)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun updateSoftkeysForFocusedMessage( chat: ChatModel, msg: MessageModel, )</ID>
+    <ID>CyclomaticComplexMethod:MediaMigrationWorker.kt$MediaMigrationWorker$override suspend fun doWork(): Result</ID>
     <ID>CyclomaticComplexMethod:MediaViewerDialog.kt$MediaViewerDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>CyclomaticComplexMethod:MediaViewerDialog.kt$MediaViewerDialog$private fun renderMedia()</ID>
     <ID>CyclomaticComplexMethod:MessageAdapter.kt$MessageAdapter.MessageViewHolder$fun bind(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:MessageTextFormatter.kt$MessageTextFormatter$fun format( message: MessageModel, revealSpoilers: Boolean = false, ): CharSequence</ID>
     <ID>CyclomaticComplexMethod:NewChatDialog.kt$NewChatDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
@@ -85,6 +88,7 @@
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$private fun toMessageModel(msg: TdApi.Message): MessageModel</ID>
     <ID>EmptyCatchBlock:AdbReporter.kt$AdbReporter${ }</ID>
     <ID>EmptyCatchBlock:ChatExportManager.kt$ChatExportManager${ }</ID>
+    <ID>EmptyCatchBlock:MediaMigrationWorker.kt$MediaMigrationWorker${ }</ID>
     <ID>EmptyCatchBlock:MediaViewerDialog.kt$MediaViewerDialog${ }</ID>
     <ID>EmptyCatchBlock:NotificationHelper.kt$NotificationHelper${ }</ID>
     <ID>EmptyCatchBlock:ProxyStorage.kt$ProxyStorage${ }</ID>
@@ -335,6 +339,9 @@
     <ID>ReturnCount:AdbReporter.kt$AdbReporter$private fun readTailLines( file: File, maxLines: Int, ): List&lt;String&gt;</ID>
     <ID>ReturnCount:ChatExportDialog.kt$ChatExportDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:ChatNotificationSettingsDialog.kt$ChatNotificationSettingsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>ReturnCount:FallbackMediaResolver.kt$FallbackMediaResolver$fun resolveFile( context: Context?, file: File?, ): File?</ID>
+    <ID>ReturnCount:FallbackMediaResolver.kt$FallbackMediaResolver$fun resolvePath( context: Context?, path: String?, ): String?</ID>
+    <ID>ReturnCount:FallbackMediaResolver.kt$FallbackMediaResolver$internal fun extractRelativeTelegramPath( file: File, context: Context, ): String?</ID>
     <ID>ReturnCount:KeypadInputEngine.kt$KeypadInputEngine$fun handleKeyEvent( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:KeypadInputEngine.kt$KeypadInputEngine$private fun isSentenceBoundary( text: CharSequence, targetIndex: Int, ): Boolean</ID>
     <ID>ReturnCount:KeypadTextDialog.kt$KeypadTextDialog$override fun dispatchKeyEvent(event: KeyEvent): Boolean</ID>
@@ -367,6 +374,7 @@
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun isChatMuted(chatId: Long): Boolean</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun switchStorageLocation( newType: com.teleflip.app.storage.StorageLocationType, onComplete: (Boolean, String) -&gt; Unit, )</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun toggleMessageReaction( chatId: Long, messageId: Long, emoji: String, )</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$private fun extractIsPaidMediaLocked(content: TdApi.MessageContent?): Boolean</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$private fun extractMediaFileInfo(content: TdApi.MessageContent?): Pair&lt;Int, String?&gt;</ID>
@@ -394,12 +402,14 @@
     <ID>TooGenericExceptionCaught:ChatExportEngine.kt$ChatExportEngine$e: Throwable</ID>
     <ID>TooGenericExceptionCaught:ChatExportManager.kt$ChatExportManager$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:ContentDescriptionFormatter.kt$ContentDescriptionFormatter$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FallbackMediaResolver.kt$FallbackMediaResolver$e: Exception</ID>
     <ID>TooGenericExceptionCaught:LocationHelper.kt$LocationHelper$e: Exception</ID>
     <ID>TooGenericExceptionCaught:LocationHelper.kt$LocationHelper.Companion$e2: Exception</ID>
     <ID>TooGenericExceptionCaught:LocationHelper.kt$LocationHelper.Companion$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$e: Throwable</ID>
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:MediaMigrationWorker.kt$MediaMigrationWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:NtgCallTransport.kt$NtgCallTransport$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:QrCodeGenerator.kt$QrCodeGenerator$e: Exception</ID>
     <ID>TooGenericExceptionCaught:TelegramManager.kt$TelegramManager$e2: Exception</ID>
