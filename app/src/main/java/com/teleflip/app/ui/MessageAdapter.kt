@@ -236,7 +236,8 @@ class MessageAdapter(
                 val isPlaying = (playingMessageId == message.id)
                 val speedStr = String.format(Locale.US, "%.1fx", currentSpeed)
                 val icon = if (isPlaying) "⏸ Playing ($speedStr)" else "▶ Play (${message.durationSeconds}s)"
-                tvMedia.text = if (message.mediaType == MediaType.AUDIO) "🎵 [Audio] $icon" else "🎤 [Voice Message] $icon"
+                val cap = if (message.mediaType == MediaType.AUDIO && message.mediaCaption.isNotBlank()) " ${message.mediaCaption}" else ""
+                tvMedia.text = if (message.mediaType == MediaType.AUDIO) "🎵 [Audio]$cap $icon" else "🎤 [Voice Message] $icon"
             }
         }
 
@@ -303,7 +304,8 @@ class MessageAdapter(
                     val isPlaying = (playingMessageId == message.id)
                     val speedStr = String.format(Locale.US, "%.1fx", currentSpeed)
                     val icon = if (isPlaying) "⏸ Playing ($speedStr)" else "▶ Play (${message.durationSeconds}s)"
-                    tvMedia.text = if (message.mediaType == MediaType.AUDIO) "🎵 [Audio] $icon" else "🎤 [Voice Message] $icon"
+                    val cap = if (message.mediaType == MediaType.AUDIO && message.mediaCaption.isNotBlank()) " ${message.mediaCaption}" else ""
+                    tvMedia.text = if (message.mediaType == MediaType.AUDIO) "🎵 [Audio]$cap $icon" else "🎤 [Voice Message] $icon"
 
                     val stateDesc =
                         ContentDescriptionFormatter.getVoiceStateDescription(
@@ -336,7 +338,7 @@ class MessageAdapter(
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    tvMedia.text = "📄 [File] ${message.mediaCaption}"
+                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "📄 [File] ${message.mediaCaption}" else "📄 [File]"
                 }
                 MediaType.STICKER -> {
                     ViewCompat.setStateDescription(tvMedia, null)
@@ -349,13 +351,13 @@ class MessageAdapter(
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
                     val dur = if (message.durationSeconds > 0) " (${message.durationSeconds}s)" else ""
-                    tvMedia.text = "📹 [Video$dur] ▶ Press OK to Play"
+                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "📹 [Video$dur] ${message.mediaCaption}" else "📹 [Video$dur] ▶ Press OK to Play"
                 }
                 MediaType.ANIMATION -> {
                     ViewCompat.setStateDescription(tvMedia, null)
                     tvMedia.contentDescription = null
                     tvMedia.visibility = View.VISIBLE
-                    tvMedia.text = "🎞️ [GIF] ▶ Press OK to Play"
+                    tvMedia.text = if (message.mediaCaption.isNotBlank()) "🎞️ [GIF] ${message.mediaCaption}" else "🎞️ [GIF] ▶ Press OK to Play"
                 }
                 MediaType.POLL -> {
                     ViewCompat.setStateDescription(tvMedia, null)
