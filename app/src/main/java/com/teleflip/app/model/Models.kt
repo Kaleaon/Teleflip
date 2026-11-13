@@ -179,6 +179,26 @@ data class ActiveCall(
     val verificationEmojis: List<String> = emptyList(),
 )
 
+data class SlowModeState(
+    val chatId: Long,
+    val delaySeconds: Int = 0,
+    val expiresAtEpochMs: Long = 0L,
+) {
+    companion object {
+        private const val MILLIS_PER_SECOND = 1000L
+        private const val CEILING_ROUNDING_OFFSET_MS = 999L
+    }
+
+    fun remainingSeconds(currentTimeMs: Long = System.currentTimeMillis()): Int {
+        if (expiresAtEpochMs <= currentTimeMs) return 0
+        val diffMs = expiresAtEpochMs - currentTimeMs
+        return ((diffMs + CEILING_ROUNDING_OFFSET_MS) / MILLIS_PER_SECOND).toInt()
+    }
+
+    val isActive: Boolean
+        get() = remainingSeconds() > 0
+}
+
 data class ChatProfile(
     val chatId: Long,
     val title: String,
@@ -196,6 +216,8 @@ data class ChatProfile(
     val isSecretChat: Boolean = false,
     val selfDestructTimerSec: Int = 0,
     val members: List<GroupMember> = emptyList(),
+    val slowModeDelay: Int = 0,
+    val slowModeDelayExpiresIn: Double = 0.0,
 )
 
 data class StickerItem(
