@@ -64,7 +64,6 @@
     <ID>CyclomaticComplexMethod:MessageAdapter.kt$MessageAdapter.MessageViewHolder$fun bind(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:MessageTextFormatter.kt$MessageTextFormatter$fun format( message: MessageModel, revealSpoilers: Boolean = false, ): CharSequence</ID>
     <ID>CyclomaticComplexMethod:NewChatDialog.kt$NewChatDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
-    <ID>CyclomaticComplexMethod:PollDialog.kt$PollDialog$override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>CyclomaticComplexMethod:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:StorageManager.kt$StorageManager$private fun performSdCardDetection(context: Context): File?</ID>
     <ID>CyclomaticComplexMethod:TelegramFeatureMenus.kt$TelegramFeatureMenus$fun buttons(message: MessageModel)</ID>
@@ -119,7 +118,6 @@
     <ID>LongMethod:MainActivity.kt$MainActivity$private fun showMessageOptionsMenu(msg: MessageModel)</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$private fun updateSoftkeysForFocusedMessage( chat: ChatModel, msg: MessageModel, )</ID>
     <ID>LongMethod:MessageAdapter.kt$MessageAdapter.MessageViewHolder$fun bind(message: MessageModel)</ID>
-    <ID>LongMethod:PollDialog.kt$PollDialog$override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>LongMethod:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>LongMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
     <ID>LongMethod:TelegramManager.kt$TelegramManager$override fun onResult(obj: TdApi.Object?)</ID>
