@@ -42,12 +42,16 @@ class PollDialog(
     private var correctOptionIndex = 0
     private var allowsMultipleAnswers = false
     private var currentStep = 1
+    private var tvError: TextView? = null
+
+    override fun getErrorTextView(): TextView? = tvError
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_create_poll)
         setupDismissKeys()
 
+        tvError = findViewById(R.id.tv_poll_error)
         val tvStepTitle = findViewById<TextView>(R.id.tv_poll_step_title)
         val tvMode = findViewById<TextView>(R.id.tv_poll_input_mode)
 
@@ -137,15 +141,18 @@ class PollDialog(
             val question = etQuestion?.text?.toString()?.trim().orEmpty()
             val opts = getValidOptions()
 
-            if (question.isNotBlank() && opts.size >= 2) {
-                currentStep = 2
-                updateStepVisibility()
-                btnModeToggle?.requestFocus()
-            } else {
-                if (question.isBlank()) {
-                    etQuestion?.requestFocus()
-                } else {
-                    etOpt2?.requestFocus()
+            when {
+                question.isBlank() -> {
+                    showDialogError("Please enter a poll question", etQuestion)
+                }
+                opts.size < 2 -> {
+                    showDialogError("Please enter at least 2 poll options", etOpt1)
+                }
+                else -> {
+                    clearDialogError()
+                    currentStep = 2
+                    updateStepVisibility()
+                    btnModeToggle?.requestFocus()
                 }
             }
         }
