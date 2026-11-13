@@ -357,16 +357,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onNewIntent(intent: android.content.Intent?) {
+    override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent == null) return
-        intent.data?.let { uri ->
+        intent?.data?.let { uri ->
             if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
                 telegramManager.handleDeepLinkProxy(uri)
             }
         }
-        val targetOpenChatId = intent.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L)
+        val targetOpenChatId = intent?.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L) ?: 0L
         if (targetOpenChatId != 0L) {
             pendingTargetChatId = targetOpenChatId
             if (!PasscodeManager.isLocked(this) && telegramManager.authState.value is AuthState.Ready) {
