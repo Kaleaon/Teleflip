@@ -65,6 +65,7 @@ android {
             includeAndroidResources = true
             returnDefaultValues = true
             all {
+                maxHeapSize = '1536m'
                 systemProperty 'robolectric.dependency.repo.id', 'google-maven'
                 systemProperty 'robolectric.dependency.repo.url', 'https://maven-central.storage-download.googleapis.com/maven2/'
             }
