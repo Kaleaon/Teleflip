@@ -21,6 +21,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowLooper
 
 @RunWith(RobolectricTestRunner::class)
 class ProxyManagerTest {
@@ -256,7 +257,12 @@ class ProxyManagerTest {
             latch.countDown()
         }
 
-        assertTrue(awaitLatch(latch, 4))
+        val deadline = System.currentTimeMillis() + 4000
+        while (latch.count > 0 && System.currentTimeMillis() < deadline) {
+            ShadowLooper.idleMainLooper(50, java.util.concurrent.TimeUnit.MILLISECONDS)
+            Thread.sleep(50)
+        }
+        assertEquals(0, latch.count)
         assertNotNull(selectedProxy)
         assertEquals("fast.proxy.com", selectedProxy?.server)
         assertEquals(100L, selectedLatency)
@@ -319,7 +325,12 @@ class ProxyManagerTest {
             latch.countDown()
         }
 
-        assertTrue(awaitLatch(latch, 4))
+        val deepLinkDeadline = System.currentTimeMillis() + 4000
+        while (latch.count > 0 && System.currentTimeMillis() < deepLinkDeadline) {
+            ShadowLooper.idleMainLooper(50, java.util.concurrent.TimeUnit.MILLISECONDS)
+            Thread.sleep(50)
+        }
+        assertEquals(0, latch.count)
         assertTrue(successResult)
 
         val enabled = ProxyStorage.getEnabledProxy(context)
@@ -328,17 +339,5 @@ class ProxyManagerTest {
         assertEquals(1080, enabled?.port)
         assertEquals("testuser", enabled?.username)
         assertTrue(telegramManager.failoverStatus.value!!.contains("Proxy deep-link activated"))
-    }
-
-    private fun awaitLatch(
-        latch: java.util.concurrent.CountDownLatch,
-        timeoutSeconds: Long,
-    ): Boolean {
-        val deadline = System.currentTimeMillis() + timeoutSeconds * 1000
-        while (latch.count > 0 && System.currentTimeMillis() < deadline) {
-            org.robolectric.shadows.ShadowLooper.idleMainLooper()
-            Thread.sleep(20)
-        }
-        return latch.count == 0L
     }
 }
