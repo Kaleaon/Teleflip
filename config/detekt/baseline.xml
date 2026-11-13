@@ -351,6 +351,7 @@
     <ID>ReturnCount:MediaViewerDialog.kt$MediaViewerDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:NewChatDialog.kt$NewChatDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:OptionsMenuDialog.kt$OptionsMenuDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
+    <ID>ReturnCount:PollDialog.kt$PollDialog$fun validateStep1Inputs(): Boolean</ID>
     <ID>ReturnCount:PollDialog.kt$PollDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:ProxySettingsDialog.kt$ProxySettingsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:ProxyStorage.kt$ProxyStorage$@Synchronized fun getProxies(context: Context): List&lt;ProxyItem&gt;</ID>
