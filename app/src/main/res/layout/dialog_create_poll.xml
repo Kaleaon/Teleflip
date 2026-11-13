@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@color/bg_dark_card">
@@ -51,101 +52,47 @@
             android:orientation="vertical"
             android:visibility="visible">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <com.teleflip.app.ui.LabeledInputView
+                android:id="@+id/liv_poll_question"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Poll Question:"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:layout_marginBottom="8dp"
+                app:inputLabel="Poll Question:"
+                app:inputHint="Ask a question..."
+                app:inputSingleLine="true" />
 
-            <EditText
-                android:id="@+id/et_poll_question"
+            <com.teleflip.app.ui.LabeledInputView
+                android:id="@+id/liv_poll_opt1"
                 android:layout_width="match_parent"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_edittext_selector"
-                android:hint="Ask a question..."
-                android:textColorHint="@color/text_hint"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:singleLine="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Options (at least 2):"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:layout_marginBottom="6dp"
+                app:inputLabel="Options (at least 2):"
+                app:inputHint="Option 1"
+                app:inputSingleLine="true" />
 
-            <EditText
-                android:id="@+id/et_poll_opt1"
+            <com.teleflip.app.ui.LabeledInputView
+                android:id="@+id/liv_poll_opt2"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:background="@drawable/bg_edittext_selector"
-                android:hint="Option 1"
-                android:textColorHint="@color/text_hint"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:singleLine="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:layout_marginBottom="6dp" />
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                app:inputHint="Option 2"
+                app:inputSingleLine="true" />
 
-            <EditText
-                android:id="@+id/et_poll_opt2"
+            <com.teleflip.app.ui.LabeledInputView
+                android:id="@+id/liv_poll_opt3"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:background="@drawable/bg_edittext_selector"
-                android:hint="Option 2"
-                android:textColorHint="@color/text_hint"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:singleLine="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:layout_marginBottom="6dp" />
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                app:inputHint="Option 3 (optional)"
+                app:inputSingleLine="true" />
 
-            <EditText
-                android:id="@+id/et_poll_opt3"
+            <com.teleflip.app.ui.LabeledInputView
+                android:id="@+id/liv_poll_opt4"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:background="@drawable/bg_edittext_selector"
-                android:hint="Option 3 (optional)"
-                android:textColorHint="@color/text_hint"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:singleLine="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:layout_marginBottom="6dp" />
-
-            <EditText
-                android:id="@+id/et_poll_opt4"
-                android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:background="@drawable/bg_edittext_selector"
-                android:hint="Option 4 (optional)"
-                android:textColorHint="@color/text_hint"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:singleLine="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:layout_marginBottom="8dp" />
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                app:inputHint="Option 4 (optional)"
+                app:inputSingleLine="true" />
 
             <Button
                 android:id="@+id/btn_poll_next"
@@ -240,30 +187,14 @@
                     android:focusable="true"
                     android:layout_marginBottom="6dp" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Explanation (shown after voting):"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="2dp" />
-
-                <EditText
-                    android:id="@+id/et_poll_explanation"
+                <com.teleflip.app.ui.LabeledInputView
+                    android:id="@+id/liv_poll_explanation"
                     android:layout_width="match_parent"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_edittext_selector"
-                    android:hint="Add explanation (optional)..."
-                    android:textColorHint="@color/text_hint"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:singleLine="true"
-                    android:focusable="true"
-                    android:focusableInTouchMode="true"
-                    android:layout_marginBottom="6dp" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    app:inputLabel="Explanation (shown after voting):"
+                    app:inputHint="Add explanation (optional)..."
+                    app:inputSingleLine="true" />
             </LinearLayout>
 
             <!-- Regular Poll Settings Container -->

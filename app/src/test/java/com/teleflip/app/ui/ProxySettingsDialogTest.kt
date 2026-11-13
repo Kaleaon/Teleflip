@@ -2,7 +2,6 @@ package com.teleflip.app.ui
 
 import android.app.Application
 import android.view.KeyEvent
-import android.widget.EditText
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -33,7 +32,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -48,7 +47,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)
@@ -75,7 +74,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -94,7 +93,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -115,8 +114,8 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
-        val etPort = dialog.findViewById<EditText>(R.id.et_proxy_port)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
+        val etPort = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_port).editText
         val tvMode = dialog.findViewById<TextView>(R.id.tv_proxy_input_mode)
 
         etServer.requestFocus()
@@ -137,7 +136,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -155,7 +154,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)

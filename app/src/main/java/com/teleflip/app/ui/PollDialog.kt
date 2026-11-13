@@ -54,11 +54,17 @@ class PollDialog(
         val layoutStep1 = findViewById<LinearLayout>(R.id.layout_step1)
         val layoutStep2 = findViewById<LinearLayout>(R.id.layout_step2)
 
-        val etQuestion = findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = findViewById<EditText>(R.id.et_poll_opt2)
-        val etOpt3 = findViewById<EditText>(R.id.et_poll_opt3)
-        val etOpt4 = findViewById<EditText>(R.id.et_poll_opt4)
+        val livQuestion = findViewById<LabeledInputView>(R.id.liv_poll_question)
+        val livOpt1 = findViewById<LabeledInputView>(R.id.liv_poll_opt1)
+        val livOpt2 = findViewById<LabeledInputView>(R.id.liv_poll_opt2)
+        val livOpt3 = findViewById<LabeledInputView>(R.id.liv_poll_opt3)
+        val livOpt4 = findViewById<LabeledInputView>(R.id.liv_poll_opt4)
+
+        val etQuestion = livQuestion?.editText
+        val etOpt1 = livOpt1?.editText
+        val etOpt2 = livOpt2?.editText
+        val etOpt3 = livOpt3?.editText
+        val etOpt4 = livOpt4?.editText
         val btnNext = findViewById<Button>(R.id.btn_poll_next)
         val btnCancel = findViewById<Button>(R.id.btn_poll_cancel)
 
@@ -68,7 +74,8 @@ class PollDialog(
 
         val layoutQuizSettings = findViewById<LinearLayout>(R.id.layout_quiz_settings)
         val btnCorrectChoice = findViewById<Button>(R.id.btn_poll_correct_choice)
-        val etExplanation = findViewById<EditText>(R.id.et_poll_explanation)
+        val livExplanation = findViewById<LabeledInputView>(R.id.liv_poll_explanation)
+        val etExplanation = livExplanation?.editText
 
         val layoutRegularSettings = findViewById<LinearLayout>(R.id.layout_regular_settings)
         val btnMultipleAnswersToggle = findViewById<Button>(R.id.btn_poll_multiple_answers_toggle)
@@ -224,7 +231,7 @@ class PollDialog(
             findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
             findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
             findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
-            findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
+            findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText?.requestFocus()
         } else {
             dismiss()
         }
@@ -241,7 +248,7 @@ class PollDialog(
                 findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
                 findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
                 findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
-                findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
+                findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText?.requestFocus()
             } else {
                 dismiss()
             }

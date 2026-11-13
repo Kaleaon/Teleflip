@@ -4,7 +4,6 @@ import android.app.Activity
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
-import android.widget.EditText
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -166,7 +165,7 @@ class ListFocusPreservationTest {
         val dialog = SearchDialog(activity, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         val tabChats = dialog.findViewById<TextView>(R.id.tab_search_chats)
         val tabContacts = dialog.findViewById<TextView>(R.id.tab_search_contacts)
 
@@ -199,7 +198,7 @@ class ListFocusPreservationTest {
         val dialog = SearchDialog(activity, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         val tabChats = dialog.findViewById<TextView>(R.id.tab_search_chats)
 
         // D-pad DOWN on empty search results moves focus to active tab

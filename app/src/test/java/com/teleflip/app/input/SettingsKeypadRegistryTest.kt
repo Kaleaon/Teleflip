@@ -3,11 +3,11 @@ package com.teleflip.app.input
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.LayoutInflater
-import android.widget.EditText
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import com.teleflip.app.MainActivity
 import com.teleflip.app.R
+import com.teleflip.app.ui.LabeledInputView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -35,10 +35,10 @@ class SettingsKeypadRegistryTest {
 
         val tvMode = view.findViewById<TextView>(R.id.tv_settings_input_mode)
         assertNotNull("tv_settings_input_mode should exist in view_settings.xml", tvMode)
-        val etId = view.findViewById<EditText>(R.id.et_api_id)
-        assertNotNull("et_api_id should exist in view_settings.xml", etId)
-        val etHash = view.findViewById<EditText>(R.id.et_api_hash)
-        assertNotNull("et_api_hash should exist in view_settings.xml", etHash)
+        val etId = view.findViewById<LabeledInputView>(R.id.liv_api_id)?.editText
+        assertNotNull("liv_api_id should exist in view_settings.xml", etId)
+        val etHash = view.findViewById<LabeledInputView>(R.id.liv_api_hash)?.editText
+        assertNotNull("liv_api_hash should exist in view_settings.xml", etHash)
     }
 
     @Test
@@ -48,16 +48,16 @@ class SettingsKeypadRegistryTest {
         showSettingsMethod.invoke(activity)
         shadowOf(Looper.getMainLooper()).idle()
 
-        val etId = activity.findViewById<EditText>(R.id.et_api_id)
-        val etHash = activity.findViewById<EditText>(R.id.et_api_hash)
+        val etId = activity.findViewById<LabeledInputView>(R.id.liv_api_id)?.editText
+        val etHash = activity.findViewById<LabeledInputView>(R.id.liv_api_hash)?.editText
         val tvMode = activity.findViewById<TextView>(R.id.tv_settings_input_mode)
 
-        assertNotNull("et_api_id should be present on Settings screen", etId)
-        assertNotNull("et_api_hash should be present on Settings screen", etHash)
+        assertNotNull("liv_api_id should be present on Settings screen", etId)
+        assertNotNull("liv_api_hash should be present on Settings screen", etHash)
         assertNotNull("tv_settings_input_mode should be present on Settings screen", tvMode)
 
         // Focus et_api_id (Numeric mode)
-        etId.requestFocus()
+        etId!!.requestFocus()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals("[#] 123", tvMode.text.toString())
 
@@ -71,7 +71,7 @@ class SettingsKeypadRegistryTest {
         assertTrue("Key event on et_api_id should be handled", handledDown1)
 
         // Focus et_api_hash (Lower mode)
-        etHash.requestFocus()
+        etHash!!.requestFocus()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals("[#] abc", tvMode.text.toString())
 
@@ -97,9 +97,10 @@ class SettingsKeypadRegistryTest {
         showSettingsMethod.invoke(activity)
         shadowOf(Looper.getMainLooper()).idle()
 
-        val etHash = activity.findViewById<EditText>(R.id.et_api_hash)
+        val etHash = activity.findViewById<LabeledInputView>(R.id.liv_api_hash)?.editText
         val tvMode = activity.findViewById<TextView>(R.id.tv_settings_input_mode)
-        etHash.requestFocus()
+        assertNotNull("liv_api_hash should be present on Settings screen", etHash)
+        etHash!!.requestFocus()
         shadowOf(Looper.getMainLooper()).idle()
 
         // Toggle mode with POUND (#)
