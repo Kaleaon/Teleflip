@@ -360,30 +360,9 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent != null) {
-            intent.data?.let { uri ->
-                if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
-                    telegramManager.handleDeepLinkProxy(uri)
-                }
-            }
-            val targetOpenChatId = intent.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L)
-            if (targetOpenChatId != 0L) {
-                pendingTargetChatId = targetOpenChatId
-                if (!PasscodeManager.isLocked(this) && telegramManager.authState.value is AuthState.Ready) {
-                    val targetChat =
-                        telegramManager.chats.value.find { it.id == targetOpenChatId }
-                            ?: ChatModel(
-                                id = targetOpenChatId,
-                                title = "Chat #$targetOpenChatId",
-                                lastMessage = "",
-                                time = "",
-                                unreadCount = 0,
-                                chatType = ChatType.DIRECT,
-                                avatarLetters = "TG",
-                            )
-                    pendingTargetChatId = 0L
-                    openConversation(targetChat)
-                }
+        intent?.data?.let { uri ->
+            if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
+                telegramManager.handleDeepLinkProxy(uri)
             }
         }
         val targetOpenChatId = intent?.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L) ?: 0L
