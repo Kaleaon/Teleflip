@@ -76,17 +76,19 @@ class ChatExportDialog(
             dismiss()
         }
 
-        val tvSoftkeyLeft = findViewById<TextView>(R.id.tv_softkey_left)
-        val tvSoftkeyCenter = findViewById<TextView>(R.id.tv_softkey_center)
-        val tvSoftkeyRight = findViewById<TextView>(R.id.tv_softkey_right)
-
-        tvSoftkeyLeft?.text = "Start"
-        tvSoftkeyCenter?.text = "Toggle"
-        tvSoftkeyRight?.text = "Cancel"
-
-        tvSoftkeyLeft?.setOnClickListener { startExport() }
-        tvSoftkeyCenter?.setOnClickListener { currentFocus?.performClick() }
-        tvSoftkeyRight?.setOnClickListener { dismiss() }
+        setupSoftkeys(
+            left = "Start",
+            center = "Toggle",
+            right = "Cancel",
+            onLeft = { startExport() },
+            onCenter = {
+                val focused = currentFocus
+                if (focused != null && focused.isEnabled) {
+                    focused.performClick()
+                }
+            },
+            onRight = { dismiss() },
+        )
 
         btnText?.requestFocus()
         btnText?.post {

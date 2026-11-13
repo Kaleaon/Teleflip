@@ -170,6 +170,35 @@ class MediaViewerDialog(
                 setupPhoto(filePath, fileExists)
             }
         }
+
+        setupViewerSoftkeys()
+    }
+
+    private fun setupViewerSoftkeys() {
+        if (isVideoMedia) {
+            setupSoftkeys(
+                left = "Restart",
+                center = "Play/Pause",
+                right = "Back",
+                onLeft = {
+                    vvVideo?.seekTo(0)
+                    vvVideo?.start()
+                    isVideoPlaying = true
+                    updateSpeedBadge()
+                },
+                onCenter = { toggleVideoPlayback() },
+                onRight = { dismiss() },
+            )
+        } else {
+            setupSoftkeys(
+                left = "Zoom",
+                center = "Save",
+                right = "Back",
+                onLeft = { cycleZoomIn() },
+                onCenter = { onSaveMedia(message) },
+                onRight = { dismiss() },
+            )
+        }
     }
 
     private fun setupPhoto(

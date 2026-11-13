@@ -35,7 +35,6 @@ class SymbolsDialog(
     internal val visibleSymbols: List<String>
         get() = getCurrentPageSymbols()
 
-    private var softkeyManager: SoftkeyManager? = null
     private var adapter: SymbolAdapter? = null
     private var tvHeader: TextView? = null
     private var rvGrid: RecyclerView? = null
@@ -52,24 +51,14 @@ class SymbolsDialog(
         rvGrid?.layoutManager = GridLayoutManager(context, COLUMNS)
         rvGrid?.adapter = adapter
 
-        val tvLeft = findViewById<TextView>(R.id.tv_softkey_left)
-        val tvCenter = findViewById<TextView>(R.id.tv_softkey_center)
-        val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
-        val softkeyBar = findViewById<View>(R.id.softkey_bar)
-
-        if (tvLeft != null && tvCenter != null && tvRight != null) {
-            softkeyManager =
-                SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight).apply {
-                    update(
-                        left = "Page",
-                        center = "Select",
-                        right = "Back",
-                        onLeft = { nextPage() },
-                        onCenter = { selectCurrentFocusedSymbol() },
-                        onRight = { dismiss() },
-                    )
-                }
-        }
+        setupSoftkeys(
+            left = "Page",
+            center = "Select",
+            right = "Back",
+            onLeft = { nextPage() },
+            onCenter = { selectCurrentFocusedSymbol() },
+            onRight = { dismiss() },
+        )
 
         updatePageUI()
     }

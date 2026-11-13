@@ -112,6 +112,23 @@ class PollDialog(
                 layoutStep1?.visibility = View.VISIBLE
                 layoutStep2?.visibility = View.GONE
                 tvStepTitle?.text = "📊 Create Poll (Step 1/2)"
+                softkeyManager?.update(
+                    left = "Clear",
+                    center = "Next",
+                    right = "Cancel",
+                    onLeft = {
+                        val focusedEdit = currentFocus as? EditText
+                        if (focusedEdit != null) {
+                            engines[focusedEdit.id]?.commitCurrentChar()
+                            focusedEdit.setText("")
+                        }
+                    },
+                    onCenter = { btnNext?.performClick() },
+                    onRight = {
+                        engines.values.forEach { it.commitCurrentChar() }
+                        dismiss()
+                    },
+                )
             } else {
                 layoutStep1?.visibility = View.GONE
                 layoutStep2?.visibility = View.VISIBLE
@@ -129,6 +146,26 @@ class PollDialog(
                     layoutQuizSettings?.visibility = View.GONE
                     layoutRegularSettings?.visibility = View.VISIBLE
                 }
+
+                softkeyManager?.update(
+                    left = "Clear",
+                    center = "Send",
+                    right = "Back",
+                    onLeft = {
+                        val focusedEdit = currentFocus as? EditText
+                        if (focusedEdit != null) {
+                            engines[focusedEdit.id]?.commitCurrentChar()
+                            focusedEdit.setText("")
+                        }
+                    },
+                    onCenter = { btnSubmit?.performClick() },
+                    onRight = {
+                        engines.values.forEach { it.commitCurrentChar() }
+                        currentStep = 1
+                        updateStepVisibility()
+                        etQuestion?.requestFocus()
+                    },
+                )
             }
         }
 
@@ -212,6 +249,36 @@ class PollDialog(
                 )
             }
         }
+
+        setupSoftkeys(
+            left = "Clear",
+            center = "Next",
+            right = "Cancel",
+            onLeft = {
+                val focusedEdit = currentFocus as? EditText
+                if (focusedEdit != null) {
+                    engines[focusedEdit.id]?.commitCurrentChar()
+                    focusedEdit.setText("")
+                }
+            },
+            onCenter = {
+                if (currentStep == 1) {
+                    btnNext?.performClick()
+                } else {
+                    btnSubmit?.performClick()
+                }
+            },
+            onRight = {
+                engines.values.forEach { it.commitCurrentChar() }
+                if (currentStep == 2) {
+                    currentStep = 1
+                    updateStepVisibility()
+                    etQuestion?.requestFocus()
+                } else {
+                    dismiss()
+                }
+            },
+        )
 
         updateStepVisibility()
         etQuestion?.requestFocus()

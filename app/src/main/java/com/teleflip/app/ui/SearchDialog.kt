@@ -47,8 +47,6 @@ class SearchDialog(
     private lateinit var tvEmptyTitle: TextView
     private lateinit var progressBar: ProgressBar
 
-    private var softkeyManager: SoftkeyManager? = null
-
     private var keypadEngine: KeypadInputEngine? = null
 
     private var chatAdapter: ChatListAdapter? = null
@@ -86,16 +84,12 @@ class SearchDialog(
         tvEmptyTitle = findViewById(R.id.tv_search_empty_title)
         progressBar = findViewById(R.id.progress_search)
 
-        val tvSoftkeyLeft: TextView = findViewById(R.id.tv_search_softkey_left)
-        val tvSoftkeyCenter: TextView = findViewById(R.id.tv_search_softkey_center)
-        val tvSoftkeyRight: TextView = findViewById(R.id.tv_search_softkey_right)
-
-        softkeyManager = SoftkeyManager(tvSoftkeyLeft, tvSoftkeyCenter, tvSoftkeyRight)
-        softkeyManager?.update(
+        setupSoftkeys(
             left = "Clear",
             center = "Select",
             right = "Back",
             onLeft = {
+                keypadEngine?.commitCurrentChar()
                 etSearchInput.setText("")
                 etSearchInput.requestFocus()
             },
@@ -103,6 +97,7 @@ class SearchDialog(
                 handleCenterPress()
             },
             onRight = {
+                keypadEngine?.commitCurrentChar()
                 dismiss()
             },
         )
@@ -156,6 +151,19 @@ class SearchDialog(
         setupTabs()
         setupSearchInput()
         setupPagination()
+
+        setupSoftkeys(
+            left = "Clear",
+            center = "Select",
+            right = "Back",
+            onLeft = {
+                etSearchInput.setText("")
+                etSearchInput.requestFocus()
+            },
+            onRight = {
+                dismiss()
+            },
+        )
 
         selectTab(SearchTab.CHATS)
 
@@ -455,6 +463,7 @@ class SearchDialog(
         }
 
         if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+            keypadEngine?.commitCurrentChar()
             etSearchInput.setText("")
             etSearchInput.requestFocus()
             return true
