@@ -71,6 +71,7 @@ import com.teleflip.app.ui.ChatExportDialog
 import com.teleflip.app.ui.ChatExportProgressDialog
 import com.teleflip.app.ui.ChatListAdapter
 import com.teleflip.app.ui.ChatNotificationSettingsDialog
+import com.teleflip.app.ui.GifStickerPickerDialog
 import com.teleflip.app.ui.MediaViewerDialog
 import com.teleflip.app.ui.MenuOption
 import com.teleflip.app.ui.MessageAdapter
@@ -2040,7 +2041,23 @@ class MainActivity : AppCompatActivity() {
             context = this,
             message = msg,
             messageUpdates = telegramManager.messages,
-            onSaveMedia = { targetMsg -> saveMessageToDevice(targetMsg) },
+            onSaveMedia = { targetMsg ->
+                if (targetMsg.mediaType == MediaType.STICKER) {
+                    telegramManager.saveSticker(
+                        fileId = targetMsg.mediaFileId,
+                        emoji = targetMsg.stickerEmoji,
+                        filePath = targetMsg.mediaFilePath,
+                    )
+                } else if (targetMsg.mediaType == MediaType.ANIMATION) {
+                    telegramManager.saveGif(
+                        fileId = targetMsg.mediaFileId,
+                        duration = targetMsg.durationSeconds,
+                        caption = targetMsg.mediaCaption.ifBlank { targetMsg.text },
+                        filePath = targetMsg.mediaFilePath,
+                    )
+                }
+                saveMessageToDevice(targetMsg)
+            },
             onRequestDownload = { fileId ->
                 telegramManager.downloadFilePriority(fileId)
                 showToast("Prioritizing media download...")
@@ -2411,13 +2428,18 @@ class MainActivity : AppCompatActivity() {
             },
         )
         options.add(
+            MenuOption(options.size + 1, "🎞️ Open GIFs") {
+                showGifStickerPickerDialog(chat, initialIsGif = true)
+            },
+        )
+        options.add(
             MenuOption(options.size + 1, "🎨 Send Sticker") {
-                showStickerPickerMenu(chat)
+                showGifStickerPickerDialog(chat, initialIsGif = false)
             },
         )
         options.add(
             MenuOption(options.size + 1, "🎞️ Send GIF / Animation") {
-                showGifPickerMenu(chat)
+                showGifStickerPickerDialog(chat, initialIsGif = true)
             },
         )
         if (chat.chatType == ChatType.BOT || chat.chatType == ChatType.GROUP) {
@@ -3818,7 +3840,20 @@ class MainActivity : AppCompatActivity() {
         OptionsMenuDialog(this, title, options).show()
     }
 
-    private fun showStickerPickerMenu(chat: ChatModel) {
+    private fun showGifStickerPickerDialog(
+        chat: ChatModel,
+        initialIsGif: Boolean = true,
+    ) {
+        commitActiveInputEngines()
+        GifStickerPickerDialog(
+            context = this,
+            chat = chat,
+            telegramManager = telegramManager,
+            initialIsGif = initialIsGif,
+        ).show()
+    }
+
+    internal fun showStickerPickerMenu(chat: ChatModel) {
         val rootOptions = mutableListOf<MenuOption>()
 
         rootOptions.add(
@@ -3903,7 +3938,7 @@ class MainActivity : AppCompatActivity() {
         OptionsMenuDialog(this, "Popular Stickers", options).show()
     }
 
-    private fun showGifPickerMenu(chat: ChatModel) {
+    internal fun showGifPickerMenu(chat: ChatModel) {
         val rootOptions = mutableListOf<MenuOption>()
 
         rootOptions.add(
@@ -4312,6 +4347,38 @@ class MainActivity : AppCompatActivity() {
             options.add(
                 MenuOption(options.size + 1, "📊 Vote / Manage Poll") {
                     showPollVoteMenu(msg)
+                },
+            )
+        }
+        if (msg.mediaType == MediaType.STICKER) {
+            options.add(
+                MenuOption(options.size + 1, "⭐ Save Sticker") {
+                    telegramManager.saveSticker(
+                        fileId = msg.mediaFileId,
+                        emoji = msg.stickerEmoji,
+                        setName = "",
+                        filePath = msg.mediaFilePath,
+                    ) { success ->
+                        runOnUiThread {
+                            showToast(if (success) "Sticker saved" else "Could not save sticker")
+                        }
+                    }
+                },
+            )
+        }
+        if (msg.mediaType == MediaType.ANIMATION) {
+            options.add(
+                MenuOption(options.size + 1, "💾 Save GIF") {
+                    telegramManager.saveGif(
+                        fileId = msg.mediaFileId,
+                        duration = msg.durationSeconds,
+                        caption = msg.mediaCaption.ifBlank { msg.text },
+                        filePath = msg.mediaFilePath,
+                    ) { success ->
+                        runOnUiThread {
+                            showToast(if (success) "GIF saved" else "Could not save GIF")
+                        }
+                    }
                 },
             )
         }
