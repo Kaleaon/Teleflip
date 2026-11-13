@@ -6003,9 +6003,9 @@ class TelegramManager(
                 ProxyStorage.deleteProxy(context, proxyId)
                 ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
                 activeProxyId = added.id
-                callback?.invoke(true, null)
+                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
             } catch (e: Exception) {
-                callback?.invoke(false, e.message ?: "Could not enable proxy")
+                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not enable proxy") }
             }
         }
     }
