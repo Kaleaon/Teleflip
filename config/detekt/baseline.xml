@@ -67,7 +67,6 @@
     <ID>CyclomaticComplexMethod:PollDialog.kt$PollDialog$override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>CyclomaticComplexMethod:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:StorageManager.kt$StorageManager$private fun performSdCardDetection(context: Context): File?</ID>
-    <ID>CyclomaticComplexMethod:SymbolsDialog.kt$SymbolsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:TelegramFeatureMenus.kt$TelegramFeatureMenus$fun buttons(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun fetchCustomEmojiStickers(onResult: (List&lt;StickerItem&gt;) -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
@@ -333,7 +332,6 @@
     <ID>NestedBlockDepth:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>NestedBlockDepth:SearchDialog.kt$SearchDialog$private fun handleCenterPress(): Boolean</ID>
     <ID>NestedBlockDepth:StorageManager.kt$StorageManager$private fun performSdCardDetection(context: Context): File?</ID>
-    <ID>NestedBlockDepth:SymbolsDialog.kt$SymbolsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:AccessibilityActionManager.kt$AccessibilityActionManager$@Suppress("UNCHECKED_CAST") fun &lt;T : Any&gt; bindActions( view: View, item: T?, listener: AccessibilityActionListener&lt;T&gt;? = null, )</ID>
     <ID>ReturnCount:AdbReporter.kt$AdbReporter$private fun readTailLines( file: File, maxLines: Int, ): List&lt;String&gt;</ID>
     <ID>ReturnCount:ChatExportDialog.kt$ChatExportDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
