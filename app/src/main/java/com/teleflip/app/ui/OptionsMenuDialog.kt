@@ -46,7 +46,27 @@ class OptionsMenuDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_options_menu)
-        setupDismissKeys()
+        setupSoftkeys(
+            left = "",
+            center = "Select",
+            right = "Close",
+            onLeft = null,
+            onCenter = {
+                val focused = currentFocus
+                val rv = findViewById<RecyclerView>(R.id.rv_menu_options)
+                if (focused != null && rv != null) {
+                    val itemView = rv.findContainingItemView(focused)
+                    if (itemView != null) {
+                        val pos = rv.getChildAdapterPosition(itemView)
+                        if (pos in options.indices) {
+                            dismiss()
+                            options[pos].action.invoke()
+                        }
+                    }
+                }
+            },
+            onRight = { dismiss() },
+        )
 
         findViewById<TextView>(R.id.tv_menu_title)?.text = title
 
@@ -89,11 +109,6 @@ class OptionsMenuDialog(
             }
         }
 
-        // Back or Soft Right closes menu
-        if (isBackOrRightSoftKey(keyCode)) {
-            dismiss()
-            return true
-        }
         return super.onKeyDown(keyCode, event)
     }
 

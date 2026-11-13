@@ -5996,16 +5996,37 @@ class TelegramManager(
         proxyId: Int,
         callback: ((Boolean, String?) -> Unit)? = null,
     ) {
+        ProxyStorage.enableProxy(context, proxyId)
+        val item = ProxyStorage.getProxies(context).find { it.id == proxyId }
+        if (item == null) {
+            callback?.invoke(false, "Proxy not found")
+            return
+        }
+
+        if (tdClient == null) {
+            activeProxyId = proxyId
+            callback?.invoke(true, "Proxy enabled locally")
+            return
+        }
+
         scope.launch {
             try {
-                val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
-                val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
-                ProxyStorage.deleteProxy(context, proxyId)
-                ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
-                activeProxyId = added.id
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                val tdProxy = buildTdApiProxy(item)
+                val addResult = sendQuery(TdApi.AddProxy(tdProxy, true, ""))
+                val realId = if (addResult is TdApi.AddedProxy) addResult.id else proxyId
+                val enableResult = sendQuery(TdApi.EnableProxy(realId))
+                if (enableResult is TdApi.Ok) {
+                    activeProxyId = realId
+                    if (_connectionState.value == "Online" || _connectionState.value == "Connecting...") {
+                        _connectionState.value = "Online via Proxy"
+                    }
+                    callback?.invoke(true, null)
+                } else {
+                    callback?.invoke(false, "Failed to enable proxy in TDLib")
+                }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not enable proxy") }
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Error enabling proxy: ${e.message}")
+                callback?.invoke(false, e.message ?: "Failed to enable proxy")
             }
         }
     }

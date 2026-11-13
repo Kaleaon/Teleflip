@@ -248,7 +248,6 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$3000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300_000</ID>
-    <ID>MagicNumber:TelegramManager.kt$TelegramManager$31536000</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$32</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$4</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$40</ID>
@@ -351,7 +350,6 @@
     <ID>ReturnCount:MediaViewerDialog.kt$MediaViewerDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:NewChatDialog.kt$NewChatDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:OptionsMenuDialog.kt$OptionsMenuDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
-    <ID>ReturnCount:PollDialog.kt$PollDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:ProxySettingsDialog.kt$ProxySettingsDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>ReturnCount:ProxyStorage.kt$ProxyStorage$@Synchronized fun getProxies(context: Context): List&lt;ProxyItem&gt;</ID>
     <ID>ReturnCount:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>

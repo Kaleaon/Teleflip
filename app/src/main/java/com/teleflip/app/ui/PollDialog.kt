@@ -46,7 +46,6 @@ class PollDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_create_poll)
-        setupDismissKeys()
 
         val tvStepTitle = findViewById<TextView>(R.id.tv_poll_step_title)
         val tvMode = findViewById<TextView>(R.id.tv_poll_input_mode)
@@ -130,6 +129,7 @@ class PollDialog(
                     layoutRegularSettings?.visibility = View.VISIBLE
                 }
             }
+            updatePollSoftkeys()
         }
 
         btnNext?.setOnClickListener {
@@ -224,9 +224,64 @@ class PollDialog(
             findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
             findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
             findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
+            updatePollSoftkeys()
             findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
         } else {
             dismiss()
+        }
+    }
+
+    private fun updatePollSoftkeys() {
+        val btnNext = findViewById<Button>(R.id.btn_poll_next)
+        val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
+        if (currentStep == 1) {
+            setupSoftkeys(
+                left = "Clear",
+                center = "Next",
+                right = "Cancel",
+                onLeft = {
+                    val focusedEdit = currentFocus as? EditText
+                    if (focusedEdit != null) {
+                        engines[focusedEdit.id]?.commitCurrentChar()
+                        focusedEdit.setText("")
+                    }
+                },
+                onCenter = {
+                    val focused = currentFocus
+                    if (focused is Button) {
+                        focused.performClick()
+                    } else {
+                        btnNext?.performClick()
+                    }
+                },
+                onRight = {
+                    onBackPressed()
+                },
+            )
+        } else {
+            setupSoftkeys(
+                left = "Clear",
+                center = "Submit",
+                right = "Back",
+                onLeft = {
+                    val focusedEdit = currentFocus as? EditText
+                    if (focusedEdit != null) {
+                        engines[focusedEdit.id]?.commitCurrentChar()
+                        focusedEdit.setText("")
+                    }
+                },
+                onCenter = {
+                    val focused = currentFocus
+                    if (focused is Button) {
+                        focused.performClick()
+                    } else {
+                        btnSubmit?.performClick()
+                    }
+                },
+                onRight = {
+                    onBackPressed()
+                },
+            )
         }
     }
 
@@ -235,38 +290,35 @@ class PollDialog(
         event: KeyEvent,
     ): Boolean {
         if (isBackOrRightSoftKey(keyCode)) {
-            engines.values.forEach { it.commitCurrentChar() }
-            if (currentStep == 2) {
-                currentStep = 1
-                findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
-                findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
-                findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
-                findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
-            } else {
-                dismiss()
-            }
+            onBackPressed()
             return true
         }
 
         val focusedEdit = currentFocus as? EditText
-        if (focusedEdit != null) {
-            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
-                engines[focusedEdit.id]?.commitCurrentChar()
-                focusedEdit.setText("")
-                return true
+        val handledInput =
+            if (focusedEdit != null) {
+                val isInputKey =
+                    (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                        keyCode in INPUT_KEYCODES
+                val handled = isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true
+                if (!handled) {
+                    engines[focusedEdit.id]?.commitCurrentChar()
+                }
+                handled
+            } else {
+                false
             }
-            val isInputKey =
-                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
-                    keyCode == KeyEvent.KEYCODE_STAR ||
-                    keyCode == KeyEvent.KEYCODE_POUND ||
-                    keyCode == KeyEvent.KEYCODE_DEL ||
-                    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-            if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
-                return true
-            }
-            engines[focusedEdit.id]?.commitCurrentChar()
-        }
 
-        return super.onKeyDown(keyCode, event)
+        return handledInput || super.onKeyDown(keyCode, event)
+    }
+
+    companion object {
+        private val INPUT_KEYCODES =
+            setOf(
+                KeyEvent.KEYCODE_STAR,
+                KeyEvent.KEYCODE_POUND,
+                KeyEvent.KEYCODE_DEL,
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+            )
     }
 }

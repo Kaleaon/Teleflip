@@ -231,4 +231,6 @@
 
     </LinearLayout>
 
+    <include layout="@layout/layout_softkeys" />
+
 </LinearLayout>
