@@ -6134,7 +6134,7 @@ class TelegramManager(
                     if (success) {
                         retryConnection()
                     }
-                    val activeProxy = if (success) ProxyStorage.getEnabledProxy(context) ?: bestProxy else bestProxy
+                    val activeProxy = ProxyStorage.getEnabledProxy(context) ?: bestProxy
                     callback?.invoke(activeProxy, pingMs)
                 }
             } else {
