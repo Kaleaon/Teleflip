@@ -27,6 +27,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowLooper
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -271,7 +272,12 @@ class ProxyManagerTest {
             latch.countDown()
         }
 
-        assertTrue(latch.await(4, java.util.concurrent.TimeUnit.SECONDS))
+        val deadline = System.currentTimeMillis() + 4000
+        while (latch.count > 0 && System.currentTimeMillis() < deadline) {
+            ShadowLooper.idleMainLooper(50, java.util.concurrent.TimeUnit.MILLISECONDS)
+            Thread.sleep(50)
+        }
+        assertEquals(0, latch.count)
         assertNotNull(selectedProxy)
         assertEquals("fast.proxy.com", selectedProxy?.server)
         assertEquals(100L, selectedLatency)
@@ -334,7 +340,12 @@ class ProxyManagerTest {
             latch.countDown()
         }
 
-        assertTrue(latch.await(4, java.util.concurrent.TimeUnit.SECONDS))
+        val deepLinkDeadline = System.currentTimeMillis() + 4000
+        while (latch.count > 0 && System.currentTimeMillis() < deepLinkDeadline) {
+            ShadowLooper.idleMainLooper(50, java.util.concurrent.TimeUnit.MILLISECONDS)
+            Thread.sleep(50)
+        }
+        assertEquals(0, latch.count)
         assertTrue(successResult)
 
         val enabled = ProxyStorage.getEnabledProxy(context)
