@@ -132,6 +132,18 @@ class TelegramManager(
     private val _activeCall = MutableStateFlow<ActiveCall?>(null)
     val activeCall: StateFlow<ActiveCall?> = _activeCall.asStateFlow()
 
+    private val _contacts = MutableStateFlow<List<ContactModel>>(emptyList())
+    val contacts: StateFlow<List<ContactModel>> = _contacts.asStateFlow()
+
+    var syncContactsEnabled: Boolean
+        get() = prefs.getBoolean("pref_sync_contacts", true)
+        set(value) {
+            prefs.edit().putBoolean("pref_sync_contacts", value).apply()
+            if (value && authState.value is AuthState.Ready) {
+                syncContacts()
+            }
+        }
+
     private val callDispatcher by lazy { callTaskDispatcher ?: Executors.newSingleThreadExecutor { task -> Thread(task, "TeleFlipCall").apply { isDaemon = true } }.asCoroutineDispatcher() }
     private val callAudio by lazy { audioFactory(context) }
     private val callTonePlayer by lazy { tonePlayerFactory(context) }
@@ -3192,10 +3204,22 @@ class TelegramManager(
     // =========================================================================
     // Contact Management
     // =========================================================================
-    fun loadContacts(onResult: (List<ContactModel>) -> Unit) {
+    fun loadContacts(onResult: ((List<ContactModel>) -> Unit)? = null) {
         val client = tdClient
         if (client == null) {
-            onResult(emptyList())
+            val fallbackContacts =
+                _chats.value.filter { it.chatType == ChatType.DIRECT }.map {
+                    ContactModel(
+                        userId = it.id,
+                        firstName = it.title,
+                        lastName = "",
+                        phoneNumber = "",
+                        username = "",
+                        isOnline = false,
+                    )
+                }
+            _contacts.value = fallbackContacts
+            onResult?.invoke(fallbackContacts)
             return
         }
 
@@ -3203,7 +3227,8 @@ class TelegramManager(
             if (obj is TdApi.Users) {
                 val userIds = obj.userIds
                 if (userIds.isEmpty()) {
-                    scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+                    _contacts.value = emptyList()
+                    scope.launch(Dispatchers.Main) { onResult?.invoke(emptyList()) }
                     return@send
                 }
                 val contacts = mutableListOf<ContactModel>()
@@ -3225,12 +3250,108 @@ class TelegramManager(
                         }
                         if (latch.decrementAndGet() == 0) {
                             val sorted = contacts.sortedBy { "${it.firstName} ${it.lastName}".trim().lowercase() }
-                            scope.launch(Dispatchers.Main) { onResult(sorted) }
+                            _contacts.value = sorted
+                            scope.launch(Dispatchers.Main) { onResult?.invoke(sorted) }
                         }
                     }
                 }
             } else {
-                scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+                _contacts.value = emptyList()
+                scope.launch(Dispatchers.Main) { onResult?.invoke(emptyList()) }
+            }
+        }
+    }
+
+    fun syncContacts(onComplete: ((Boolean, Int) -> Unit)? = null) {
+        if (!syncContactsEnabled) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "Contact sync disabled in settings")
+            onComplete?.invoke(false, 0)
+            return
+        }
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.READ_CONTACTS,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "READ_CONTACTS permission not granted; skipping contact sync")
+            onComplete?.invoke(false, 0)
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val contentResolver = context.contentResolver
+                val projection =
+                    arrayOf(
+                        android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER,
+                        android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    )
+                val cursor =
+                    contentResolver.query(
+                        android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                        projection,
+                        null,
+                        null,
+                        null,
+                    )
+                val importedList = mutableListOf<TdApi.ImportedContact>()
+                val seenPhones = mutableSetOf<String>()
+                cursor?.use { c ->
+                    val numIdx = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                    val nameIdx = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                    while (c.moveToNext()) {
+                        val rawNum = if (numIdx >= 0) c.getString(numIdx) else null
+                        val rawName = if (nameIdx >= 0) c.getString(nameIdx) else null
+                        if (rawNum.isNullOrBlank()) continue
+                        val cleanPhone = org.telegram.PhoneFormat.PhoneFormat.stripExceptNumbers(rawNum, true) ?: continue
+                        if (cleanPhone.isBlank()) continue
+                        val normalizedPhone = if (!cleanPhone.startsWith("+")) "+$cleanPhone" else cleanPhone
+                        if (seenPhones.add(normalizedPhone)) {
+                            val nameStr = rawName?.trim().orEmpty()
+                            val parts = nameStr.split("\\s+".toRegex(), 2)
+                            val first = parts.getOrNull(0)?.ifBlank { normalizedPhone } ?: normalizedPhone
+                            val last = parts.getOrNull(1) ?: ""
+                            importedList.add(
+                                TdApi.ImportedContact().apply {
+                                    phoneNumber = normalizedPhone
+                                    firstName = first
+                                    lastName = last
+                                },
+                            )
+                        }
+                    }
+                }
+                if (importedList.isEmpty()) {
+                    com.teleflip.app.report.AdbReporter.reportInfo(tag, "No contacts found in device phonebook to sync")
+                    withContext(Dispatchers.Main) { onComplete?.invoke(true, 0) }
+                    return@launch
+                }
+                val client = tdClient
+                if (client == null) {
+                    com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib client null during contact sync")
+                    withContext(Dispatchers.Main) { onComplete?.invoke(false, 0) }
+                    return@launch
+                }
+                val req = TdApi.ImportContacts(importedList.toTypedArray())
+                client.send(req) { obj ->
+                    scope.launch(Dispatchers.Main) {
+                        if (obj is TdApi.ImportedContacts) {
+                            com.teleflip.app.report.AdbReporter.reportInfo(
+                                tag,
+                                "Successfully imported ${importedList.size} contacts to Telegram",
+                            )
+                            loadContacts { onComplete?.invoke(true, importedList.size) }
+                        } else {
+                            com.teleflip.app.report.AdbReporter.reportError(
+                                tag,
+                                "ImportContacts returned unexpected object: $obj",
+                            )
+                            onComplete?.invoke(false, 0)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Error during phonebook contact sync", e)
+                withContext(Dispatchers.Main) { onComplete?.invoke(false, 0) }
             }
         }
     }
@@ -4822,6 +4943,7 @@ class TelegramManager(
                 loadCurrentUser()
                 loadChatFolders()
                 loadScopeNotificationSettings()
+                syncContacts()
             }
             TdApi.AuthorizationStateClosing.CONSTRUCTOR -> {
                 com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib is closing gracefully...")
@@ -5992,17 +6114,22 @@ class TelegramManager(
         }
     }
 
+    private suspend fun enableProxyInternal(proxyId: Int): ProxyItem? {
+        val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
+        val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
+        ProxyStorage.deleteProxy(context, proxyId)
+        val updated = ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
+        activeProxyId = added.id
+        return updated
+    }
+
     fun enableProxy(
         proxyId: Int,
         callback: ((Boolean, String?) -> Unit)? = null,
     ) {
         scope.launch {
             try {
-                val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
-                val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
-                ProxyStorage.deleteProxy(context, proxyId)
-                ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
-                activeProxyId = added.id
+                enableProxyInternal(proxyId)
                 withContext(Dispatchers.Main) { callback?.invoke(true, null) }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not enable proxy") }
@@ -6128,12 +6255,17 @@ class TelegramManager(
                     "Selected best proxy: ${bestProxy.server}:${bestProxy.port} with latency ${pingMs}ms",
                 )
 
-                enableProxy(bestProxy.id) { success, _ ->
-                    if (success) {
+                try {
+                    val updatedProxy = enableProxyInternal(bestProxy.id)
+                    val activeProxy = ProxyStorage.getEnabledProxy(context) ?: updatedProxy
+                    if (updatedProxy != null) {
                         retryConnection()
+                        callback?.invoke(activeProxy, pingMs)
+                    } else {
+                        callback?.invoke(null, null)
                     }
-                    val activeProxy = ProxyStorage.getEnabledProxy(context) ?: bestProxy
-                    callback?.invoke(activeProxy, pingMs)
+                } catch (_: Exception) {
+                    callback?.invoke(null, null)
                 }
             } else {
                 _failoverStatus.value = "🔴 Proxy failover: All stored proxies unreachable"
@@ -6181,16 +6313,15 @@ class TelegramManager(
         scope.launch {
             val ping = pingProxy(savedProxy, timeoutMs = 3000L)
             if (ping != null) {
-                enableProxy(savedProxy.id) { success, err ->
-                    if (success) {
-                        val msg = "🟢 Proxy deep-link activated: ${savedProxy.server}:${savedProxy.port} (${ping}ms)"
-                        _failoverStatus.value = msg
-                        callback?.invoke(true, msg)
-                    } else {
-                        val msg = "🔴 Failed to enable deep-link proxy: ${err ?: "Unknown error"}"
-                        _failoverStatus.value = msg
-                        callback?.invoke(false, msg)
-                    }
+                try {
+                    enableProxyInternal(savedProxy.id)
+                    val msg = "🟢 Proxy deep-link activated: ${savedProxy.server}:${savedProxy.port} (${ping}ms)"
+                    _failoverStatus.value = msg
+                    callback?.invoke(true, msg)
+                } catch (e: Exception) {
+                    val msg = "🔴 Failed to enable deep-link proxy: ${e.message ?: "Unknown error"}"
+                    _failoverStatus.value = msg
+                    callback?.invoke(false, msg)
                 }
             } else {
                 val msg = "🔴 Deep-link proxy failed latency ping test: ${savedProxy.server}:${savedProxy.port}"
