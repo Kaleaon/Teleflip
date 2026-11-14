@@ -17,6 +17,7 @@ class TeleFlipApp : Application() {
     override fun onCreate() {
         super.onCreate()
         ApplicationLoader.applicationContext = this
+        com.teleflip.app.storage.FallbackMediaResolver.applicationContext = this
         NotificationHelper.ensureChannels(this)
 
         val telegramManager = TelegramManager.getInstance(this)
