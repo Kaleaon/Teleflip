@@ -20,8 +20,8 @@ abstract class BaseDialog(
     context: Context,
     themeResId: Int = R.style.Theme_TeleFlip,
 ) : Dialog(context, themeResId) {
-    protected var softkeyManager: SoftkeyManager? = null
-        private set
+    var softkeyManager: SoftkeyManager? = null
+        protected set
 
     override fun show() {
         context.findMainActivity()?.captureFocusForDialog()

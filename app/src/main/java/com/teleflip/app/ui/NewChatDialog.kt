@@ -3,9 +3,11 @@ package com.teleflip.app.ui
 import android.content.Context
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
+import androidx.core.widget.doAfterTextChanged
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 
@@ -36,6 +38,15 @@ class NewChatDialog(
         val btnSecret = findViewById<Button>(R.id.btn_start_secret_chat)
         val btnCancel = findViewById<Button>(R.id.btn_cancel_new_chat)
 
+        val softkeyBar = findViewById<View>(R.id.softkey_bar)
+        val tvLeft = findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
+
+        if (tvLeft != null && tvCenter != null && tvRight != null) {
+            softkeyManager = SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight)
+        }
+
         etInput = input
         this.btnDirect = btnDirect
 
@@ -50,23 +61,6 @@ class NewChatDialog(
                     },
                 )
         }
-
-        setupSoftkeys(
-            left = "Clear",
-            center = "Select",
-            right = "Back",
-            onLeft = {
-                keypadEngine?.commitCurrentChar()
-                etInput?.setText("")
-            },
-            onCenter = {
-                handleCenterAction()
-            },
-            onRight = {
-                keypadEngine?.commitCurrentChar()
-                dismiss()
-            },
-        )
 
         btnDirect?.setOnClickListener {
             keypadEngine?.commitCurrentChar()
@@ -107,7 +101,21 @@ class NewChatDialog(
             dismiss()
         }
 
+        val focusListener = View.OnFocusChangeListener { _, _ -> updateSoftkeys() }
+        input?.onFocusChangeListener = focusListener
+        btnDirect?.onFocusChangeListener = focusListener
+        btnSaved?.onFocusChangeListener = focusListener
+        btnGroup?.onFocusChangeListener = focusListener
+        btnChannel?.onFocusChangeListener = focusListener
+        btnSecret?.onFocusChangeListener = focusListener
+        btnCancel?.onFocusChangeListener = focusListener
+
+        input?.doAfterTextChanged {
+            updateSoftkeys()
+        }
+
         btnDirect?.requestFocus()
+        updateSoftkeys()
     }
 
     private fun handleCenterAction() {
@@ -116,6 +124,48 @@ class NewChatDialog(
             focused.performClick()
         } else {
             btnDirect?.performClick()
+        }
+    }
+
+    private fun updateSoftkeys() {
+        val input = etInput
+        if (input?.hasFocus() == true) {
+            softkeyManager?.update(
+                left = "Clear",
+                center = "Start",
+                right = "Back",
+                onLeft = {
+                    keypadEngine?.commitCurrentChar()
+                    input.setText("")
+                },
+                onCenter = {
+                    btnDirect?.performClick()
+                },
+                onRight = {
+                    keypadEngine?.commitCurrentChar()
+                    dismiss()
+                },
+            )
+        } else {
+            val hasText = !input?.text.isNullOrEmpty()
+            softkeyManager?.update(
+                left = if (hasText) "Clear Input" else "",
+                center = "Select",
+                right = "Back",
+                onLeft = {
+                    if (hasText) {
+                        keypadEngine?.commitCurrentChar()
+                        input?.setText("")
+                    }
+                },
+                onCenter = {
+                    handleCenterAction()
+                },
+                onRight = {
+                    keypadEngine?.commitCurrentChar()
+                    dismiss()
+                },
+            )
         }
     }
 
@@ -133,6 +183,10 @@ class NewChatDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
+            return true
+        }
+
         if (isBackOrRightSoftKey(keyCode)) {
             keypadEngine?.commitCurrentChar()
             dismiss()

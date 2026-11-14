@@ -240,6 +240,8 @@ object StorageManager {
     fun setSelectedStorageType(
         context: Context,
         type: StorageLocationType,
+        telegramManager: com.teleflip.app.telegram.TelegramManager? = null,
+        onComplete: ((Boolean, String) -> Unit)? = null,
     ): Boolean {
         invalidateCache()
         if (type == StorageLocationType.SD_CARD && !isSdCardAvailable(context)) {
@@ -249,13 +251,16 @@ object StorageManager {
         val value = if (type == StorageLocationType.SD_CARD) "sd_card" else "internal"
         prefs.edit().putString(PREF_STORAGE_LOCATION, value).apply()
         invalidateCache()
+        telegramManager?.switchStorageLocation(type, onComplete ?: { _, _ -> })
         return true
     }
 
-    fun getFilesDirectory(context: Context): File {
-        val currentType = getSelectedStorageType(context)
+    fun getFilesDirectoryForType(
+        context: Context,
+        type: StorageLocationType,
+    ): File {
         val baseDir =
-            if (currentType == StorageLocationType.SD_CARD) {
+            if (type == StorageLocationType.SD_CARD) {
                 detectSdCardDirectory(context) ?: context.getExternalFilesDir(null) ?: context.filesDir
             } else {
                 context.getExternalFilesDir(null) ?: context.filesDir
@@ -265,6 +270,10 @@ object StorageManager {
             telegramDir.mkdirs()
         }
         return telegramDir
+    }
+
+    fun getFilesDirectory(context: Context): File {
+        return getFilesDirectoryForType(context, getSelectedStorageType(context))
     }
 
     fun getDownloadDirectory(context: Context): File {
