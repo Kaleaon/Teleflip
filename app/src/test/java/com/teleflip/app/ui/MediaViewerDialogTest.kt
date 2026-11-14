@@ -84,7 +84,8 @@ class MediaViewerDialogTest {
         val message = samplePhotoMessage.copy(mediaType = MediaType.PAID_MEDIA, mediaFilePath = null, isPaidMediaLocked = false, mediaMimeType = "video/mp4")
         val dialog = MediaViewerDialog(context, message, {}, {})
         dialog.show()
-        assertTrue(dialog.findViewById<TextView>(R.id.tv_viewer_controls_hint)!!.text.contains("Play/Pause"))
+        val centerSoftkey = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        assertEquals("Play", centerSoftkey.text.toString())
         dialog.onKeyDown(KeyEvent.KEYCODE_3, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_3))
         assertEquals(1.25f, dialog.playbackSpeed)
         dialog.dismiss()
@@ -127,7 +128,7 @@ class MediaViewerDialogTest {
         for (keyCode in dpadKeys) {
             val event = KeyEvent(KeyEvent.ACTION_DOWN, keyCode)
             val handled = dialog.onKeyDown(keyCode, event)
-            assertFalse("D-Pad key $keyCode should not be consumed when unzoomed", handled)
+            assertTrue("D-Pad key $keyCode should be consumed when unzoomed", handled)
             assertEquals(0f, dialog.panX)
             assertEquals(0f, dialog.panY)
         }
@@ -173,16 +174,19 @@ class MediaViewerDialogTest {
 
         // Unzoomed initially
         val rightEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)
-        assertFalse(dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, rightEvent))
+        assertTrue(dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, rightEvent))
+        assertEquals(0f, dialog.panX)
 
         // Zoom in
         dialog.cycleZoomIn()
         assertTrue(dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, rightEvent))
+        assertEquals(-48f, dialog.panX)
 
         // Reset zoom back to 1.0f
         dialog.resetZoomAndPan()
         assertEquals(1.0f, dialog.zoomLevel)
-        assertFalse(dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, rightEvent))
+        assertTrue(dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, rightEvent))
+        assertEquals(0f, dialog.panX)
 
         dialog.dismiss()
     }
@@ -264,6 +268,95 @@ class MediaViewerDialogTest {
 
         val badgeTextView = dialog.findViewById<TextView>(R.id.tv_viewer_zoom_badge)
         assertEquals("1.25x", badgeTextView.text.toString())
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun onKeyDown_dpadVerticalKeys_consumedDuringVideoPlayback() {
+        val message = createTestMessage(MediaType.VIDEO)
+        val dialog = MediaViewerDialog(context, message, {}, {})
+        dialog.show()
+
+        val upEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP)
+        val downEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN)
+
+        assertTrue("KEYCODE_DPAD_UP should be consumed in video mode", dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_UP, upEvent))
+        assertTrue("KEYCODE_DPAD_DOWN should be consumed in video mode", dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_DOWN, downEvent))
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun softkeyManager_configuresCorrectLabels_forPhotoVideoAndLockedMedia() {
+        // Photo mode
+        val photoDialog = MediaViewerDialog(context, samplePhotoMessage, {}, {})
+        photoDialog.show()
+        val photoLeft = photoDialog.findViewById<TextView>(R.id.tv_softkey_left)
+        val photoCenter = photoDialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val photoRight = photoDialog.findViewById<TextView>(R.id.tv_softkey_right)
+        assertEquals("Zoom", photoLeft.text.toString())
+        assertEquals("Zoom", photoCenter.text.toString())
+        assertEquals("Back", photoRight.text.toString())
+        photoDialog.dismiss()
+
+        // Video mode
+        val videoMessage = createTestMessage(MediaType.VIDEO)
+        val videoDialog = MediaViewerDialog(context, videoMessage, {}, {})
+        videoDialog.show()
+        val videoLeft = videoDialog.findViewById<TextView>(R.id.tv_softkey_left)
+        val videoCenter = videoDialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val videoRight = videoDialog.findViewById<TextView>(R.id.tv_softkey_right)
+        assertEquals("Restart", videoLeft.text.toString())
+        assertEquals("Play", videoCenter.text.toString())
+        assertEquals("Back", videoRight.text.toString())
+        videoDialog.dismiss()
+
+        // Locked media mode
+        val lockedMessage =
+            samplePhotoMessage.copy(
+                mediaType = MediaType.PAID_MEDIA,
+                isPaidMediaLocked = true,
+                starCount = 50,
+            )
+        val lockedDialog = MediaViewerDialog(context, lockedMessage, {}, {})
+        lockedDialog.show()
+        val lockedLeft = lockedDialog.findViewById<TextView>(R.id.tv_softkey_left)
+        val lockedCenter = lockedDialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val lockedRight = lockedDialog.findViewById<TextView>(R.id.tv_softkey_right)
+        assertEquals("", lockedLeft.text.toString())
+        assertEquals("", lockedCenter.text.toString())
+        assertEquals("Back", lockedRight.text.toString())
+        lockedDialog.dismiss()
+    }
+
+    @Test
+    fun softkeyManager_updatesCenterLabel_onPlaybackStateChange() {
+        val sampleVideoFile = tempFolder.newFile("sample_video_softkey.mp4")
+        FileOutputStream(sampleVideoFile).use { it.write("test content".toByteArray()) }
+
+        val videoMessage =
+            createTestMessage(MediaType.VIDEO).copy(
+                mediaFilePath = sampleVideoFile.absolutePath,
+            )
+        val dialog = MediaViewerDialog(context, videoMessage, {}, {})
+        dialog.show()
+
+        val centerText = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        assertEquals("Play", centerText.text.toString())
+
+        val mockPlayer = mock(MediaPlayer::class.java)
+        dialog.mediaPlayer = mockPlayer
+
+        // Toggle playback via center softkey
+        centerText.performClick()
+        assertEquals("Playing ▶", dialog.findViewById<TextView>(R.id.tv_viewer_zoom_badge).text.toString())
+        assertEquals("Pause", centerText.text.toString())
+
+        // Toggle again to pause
+        centerText.performClick()
+        assertEquals("Paused ⏸", dialog.findViewById<TextView>(R.id.tv_viewer_zoom_badge).text.toString())
+        assertEquals("Play", centerText.text.toString())
 
         dialog.dismiss()
     }

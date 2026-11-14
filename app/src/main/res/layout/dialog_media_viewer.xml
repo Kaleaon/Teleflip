@@ -220,15 +220,7 @@
             </LinearLayout>
         </HorizontalScrollView>
 
-        <TextView
-            android:id="@+id/tv_viewer_controls_hint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="[LSK/2] Zoom • [D-Pad] Pan • [5] Reset • [1] Save • [RSK] Back"
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp"
-            android:gravity="center" />
-
+        <include layout="@layout/layout_softkeys" />
     </LinearLayout>
 
 </LinearLayout>
