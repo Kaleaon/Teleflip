@@ -8,6 +8,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.widget.doAfterTextChanged
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 
@@ -82,6 +84,11 @@ class PollDialog(
 
         val editFields = listOfNotNull(etQuestion, etOpt1, etOpt2, etOpt3, etOpt4, etExplanation)
         editFields.forEach { field ->
+            field.doAfterTextChanged {
+                if (field.error != null) {
+                    field.error = null
+                }
+            }
             engines[field.id] =
                 KeypadInputEngine(
                     editText = field,
@@ -100,6 +107,42 @@ class PollDialog(
                 etOpt3?.text?.toString()?.trim(),
                 etOpt4?.text?.toString()?.trim(),
             ).filter { it.isNotBlank() }
+        }
+
+        fun validateStep1Inputs(): Boolean {
+            clearDialogError()
+            etQuestion?.error = null
+            etOpt1?.error = null
+            etOpt2?.error = null
+            etOpt3?.error = null
+            etOpt4?.error = null
+
+            val question = etQuestion?.text?.toString()?.trim().orEmpty()
+            val opt1 = etOpt1?.text?.toString()?.trim().orEmpty()
+            val opt2 = etOpt2?.text?.toString()?.trim().orEmpty()
+            val opts = getValidOptions()
+
+            if (question.isBlank()) {
+                val errorMsg = "Question cannot be empty"
+                etQuestion?.error = errorMsg
+                showDialogError("Please enter a poll question", etQuestion)
+                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                return false
+            } else if (opts.size < 2) {
+                val errorMsg = "At least 2 options required"
+                val targetField =
+                    when {
+                        opt1.isBlank() -> etOpt1
+                        opt2.isBlank() -> etOpt2
+                        else -> etOpt1
+                    }
+                targetField?.error = errorMsg
+                showDialogError("Please enter at least 2 poll options", targetField ?: etOpt1)
+                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                return false
+            }
+
+            return true
         }
 
         fun updateCorrectChoiceButtonText() {
@@ -138,22 +181,11 @@ class PollDialog(
 
         btnNext?.setOnClickListener {
             engines.values.forEach { it.commitCurrentChar() }
-            val question = etQuestion?.text?.toString()?.trim().orEmpty()
-            val opts = getValidOptions()
-
-            when {
-                question.isBlank() -> {
-                    showDialogError("Please enter a poll question", etQuestion)
-                }
-                opts.size < 2 -> {
-                    showDialogError("Please enter at least 2 poll options", etOpt1)
-                }
-                else -> {
-                    clearDialogError()
-                    currentStep = 2
-                    updateStepVisibility()
-                    btnModeToggle?.requestFocus()
-                }
+            if (validateStep1Inputs()) {
+                clearDialogError()
+                currentStep = 2
+                updateStepVisibility()
+                btnModeToggle?.requestFocus()
             }
         }
 
@@ -196,28 +228,29 @@ class PollDialog(
 
         btnSubmit?.setOnClickListener {
             engines.values.forEach { it.commitCurrentChar() }
+            if (!validateStep1Inputs()) {
+                return@setOnClickListener
+            }
             val question = etQuestion?.text?.toString()?.trim().orEmpty()
             val opts = getValidOptions()
             val explanation = etExplanation?.text?.toString()?.trim().orEmpty()
 
-            if (question.isNotBlank() && opts.size >= 2) {
-                dismiss()
-                val safeCorrectIndex =
-                    if (isQuiz && opts.isNotEmpty()) {
-                        correctOptionIndex.coerceIn(0, opts.size - 1)
-                    } else {
-                        -1
-                    }
-                onCreatePoll(
-                    question,
-                    opts,
-                    isAnonymous,
-                    isQuiz,
-                    safeCorrectIndex,
-                    if (isQuiz) explanation else "",
-                    if (!isQuiz) allowsMultipleAnswers else false,
-                )
-            }
+            dismiss()
+            val safeCorrectIndex =
+                if (isQuiz && opts.isNotEmpty()) {
+                    correctOptionIndex.coerceIn(0, opts.size - 1)
+                } else {
+                    -1
+                }
+            onCreatePoll(
+                question,
+                opts,
+                isAnonymous,
+                isQuiz,
+                safeCorrectIndex,
+                if (isQuiz) explanation else "",
+                if (!isQuiz) allowsMultipleAnswers else false,
+            )
         }
 
         updateStepVisibility()
