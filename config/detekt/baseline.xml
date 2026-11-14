@@ -163,7 +163,6 @@
     <ID>MagicNumber:MainActivity.kt$MainActivity$20</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$200</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$24</ID>
-    <ID>MagicNumber:MainActivity.kt$MainActivity$25</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$3</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$30</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$300L</ID>
@@ -248,7 +247,6 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$3000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$300_000</ID>
-    <ID>MagicNumber:TelegramManager.kt$TelegramManager$31536000</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$32</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$4</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$40</ID>
@@ -275,7 +273,6 @@
     <ID>MaxLineLength:CallAudioService.kt$CallAudioService$val end = PendingIntent.getService(this, 1, Intent(this, CallAudioService::class.java).setAction(END), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)</ID>
     <ID>MaxLineLength:CallAudioSession.kt$AndroidCallAudioSession$.</ID>
     <ID>MaxLineLength:ChatExportManager.kt$ChatExportManager$writer.write(""" &lt;a href="$relativeMedia" target="_blank"&gt;&lt;img class="media-img" src="$relativeMedia" alt="Photo" /&gt;&lt;/a&gt;""" + "\n")</ID>
-    <ID>MaxLineLength:KeypadFeatureUiTest.kt$KeypadFeatureUiTest$val message = MessageModel(1, 2, "Sender", "👋 secret", "", false, formatting = listOf(MessageFormatting(3, 6, "spoiler"), MessageFormatting(Int.MAX_VALUE, 8, "bold")))</ID>
     <ID>MaxLineLength:KeypadTextDialog.kt$KeypadTextDialog$inputType = if (numeric) InputType.TYPE_CLASS_NUMBER else InputType.TYPE_CLASS_TEXT or if (secret) InputType.TYPE_TEXT_VARIATION_PASSWORD else InputType.TYPE_TEXT_FLAG_MULTI_LINE</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$"Warning: Resetting your account will permanently delete your session and cloud messages for this account. This action cannot be undone. Are you sure you want to reset your account?"</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$.</ID>
@@ -312,13 +309,11 @@
     <ID>MaxLineLength:TelegramFeatures.kt$TelegramFeatures$it is TdApi.UserPrivacySettingRuleAllowAll || it is TdApi.UserPrivacySettingRuleAllowContacts || it is TdApi.UserPrivacySettingRuleRestrictAll || it is TdApi.UserPrivacySettingRuleRestrictContacts</ID>
     <ID>MaxLineLength:TelegramFeatures.kt$TelegramFeatures$messages.messages.filterNotNull().sortedBy { m -&gt; (m.schedulingState as? TdApi.MessageSchedulingStateSendAtDate)?.sendDate ?: Int.MAX_VALUE }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$TdApi.CallStateReady.CONSTRUCTOR -&gt; if (_activeCall.value?.callId == call.id &amp;&amp; _activeCall.value?.state == CallState.READY) CallState.READY else CallState.CONNECTING</ID>
-    <ID>MaxLineLength:TelegramManager.kt$TelegramManager$TdApi.MessageContact.CONSTRUCTOR -&gt; (content as TdApi.MessageContact).contact.let { "Contact: ${it.firstName} ${it.lastName}\n${it.phoneNumber}".trim() }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$check(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { "Microphone permission is required for calls" }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$current + (updateEdited.chatId to current[updateEdited.chatId].orEmpty().map { if (it.id == updateEdited.messageId) it.copy(hasBotButtons = hasButtons) else it })</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$if</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$if (current?.callId != call.id || current.state == CallState.ERROR || current.state == CallState.DISCARDED || current.state == CallState.HANGING_UP) return@launch</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$if (previous?.callId == call.id &amp;&amp; (previous.state == CallState.ERROR || previous.state == CallState.DISCARDED || previous.state == CallState.HANGING_UP) &amp;&amp; !terminalUpdate) return</ID>
-    <ID>MaxLineLength:TelegramManager.kt$TelegramManager$mediaFilePath = newMediaInfo.second ?: downloadedFilePaths[newMediaInfo.first] ?: old.mediaFilePath.takeIf { old.mediaFileId == newMediaInfo.first }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$private val callDispatcher by lazy { callTaskDispatcher ?: Executors.newSingleThreadExecutor { task -&gt; Thread(task, "TeleFlipCall").apply { isDaemon = true } }.asCoroutineDispatcher() }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$synchronized(pendingChats) { pendingChats[update.chatId]?.let { pendingChats[update.chatId] = it.copy(isMarkedUnread = update.isMarkedAsUnread) } }</ID>
     <ID>MaxLineLength:TelegramManager.kt$TelegramManager$val merged = (existing + convertedList).distinctBy { it.id }.map { it.copy(mediaFilePath = downloadedFilePaths[it.mediaFileId] ?: it.mediaFilePath) }.sortedBy { it.id }</ID>

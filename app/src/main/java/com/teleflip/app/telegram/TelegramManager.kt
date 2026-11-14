@@ -1421,10 +1421,19 @@ class TelegramManager(
                         if (setObj is TdApi.StickerSet) {
                             val items =
                                 setObj.stickers.map { st ->
+                                    val localPath =
+                                        if (st.sticker.local.isDownloadingCompleted && st.sticker.local.path.isNotBlank()) {
+                                            st.sticker.local.path
+                                        } else {
+                                            if (!st.sticker.local.isDownloadingActive) {
+                                                client.send(TdApi.DownloadFile(st.sticker.id, 1, 0, 0, false), null)
+                                            }
+                                            null
+                                        }
                                     StickerItem(
                                         fileId = st.sticker.id,
                                         emoji = st.emoji,
-                                        filePath = if (st.sticker.local.isDownloadingCompleted) st.sticker.local.path else null,
+                                        filePath = localPath,
                                         setName = setObj.title,
                                     )
                                 }
@@ -1582,6 +1591,110 @@ class TelegramManager(
             scope.launch(Dispatchers.Main) {
                 onResult(list)
             }
+        }
+    }
+
+    private val fileUpdateListeners = java.util.concurrent.CopyOnWriteArrayList<(TdApi.File) -> Unit>()
+
+    fun addFileUpdateListener(listener: (TdApi.File) -> Unit) {
+        fileUpdateListeners.add(listener)
+    }
+
+    fun removeFileUpdateListener(listener: (TdApi.File) -> Unit) {
+        fileUpdateListeners.remove(listener)
+    }
+
+    private var cachedGifBotUserId: Long? = null
+
+    fun searchInlineGifs(
+        query: String,
+        chatId: Long = 0,
+        onResult: (List<SavedGifItem>) -> Unit,
+    ) {
+        val client = tdClient
+        if (client == null) {
+            onResult(emptyList())
+            return
+        }
+
+        fun executeSearch(botUserId: Long) {
+            client.send(TdApi.GetInlineQueryResults(botUserId, chatId, null, query, "")) { obj ->
+                if (obj is TdApi.InlineQueryResults) {
+                    val qId = obj.inlineQueryId
+                    val items = mutableListOf<SavedGifItem>()
+                    for (res in obj.results) {
+                        if (res is TdApi.InlineQueryResultAnimation) {
+                            val anim = res.animation
+                            var filePath: String? = null
+                            if (anim != null && anim.animation != null) {
+                                val file = anim.animation
+                                if (file.local.isDownloadingCompleted && file.local.path.isNotBlank()) {
+                                    filePath = file.local.path
+                                } else if (!file.local.isDownloadingActive) {
+                                    client.send(TdApi.DownloadFile(file.id, 1, 0, 0, false), null)
+                                }
+                                items.add(
+                                    SavedGifItem(
+                                        fileId = file.id,
+                                        filePath = filePath,
+                                        durationSeconds = anim.duration,
+                                        caption = res.title.ifBlank { anim.fileName.ifBlank { "GIF" } },
+                                        queryId = qId,
+                                        resultId = res.id,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    scope.launch(Dispatchers.Main) {
+                        onResult(items)
+                    }
+                } else {
+                    scope.launch(Dispatchers.Main) {
+                        onResult(emptyList())
+                    }
+                }
+            }
+        }
+
+        val botId = cachedGifBotUserId
+        if (botId != null) {
+            executeSearch(botId)
+        } else {
+            client.send(TdApi.SearchPublicChat("gif")) { chatObj ->
+                if (chatObj is TdApi.Chat && chatObj.type is TdApi.ChatTypePrivate) {
+                    val uId = (chatObj.type as TdApi.ChatTypePrivate).userId
+                    cachedGifBotUserId = uId
+                    executeSearch(uId)
+                } else {
+                    scope.launch(Dispatchers.Main) {
+                        onResult(emptyList())
+                    }
+                }
+            }
+        }
+    }
+
+    fun sendInlineQueryResult(
+        chatId: Long,
+        queryId: Long,
+        resultId: String,
+        disableNotification: Boolean = false,
+        schedulingState: TdApi.MessageSchedulingState? = null,
+    ) {
+        val client = tdClient ?: return
+        try {
+            val req =
+                TdApi.SendInlineQueryResultMessage().apply {
+                    this.chatId = chatId
+                    this.queryId = queryId
+                    this.resultId = resultId
+                    this.hideViaBot = false
+                    this.options = createSendOptions(disableNotification, schedulingState)
+                }
+            client.send(req, this)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to send inline query result message via TDLib: ${e.message}")
         }
     }
 
@@ -5238,7 +5351,10 @@ class TelegramManager(
                                 formatting = extractFormatting(newContent),
                                 mediaType = newMediaType,
                                 mediaFileId = newMediaInfo.first,
-                                mediaFilePath = newMediaInfo.second ?: downloadedFilePaths[newMediaInfo.first] ?: old.mediaFilePath.takeIf { old.mediaFileId == newMediaInfo.first },
+                                mediaFilePath =
+                                    newMediaInfo.second
+                                        ?: downloadedFilePaths[newMediaInfo.first]
+                                        ?: old.mediaFilePath.takeIf { old.mediaFileId == newMediaInfo.first },
                                 mediaMimeType = extractMediaMimeType(newContent),
                                 starCount = starCount,
                                 isPaidMediaLocked = isLocked,
@@ -5589,6 +5705,14 @@ class TelegramManager(
     }
 
     private fun handleFileUpdate(file: TdApi.File) {
+        fileUpdateListeners.forEach { listener ->
+            try {
+                listener(file)
+            } catch (e: Exception) {
+                Log.e(tag, "Error in fileUpdateListener: ${e.message}")
+            }
+        }
+
         val path = localFilePath(file)
         if (path != null) {
             downloadedFilePaths[file.id] = path
@@ -5871,7 +5995,10 @@ class TelegramManager(
         return when (content.constructor) {
             TdApi.MessageText.CONSTRUCTOR -> (content as TdApi.MessageText).text.text
             TdApi.MessagePhoto.CONSTRUCTOR -> "📷 [Photo] " + (content as TdApi.MessagePhoto).caption.text
-            TdApi.MessageContact.CONSTRUCTOR -> (content as TdApi.MessageContact).contact.let { "Contact: ${it.firstName} ${it.lastName}\n${it.phoneNumber}".trim() }
+            TdApi.MessageContact.CONSTRUCTOR -> {
+                val c = (content as TdApi.MessageContact).contact
+                "Contact: ${c.firstName} ${c.lastName}\n${c.phoneNumber}".trim()
+            }
             TdApi.MessageVoiceNote.CONSTRUCTOR -> "🎤 [Voice Note]"
             TdApi.MessageLocation.CONSTRUCTOR -> "📍 [Location]"
             TdApi.MessageAudio.CONSTRUCTOR -> "🎵 [Audio]"
@@ -6003,9 +6130,9 @@ class TelegramManager(
                 ProxyStorage.deleteProxy(context, proxyId)
                 ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
                 activeProxyId = added.id
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                callback?.invoke(true, null)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not enable proxy") }
+                callback?.invoke(false, e.message ?: "Could not enable proxy")
             }
         }
     }
