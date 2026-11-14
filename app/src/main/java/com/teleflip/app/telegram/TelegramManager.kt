@@ -34,6 +34,7 @@ import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.model.ProxyType
 import com.teleflip.app.model.SavedGifItem
 import com.teleflip.app.model.SessionModel
+import com.teleflip.app.model.SlowModeState
 import com.teleflip.app.model.StickerItem
 import com.teleflip.app.model.StickerSetModel
 import com.teleflip.app.model.UserProfileModel
@@ -65,6 +66,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -128,6 +130,60 @@ class TelegramManager(
 
     private val _messages = MutableStateFlow<Map<Long, List<MessageModel>>>(emptyMap())
     val messages: StateFlow<Map<Long, List<MessageModel>>> = _messages.asStateFlow()
+
+    private val supergroupToChatIdMap = ConcurrentHashMap<Long, Long>()
+
+    private val _slowModeStates = MutableStateFlow<Map<Long, SlowModeState>>(emptyMap())
+    val slowModeStates: StateFlow<Map<Long, SlowModeState>> = _slowModeStates.asStateFlow()
+
+    fun getChatIdForSupergroup(supergroupId: Long): Long {
+        val cached = supergroupToChatIdMap[supergroupId]
+        if (cached != null) return cached
+        val chatModel =
+            _chats.value.find {
+                (it.chatType == ChatType.GROUP || it.chatType == ChatType.CHANNEL)
+            }
+        return chatModel?.id ?: 0L
+    }
+
+    fun getSlowModeState(chatId: Long): SlowModeState? {
+        return _slowModeStates.value[chatId]
+    }
+
+    fun getSlowModeRemainingSeconds(chatId: Long): Int {
+        return _slowModeStates.value[chatId]?.remainingSeconds() ?: 0
+    }
+
+    fun updateSlowModeCooldown(
+        chatId: Long,
+        seconds: Int,
+    ) {
+        if (seconds <= 0) return
+        val now = System.currentTimeMillis()
+        val expiresAtMs = now + (seconds * 1000L)
+        _slowModeStates.update { current ->
+            val existing = current[chatId]
+            val delay = if ((existing?.delaySeconds ?: 0) > 0) existing!!.delaySeconds else seconds
+            current + (chatId to SlowModeState(chatId, delay, expiresAtMs))
+        }
+    }
+
+    fun updateSlowModeStateFromSupergroupInfo(
+        chatId: Long,
+        delaySeconds: Int,
+        expiresInSeconds: Double,
+    ) {
+        val now = System.currentTimeMillis()
+        val expiresAtMs =
+            if (expiresInSeconds > 0) {
+                now + (expiresInSeconds * 1000).toLong()
+            } else {
+                0L
+            }
+        _slowModeStates.update { current ->
+            current + (chatId to SlowModeState(chatId, delaySeconds, expiresAtMs))
+        }
+    }
 
     private val _activeCall = MutableStateFlow<ActiveCall?>(null)
     val activeCall: StateFlow<ActiveCall?> = _activeCall.asStateFlow()
@@ -837,6 +893,11 @@ class TelegramManager(
         saveChatDraft(chatId, "")
 
         // Live TDLib send text message
+        val delay = _slowModeStates.value[chatId]?.delaySeconds ?: 0
+        if (delay > 0) {
+            updateSlowModeCooldown(chatId, delay)
+        }
+
         val content =
             TdApi.InputMessageText(
                 TdApi.FormattedText(text, emptyArray()),
@@ -863,6 +924,11 @@ class TelegramManager(
     }
 
     private fun reportOperationError(message: String) {
+        val slowModeMatch = Regex("""SLOWMODE_WAIT_(\d+)""", RegexOption.IGNORE_CASE).find(message)
+        if (slowModeMatch != null) {
+            Log.d(tag, "Suppressed operation error due to slow mode wait: $message")
+            return
+        }
         _operationError.value = message
         Log.e(tag, message)
     }
@@ -879,7 +945,16 @@ class TelegramManager(
         }
         client.send(request) { result ->
             if (result is TdApi.Error) {
-                reportOperationError("Message was not sent: ${result.message}")
+                val msg = result.message.orEmpty()
+                val slowModeMatch = Regex("""SLOWMODE_WAIT_(\d+)""", RegexOption.IGNORE_CASE).find(msg)
+                if (slowModeMatch != null) {
+                    val seconds = slowModeMatch.groupValues[1].toIntOrNull() ?: 0
+                    if (seconds > 0) {
+                        updateSlowModeCooldown(request.chatId, seconds)
+                    }
+                } else {
+                    reportOperationError("Message was not sent: $msg")
+                }
             }
             // UpdateNewMessage owns insertion. The send callback may arrive after
             // UpdateMessageSendSucceeded and contain an obsolete pending ID.
@@ -1142,6 +1217,7 @@ class TelegramManager(
         chatId: Long,
         messageId: Long,
         currentPinned: Boolean,
+        disableNotification: Boolean = false,
         onResult: ((Boolean) -> Unit)? = null,
     ) {
         val newPinned = !currentPinned
@@ -1158,6 +1234,7 @@ class TelegramManager(
                 TdApi.PinChatMessage().apply {
                     this.chatId = chatId
                     this.messageId = messageId
+                    this.disableNotification = disableNotification
                 }
             } else {
                 TdApi.UnpinChatMessage(chatId, messageId)
@@ -2153,21 +2230,66 @@ class TelegramManager(
     fun setSelfDestructTimer(
         chatId: Long,
         seconds: Int,
-        onResult: ((Int) -> Unit)? = null,
+        onResult: ((Boolean, String?, Int) -> Unit)? = null,
     ) {
         scope.launch {
             try {
                 val validSeconds = seconds.coerceAtLeast(0)
-                sendQuery(TdApi.SetChatMessageAutoDeleteTime(chatId, validSeconds))
-                synchronized(chatMap) {
-                    val existing = chatMap[chatId]
-                    if (existing != null) chatMap[chatId] = existing.copy(selfDestructTimerSec = validSeconds)
+                val targetChat = _chats.value.find { it.id == chatId }
+                if (targetChat != null && (targetChat.chatType == ChatType.GROUP || targetChat.chatType == ChatType.CHANNEL)) {
+                    val me = sendQuery(TdApi.GetMe()) as? TdApi.User
+                    if (me != null) {
+                        val member = sendQuery(TdApi.GetChatMember(chatId, TdApi.MessageSenderUser(me.id))) as? TdApi.ChatMember
+                        val status = member?.status
+                        val isAdminOrCreator = status is TdApi.ChatMemberStatusCreator || status is TdApi.ChatMemberStatusAdministrator
+                        if (!isAdminOrCreator) {
+                            val errStr = "Only administrators can change auto-delete timer in groups or channels"
+                            reportOperationError(errStr)
+                            withContext(Dispatchers.Main) { onResult?.invoke(false, errStr, 0) }
+                            return@launch
+                        }
+                    }
                 }
-                _chats.value = synchronized(chatMap) { chatMap.values.toList() }
-                withContext(Dispatchers.Main) { onResult?.invoke(validSeconds) }
+                sendQuery(TdApi.SetChatMessageAutoDeleteTime(chatId, validSeconds))
+                handleChatMessageAutoDeleteTimeUpdated(chatId, validSeconds)
+                withContext(Dispatchers.Main) { onResult?.invoke(true, null, validSeconds) }
             } catch (e: Exception) {
-                reportOperationError(e.message ?: "Could not update message timer")
+                val errMsg = e.message ?: "Could not update message timer"
+                reportOperationError(errMsg)
+                withContext(Dispatchers.Main) { onResult?.invoke(false, errMsg, 0) }
             }
+        }
+    }
+
+    fun setSelfDestructTimer(
+        chatId: Long,
+        seconds: Int,
+        onResult: ((Int) -> Unit)?,
+    ) {
+        setSelfDestructTimer(chatId, seconds) { success, _, appliedSec ->
+            if (success) {
+                onResult?.invoke(appliedSec)
+            }
+        }
+    }
+
+    fun handleChatMessageAutoDeleteTimeUpdated(
+        chatId: Long,
+        autoDeleteTime: Int,
+    ) {
+        synchronized(pendingChats) {
+            pendingChats[chatId]?.let {
+                pendingChats[chatId] = it.copy(selfDestructTimerSec = autoDeleteTime)
+            }
+        }
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(selfDestructTimerSec = autoDeleteTime)
+            }
+        }
+        _chats.update { chats ->
+            chats.map { if (it.id == chatId) it.copy(selfDestructTimerSec = autoDeleteTime) else it }
         }
     }
 
@@ -3749,25 +3871,72 @@ class TelegramManager(
         newType: com.teleflip.app.storage.StorageLocationType,
         onComplete: (Boolean, String) -> Unit,
     ) {
-        val oldDir = com.teleflip.app.storage.StorageManager.getFilesDirectory(context)
-        val success = com.teleflip.app.storage.StorageManager.setSelectedStorageType(context, newType)
-        if (!success) {
+        if (newType == com.teleflip.app.storage.StorageLocationType.SD_CARD &&
+            !com.teleflip.app.storage.StorageManager.isSdCardAvailable(context)
+        ) {
             onComplete(false, "Storage location is not available or not mounted")
             return
         }
-        val newDir = com.teleflip.app.storage.StorageManager.getFilesDirectory(context)
-        scope.launch(Dispatchers.IO) {
-            val copied = com.teleflip.app.storage.StorageManager.copyMediaFiles(oldDir, newDir)
-            val label =
-                if (newType == com.teleflip.app.storage.StorageLocationType.SD_CARD) {
-                    "MicroSD Card"
-                } else {
-                    "Internal Storage"
-                }
-            withContext(Dispatchers.Main) {
-                onComplete(true, "Storage switched to $label. Migrated $copied files.")
+
+        if (com.teleflip.app.storage.MediaMigrationWorker.isMigrationRunning) {
+            onComplete(false, "Media migration already in progress. Please wait.")
+            return
+        }
+
+        val currentType = com.teleflip.app.storage.StorageManager.getSelectedStorageType(context)
+        val oldDir = com.teleflip.app.storage.StorageManager.getFilesDirectoryForType(context, currentType)
+        val newDir = com.teleflip.app.storage.StorageManager.getFilesDirectoryForType(context, newType)
+
+        if (currentType != newType) {
+            val success = com.teleflip.app.storage.StorageManager.setSelectedStorageType(context, newType)
+            if (!success) {
+                onComplete(false, "Storage location is not available or not mounted")
+                return
             }
         }
+
+        // Restart TDLib with updated filesDirectory
+        val activeClient: Client?
+        synchronized(clientLock) {
+            activeClient = tdClient
+            if (activeClient == null && !isStartingClient) {
+                reconnectPending = false
+                start()
+            } else {
+                isClosingClient = true
+                reconnectPending = true
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        activeClient?.send(TdApi.Close(), this@TelegramManager)
+                    } catch (e: Throwable) {
+                        Log.w(tag, "Error closing client for storage switch: ${e.message}")
+                        synchronized(clientLock) {
+                            isClosingClient = false
+                            tdClient = null
+                        }
+                        start()
+                    }
+                }
+            }
+        }
+
+        // Enqueue background migration via WorkManager
+        if (oldDir.absolutePath != newDir.absolutePath) {
+            com.teleflip.app.storage.MediaMigrationWorker.enqueue(
+                context = context,
+                sourceDir = oldDir,
+                targetDir = newDir,
+                targetType = newType,
+            )
+        }
+
+        val label =
+            if (newType == com.teleflip.app.storage.StorageLocationType.SD_CARD) {
+                "MicroSD Card"
+            } else {
+                "Internal Storage"
+            }
+        onComplete(true, "Storage switched to $label. Background migration started.")
     }
 
     // =========================================================================
@@ -4258,6 +4427,7 @@ class TelegramManager(
                     statusText = "$memberCount members"
                 } else if (chatObj?.type is TdApi.ChatTypeSupergroup) {
                     val supergroupId = (chatObj.type as TdApi.ChatTypeSupergroup).supergroupId
+                    supergroupToChatIdMap[supergroupId] = chatId
                     val supergroupFull =
                         withTimeoutOrNull(3000L) {
                             sendQuery(TdApi.GetSupergroupFullInfo(supergroupId))
@@ -4267,6 +4437,13 @@ class TelegramManager(
                     statusText = if (chatType == ChatType.CHANNEL) "$memberCount subscribers" else "$memberCount members"
                     if (!supergroupFull?.inviteLink?.inviteLink.isNullOrBlank()) {
                         username = supergroupFull?.inviteLink?.inviteLink ?: ""
+                    }
+                    if (supergroupFull != null) {
+                        updateSlowModeStateFromSupergroupInfo(
+                            chatId = chatId,
+                            delaySeconds = supergroupFull.slowModeDelay,
+                            expiresInSeconds = supergroupFull.slowModeDelayExpiresIn,
+                        )
                     }
                 }
 
@@ -4294,6 +4471,14 @@ class TelegramManager(
                         isSecretChat = chatModel?.isSecretChat ?: false,
                         selfDestructTimerSec = chatModel?.selfDestructTimerSec ?: 0,
                         members = membersList,
+                        slowModeDelay =
+                            (chatObj?.type as? TdApi.ChatTypeSupergroup)?.let {
+                                _slowModeStates.value[chatId]?.delaySeconds ?: 0
+                            } ?: 0,
+                        slowModeDelayExpiresIn =
+                            (chatObj?.type as? TdApi.ChatTypeSupergroup)?.let {
+                                _slowModeStates.value[chatId]?.remainingSeconds()?.toDouble() ?: 0.0
+                            } ?: 0.0,
                     )
 
                 try {
@@ -4776,6 +4961,20 @@ class TelegramManager(
         if (obj == null) return
 
         when (obj.constructor) {
+            TdApi.UpdateSupergroupFullInfo.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateSupergroupFullInfo
+                val fullInfo = update.supergroupFullInfo
+                if (fullInfo != null) {
+                    val chatId = getChatIdForSupergroup(update.supergroupId)
+                    if (chatId != 0L) {
+                        updateSlowModeStateFromSupergroupInfo(
+                            chatId = chatId,
+                            delaySeconds = fullInfo.slowModeDelay,
+                            expiresInSeconds = fullInfo.slowModeDelayExpiresIn,
+                        )
+                    }
+                }
+            }
             TdApi.UpdateChatIsMarkedAsUnread.CONSTRUCTOR -> {
                 val update = obj as TdApi.UpdateChatIsMarkedAsUnread
                 synchronized(pendingChats) { pendingChats[update.chatId]?.let { pendingChats[update.chatId] = it.copy(isMarkedUnread = update.isMarkedAsUnread) } }
@@ -4837,6 +5036,10 @@ class TelegramManager(
                 val updateDraft = obj as TdApi.UpdateChatDraftMessage
                 val draftText = (updateDraft.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
                 handleChatDraftUpdated(updateDraft.chatId, draftText)
+            }
+            TdApi.UpdateChatMessageAutoDeleteTime.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateChatMessageAutoDeleteTime
+                handleChatMessageAutoDeleteTimeUpdated(update.chatId, update.messageAutoDeleteTime)
             }
             TdApi.UpdateChatNotificationSettings.CONSTRUCTOR -> {
                 val update = obj as TdApi.UpdateChatNotificationSettings
@@ -5192,6 +5395,10 @@ class TelegramManager(
     }
 
     private fun addOrUpdateChat(chat: TdApi.Chat) {
+        if (chat.type is TdApi.ChatTypeSupergroup) {
+            val supergroupId = (chat.type as TdApi.ChatTypeSupergroup).supergroupId
+            supergroupToChatIdMap[supergroupId] = chat.id
+        }
         lastReadOutboxIds[chat.id] = chat.lastReadOutboxMessageId
         val title = chat.title.ifBlank { "Chat #${chat.id}" }
         val lastMsg = chat.lastMessage
@@ -5282,6 +5489,7 @@ class TelegramManager(
                 order = mainPosition?.order ?: existingModel?.order ?: 0L,
                 lastMessageDate = lastMsg?.date?.toLong() ?: existingModel?.lastMessageDate ?: 0L,
                 lastMessageId = lastMsg?.id ?: existingModel?.lastMessageId ?: 0L,
+                selfDestructTimerSec = chat.messageAutoDeleteTime,
             )
 
         synchronized(pendingChats) {
@@ -6066,12 +6274,31 @@ class TelegramManager(
 
     private fun localFilePath(file: TdApi.File): String? =
         file.local?.let { local ->
-            local.path.takeIf { local.isDownloadingCompleted && it.isNotBlank() && File(it).isFile }
+            val rawPath = local.path.takeIf { local.isDownloadingCompleted && it.isNotBlank() } ?: return@let null
+            val resolved = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, rawPath)
+            if (resolved != null && File(resolved).isFile) {
+                resolved
+            } else if (File(rawPath).isFile) {
+                rawPath
+            } else {
+                null
+            }
         }
 
     private fun resolveFile(f: TdApi.File?): Pair<Int, String?> {
         if (f == null) return Pair(0, null)
-        val path = localFilePath(f) ?: downloadedFilePaths[f.id]?.takeIf { File(it).isFile }
+        val candidatePath =
+            downloadedFilePaths[f.id]?.let {
+                val resolved = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, it)
+                if (resolved != null && File(resolved).isFile) {
+                    resolved
+                } else if (File(it).isFile) {
+                    it
+                } else {
+                    null
+                }
+            }
+        val path = localFilePath(f) ?: candidatePath
         if (path != null) return Pair(f.id, path)
         val fileBytes = if (f.expectedSize > 0) f.expectedSize else f.size
         if (f.local?.canBeDownloaded == true &&
@@ -6081,7 +6308,7 @@ class TelegramManager(
         ) {
             requestFileDownload(f.id)
         }
-        return Pair(f.id, downloadedFilePaths[f.id]?.takeIf { File(it).isFile })
+        return Pair(f.id, candidatePath)
     }
 
     fun deleteMessage(
@@ -6238,9 +6465,9 @@ class TelegramManager(
                 val result = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), enableNow, "")) as TdApi.AddedProxy
                 ProxyStorage.saveProxy(context, item.copy(id = result.id, isEnabled = enableNow))
                 if (enableNow) activeProxyId = result.id
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                callback?.invoke(true, null)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not add proxy") }
+                callback?.invoke(false, e.message ?: "Could not add proxy")
             }
         }
     }
@@ -6253,8 +6480,7 @@ class TelegramManager(
             try {
                 val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
                 val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
-                ProxyStorage.deleteProxy(context, proxyId)
-                ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
+                ProxyStorage.enableProxy(context, proxyId)
                 activeProxyId = added.id
                 callback?.invoke(true, null)
             } catch (e: Exception) {
@@ -6269,9 +6495,9 @@ class TelegramManager(
                 sendQuery(TdApi.DisableProxy())
                 ProxyStorage.disableAllProxies(context)
                 activeProxyId = 0
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                callback?.invoke(true, null)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not disable proxy") }
+                callback?.invoke(false, e.message ?: "Could not disable proxy")
             }
         }
     }
@@ -6286,9 +6512,9 @@ class TelegramManager(
                 sendQuery(TdApi.RemoveProxy(proxyId))
                 ProxyStorage.deleteProxy(context, proxyId)
                 if (activeProxyId == proxyId) activeProxyId = 0
-                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
+                callback?.invoke(true, null)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not delete proxy") }
+                callback?.invoke(false, e.message ?: "Could not delete proxy")
             }
         }
     }
