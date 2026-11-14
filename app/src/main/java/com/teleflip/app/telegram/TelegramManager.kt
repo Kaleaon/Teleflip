@@ -1213,6 +1213,7 @@ class TelegramManager(
         chatId: Long,
         messageId: Long,
         currentPinned: Boolean,
+        disableNotification: Boolean = false,
         onResult: ((Boolean) -> Unit)? = null,
     ) {
         val newPinned = !currentPinned
@@ -1229,6 +1230,7 @@ class TelegramManager(
                 TdApi.PinChatMessage().apply {
                     this.chatId = chatId
                     this.messageId = messageId
+                    this.disableNotification = disableNotification
                 }
             } else {
                 TdApi.UnpinChatMessage(chatId, messageId)
