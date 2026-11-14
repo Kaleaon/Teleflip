@@ -45,21 +45,23 @@ fun decodeSampledBitmapFromFile(
     filePath: String,
     reqWidth: Int,
     reqHeight: Int,
+    context: android.content.Context? = null,
 ): Bitmap? {
     return try {
-        val file = File(filePath)
+        val resolvedPath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, filePath) ?: filePath
+        val file = File(resolvedPath)
         if (!file.exists()) return null
 
         val options =
             BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
-        BitmapFactory.decodeFile(filePath, options)
+        BitmapFactory.decodeFile(resolvedPath, options)
 
         options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
         options.inJustDecodeBounds = false
 
-        BitmapFactory.decodeFile(filePath, options)
+        BitmapFactory.decodeFile(resolvedPath, options)
     } catch (_: Throwable) {
         null
     }
@@ -87,7 +89,8 @@ fun ImageView.loadCircularAvatarOrFallback(
     }
 
     try {
-        val file = File(path)
+        val resolvedPath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, path) ?: path
+        val file = File(resolvedPath)
         visibility = View.VISIBLE
         load(file) {
             transformations(CircleCropTransformation())
@@ -123,7 +126,8 @@ fun ImageView.loadMediaFromFile(path: String?) {
     }
 
     try {
-        val file = File(path)
+        val resolvedPath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, path) ?: path
+        val file = File(resolvedPath)
         visibility = View.VISIBLE
         load(file) {
             listener(

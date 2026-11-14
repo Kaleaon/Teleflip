@@ -429,7 +429,8 @@ class MessageAdapter(
                 ivPhoto.layoutParams = lp
 
                 if (!message.mediaFilePath.isNullOrEmpty()) {
-                    ivPhoto.loadMediaFromFile(message.mediaFilePath)
+                    val resolvedMedia = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, message.mediaFilePath)
+                    ivPhoto.loadMediaFromFile(resolvedMedia)
                 } else if (message.mediaType == MediaType.PAID_MEDIA && message.isPaidMediaLocked) {
                     ivPhoto.setImageResource(R.drawable.bg_inbound_bubble)
                     ivPhoto.visibility = View.VISIBLE
@@ -533,9 +534,10 @@ class MessageAdapter(
                                 ?: TelegramManager.getCustomEmojiFilePath(reaction)
 
                         if (!filePath.isNullOrBlank()) {
+                            val resolvedPath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, filePath) ?: filePath
                             val request =
                                 ImageRequest.Builder(context)
-                                    .data(File(filePath))
+                                    .data(File(resolvedPath))
                                     .target(
                                         onSuccess = { drawable ->
                                             val bitmap =
