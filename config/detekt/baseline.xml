@@ -74,6 +74,7 @@
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleDeepLinkProxy( uri: android.net.Uri, callback: ((Boolean, String) -&gt; Unit)? = null, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun parseProxyUri(uri: Uri): ProxyItem?</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun updateUserCache(user: TdApi.User)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$override fun onResult(obj: TdApi.Object?)</ID>
@@ -238,6 +239,7 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$0x6FB9F0</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$100</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000</ID>
+    <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000.0</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$10000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1024L</ID>
@@ -370,6 +372,7 @@
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun getSenderDisplayName(message: TdApi.Message): String</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun isChatMuted(chatId: Long): Boolean</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun parseProxyUri(uri: Uri): ProxyItem?</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun switchStorageLocation( newType: com.teleflip.app.storage.StorageLocationType, onComplete: (Boolean, String) -&gt; Unit, )</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun toggleMessageReaction( chatId: Long, messageId: Long, emoji: String, )</ID>
