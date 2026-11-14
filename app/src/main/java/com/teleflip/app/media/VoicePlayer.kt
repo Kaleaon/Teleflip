@@ -177,13 +177,14 @@ class VoicePlayer(private val context: Context) {
         try {
             stop()
             currentOnStateChanged = onStateChanged
-            val file = File(path)
+            val resolvedPath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, path) ?: path
+            val file = File(resolvedPath)
             val player =
                 MediaPlayer().apply {
                     if (file.exists()) {
                         setDataSource(context, Uri.fromFile(file))
                     } else {
-                        setDataSource(path)
+                        setDataSource(resolvedPath)
                     }
                     setAudioAttributes(
                         AudioAttributes.Builder()
