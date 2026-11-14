@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layout_picker_dialog_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark_card"
+    android:padding="8dp">
+
+    <!-- Picker Title / Category counter -->
+    <TextView
+        android:id="@+id/tv_picker_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="GIFs &amp; Stickers (1/4)"
+        android:textColor="@color/focus_highlight_gold"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:paddingBottom="2dp" />
+
+    <!-- Pack Name -->
+    <TextView
+        android:id="@+id/tv_picker_pack_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Saved GIFs"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:paddingBottom="4dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/softkey_divider"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Grid Container with Empty View -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_picker_grid"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:descendantFocusability="afterDescendants"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+
+        <TextView
+            android:id="@+id/tv_picker_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="No items in this pack"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <include layout="@layout/layout_softkeys" />
+
+</LinearLayout>

@@ -56,6 +56,7 @@ import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
+import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.notifications.NotificationHelper
 import com.teleflip.app.notifications.TeleFlipNotificationService
 import com.teleflip.app.security.PasscodeManager
@@ -69,6 +70,7 @@ import com.teleflip.app.ui.ChatExportDialog
 import com.teleflip.app.ui.ChatExportProgressDialog
 import com.teleflip.app.ui.ChatListAdapter
 import com.teleflip.app.ui.ChatNotificationSettingsDialog
+import com.teleflip.app.ui.GifStickerPickerDialog
 import com.teleflip.app.ui.LabeledInputView
 import com.teleflip.app.ui.MediaPickerBottomSheetDialog
 import com.teleflip.app.ui.MediaViewerDialog
@@ -160,6 +162,27 @@ class MainActivity : AppCompatActivity() {
     internal var currentScreen: Screen = Screen.CHAT_LIST
     internal var activeChat: ChatModel? = null
     internal var pendingTargetChatId: Long = 0L
+    internal var pendingProxyItem: ProxyItem? = null
+
+    private fun handleDeepLinkIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        val proxyItem = telegramManager.parseProxyUri(data) ?: return
+        if (PasscodeManager.isLocked(this)) {
+            pendingProxyItem = proxyItem
+        } else {
+            ProxySettingsDialog(
+                context = this,
+                telegramManager = telegramManager,
+                initialProxyItem = proxyItem,
+                onProxyChanged = {
+                    if (currentScreen == Screen.LOGIN) {
+                        updateLoginConnectionState(telegramManager.connectionState.value)
+                    }
+                },
+            ).show()
+        }
+    }
+
     private var pendingTargetMessageId: Long? = null
     private var callTimerJob: Job? = null
     private var callDurationSec: Int = 0
@@ -269,6 +292,9 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED) {
             phonePerms.add(Manifest.permission.READ_PHONE_NUMBERS)
         }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            phonePerms.add(Manifest.permission.READ_CONTACTS)
+        }
         if (phonePerms.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, phonePerms.toTypedArray(), REQ_PHONE_PERM)
         }
@@ -333,6 +359,8 @@ class MainActivity : AppCompatActivity() {
 
         telegramManager.start()
 
+        handleDeepLinkIntent(intent)
+
         pendingTargetChatId = intent?.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L) ?: 0L
 
         intent?.data?.let { uri ->
@@ -364,6 +392,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleDeepLinkIntent(intent)
         intent?.data?.let { uri ->
             if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
                 telegramManager.handleDeepLinkProxy(uri)
@@ -1532,7 +1561,9 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
     // SCREEN 2: CONVERSATION / CHAT
     // =========================================================================
-    private fun openConversation(
+    @androidx.annotation.VisibleForTesting
+    @JvmName("openConversation")
+    internal fun openConversation(
         chat: ChatModel,
         targetMessageId: Long? = null,
     ) {
@@ -2107,7 +2138,23 @@ class MainActivity : AppCompatActivity() {
             context = this,
             message = msg,
             messageUpdates = telegramManager.messages,
-            onSaveMedia = { targetMsg -> saveMessageToDevice(targetMsg) },
+            onSaveMedia = { targetMsg ->
+                if (targetMsg.mediaType == MediaType.STICKER) {
+                    telegramManager.saveSticker(
+                        fileId = targetMsg.mediaFileId,
+                        emoji = targetMsg.stickerEmoji,
+                        filePath = targetMsg.mediaFilePath,
+                    )
+                } else if (targetMsg.mediaType == MediaType.ANIMATION) {
+                    telegramManager.saveGif(
+                        fileId = targetMsg.mediaFileId,
+                        duration = targetMsg.durationSeconds,
+                        caption = targetMsg.mediaCaption.ifBlank { targetMsg.text },
+                        filePath = targetMsg.mediaFilePath,
+                    )
+                }
+                saveMessageToDevice(targetMsg)
+            },
             onRequestDownload = { fileId ->
                 telegramManager.downloadFilePriority(fileId)
                 showToast("Prioritizing media download...")
@@ -2354,13 +2401,29 @@ class MainActivity : AppCompatActivity() {
         etComposeInput?.requestFocus()
     }
 
-    private fun startEditingMessage(msg: MessageModel) {
+    private fun isCaptionableMedia(msg: MessageModel?): Boolean {
+        if (msg == null) return false
+        return msg.mediaType == MediaType.PHOTO ||
+            msg.mediaType == MediaType.VIDEO ||
+            msg.mediaType == MediaType.DOCUMENT ||
+            msg.mediaType == MediaType.ANIMATION ||
+            msg.mediaType == MediaType.AUDIO
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun startEditingMessage(msg: MessageModel) {
         activeEditMessage = msg
         activeReplyMessage = null
         layoutReplyEditBar?.visibility = View.VISIBLE
-        tvReplyEditPreview?.text = "✏️ Editing: ${msg.text.take(35)}"
-        etComposeInput?.setText(msg.text)
-        etComposeInput?.setSelection(msg.text.length)
+        if (isCaptionableMedia(msg)) {
+            tvReplyEditPreview?.text = "✏️ Editing Caption: ${msg.mediaCaption.take(35)}"
+            etComposeInput?.setText(msg.mediaCaption)
+            etComposeInput?.setSelection(msg.mediaCaption.length)
+        } else {
+            tvReplyEditPreview?.text = "✏️ Editing: ${msg.text.take(35)}"
+            etComposeInput?.setText(msg.text)
+            etComposeInput?.setSelection(msg.text.length)
+        }
         etComposeInput?.requestFocus()
     }
 
@@ -2478,13 +2541,18 @@ class MainActivity : AppCompatActivity() {
             },
         )
         options.add(
+            MenuOption(options.size + 1, "🎞️ Open GIFs") {
+                showGifStickerPickerDialog(chat, initialIsGif = true)
+            },
+        )
+        options.add(
             MenuOption(options.size + 1, "🎨 Send Sticker") {
-                showStickerPickerMenu(chat)
+                showGifStickerPickerDialog(chat, initialIsGif = false)
             },
         )
         options.add(
             MenuOption(options.size + 1, "🎞️ Send GIF / Animation") {
-                showGifPickerMenu(chat)
+                showGifStickerPickerDialog(chat, initialIsGif = true)
             },
         )
         if (chat.chatType == ChatType.BOT || chat.chatType == ChatType.GROUP) {
@@ -2598,7 +2666,9 @@ class MainActivity : AppCompatActivity() {
         draftSyncJob?.cancel()
         draftSyncJob = null
         val text = etComposeInput?.text?.toString()?.trim() ?: ""
-        if (text.isEmpty()) {
+        val editing = activeEditMessage
+        val replying = activeReplyMessage
+        if (text.isEmpty() && (editing == null || !isCaptionableMedia(editing))) {
             showToast("Please enter a message first")
             etComposeInput?.requestFocus()
             return
@@ -2613,11 +2683,15 @@ class MainActivity : AppCompatActivity() {
             layoutSlowModeBanner?.announceForAccessibility(warningText)
             return
         }
-        val editing = activeEditMessage
-        val replying = activeReplyMessage
         if (editing != null) {
-            telegramManager.editMessageText(chat.id, editing.id, text) {
-                showToast("Message edited")
+            if (isCaptionableMedia(editing)) {
+                telegramManager.editMessageCaption(chat.id, editing.id, text) {
+                    showToast("Caption edited")
+                }
+            } else {
+                telegramManager.editMessageText(chat.id, editing.id, text) {
+                    showToast("Message edited")
+                }
             }
             clearReplyOrEditMode()
             etComposeInput?.setText("")
@@ -3486,6 +3560,20 @@ class MainActivity : AppCompatActivity() {
         passcodeEntry = ""
         if (unlocked) {
             tvPasscodeError?.text = ""
+            if (pendingProxyItem != null) {
+                val proxyItem = pendingProxyItem
+                pendingProxyItem = null
+                ProxySettingsDialog(
+                    context = this,
+                    telegramManager = telegramManager,
+                    initialProxyItem = proxyItem,
+                    onProxyChanged = {
+                        if (currentScreen == Screen.LOGIN) {
+                            updateLoginConnectionState(telegramManager.connectionState.value)
+                        }
+                    },
+                ).show()
+            }
             if (pendingTargetChatId != 0L) {
                 val targetId = pendingTargetChatId
                 pendingTargetChatId = 0L
@@ -3931,12 +4019,25 @@ class MainActivity : AppCompatActivity() {
         OptionsMenuDialog(this, title, options).show()
     }
 
-    private fun showStickerPickerMenu(chat: ChatModel) {
+    private fun showGifStickerPickerDialog(
+        chat: ChatModel,
+        initialIsGif: Boolean = true,
+    ) {
+        commitActiveInputEngines()
+        GifStickerPickerDialog(
+            context = this,
+            chat = chat,
+            telegramManager = telegramManager,
+            initialIsGif = initialIsGif,
+        ).show()
+    }
+
+    internal fun showStickerPickerMenu(chat: ChatModel) {
         val picker = MediaPickerBottomSheetDialog.newInstance(chat.id)
         picker.show(supportFragmentManager, "media_picker")
     }
 
-    private fun showGifPickerMenu(chat: ChatModel) {
+    internal fun showGifPickerMenu(chat: ChatModel) {
         val picker = MediaPickerBottomSheetDialog.newInstance(chat.id)
         picker.show(supportFragmentManager, "media_picker")
     }
@@ -4229,12 +4330,20 @@ class MainActivity : AppCompatActivity() {
                 startReplyToMessage(msg)
             },
         )
-        if (msg.isOutbound && msg.mediaType == MediaType.NONE && msg.text.isNotBlank()) {
-            options.add(
-                MenuOption(options.size + 1, "✏️ Edit Message") {
-                    startEditingMessage(msg)
-                },
-            )
+        if (msg.isOutbound) {
+            if (msg.mediaType == MediaType.NONE && msg.text.isNotBlank()) {
+                options.add(
+                    MenuOption(options.size + 1, "✏️ Edit Message") {
+                        startEditingMessage(msg)
+                    },
+                )
+            } else if (isCaptionableMedia(msg)) {
+                options.add(
+                    MenuOption(options.size + 1, "✏️ Edit Caption") {
+                        startEditingMessage(msg)
+                    },
+                )
+            }
         }
         options.add(
             MenuOption(options.size + 1, if (msg.isPinned) "📌 Unpin Message" else "📌 Pin Message") {
@@ -4286,6 +4395,38 @@ class MainActivity : AppCompatActivity() {
             options.add(
                 MenuOption(options.size + 1, "📊 Vote / Manage Poll") {
                     showPollVoteMenu(msg)
+                },
+            )
+        }
+        if (msg.mediaType == MediaType.STICKER) {
+            options.add(
+                MenuOption(options.size + 1, "⭐ Save Sticker") {
+                    telegramManager.saveSticker(
+                        fileId = msg.mediaFileId,
+                        emoji = msg.stickerEmoji,
+                        setName = "",
+                        filePath = msg.mediaFilePath,
+                    ) { success ->
+                        runOnUiThread {
+                            showToast(if (success) "Sticker saved" else "Could not save sticker")
+                        }
+                    }
+                },
+            )
+        }
+        if (msg.mediaType == MediaType.ANIMATION) {
+            options.add(
+                MenuOption(options.size + 1, "💾 Save GIF") {
+                    telegramManager.saveGif(
+                        fileId = msg.mediaFileId,
+                        duration = msg.durationSeconds,
+                        caption = msg.mediaCaption.ifBlank { msg.text },
+                        filePath = msg.mediaFilePath,
+                    ) { success ->
+                        runOnUiThread {
+                            showToast(if (success) "GIF saved" else "Could not save GIF")
+                        }
+                    }
                 },
             )
         }
@@ -4534,10 +4675,10 @@ class MainActivity : AppCompatActivity() {
         val btnForgotPassword = view.findViewById<Button>(R.id.btn_forgot_password)
         val btnResetAccount = view.findViewById<Button>(R.id.btn_reset_account)
         val btnUseSim = view.findViewById<Button>(R.id.btn_use_sim_number)
-        val btnProxySettings = view.findViewById<Button>(R.id.btn_login_proxy_settings)
+        val btnLoginProxy = view.findViewById<Button>(R.id.btn_login_proxy)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
 
-        btnProxySettings?.setOnClickListener {
+        btnLoginProxy?.setOnClickListener {
             ProxySettingsDialog(this, telegramManager) {
                 updateLoginConnectionState(telegramManager.connectionState.value)
             }.show()
@@ -4693,8 +4834,10 @@ class MainActivity : AppCompatActivity() {
                 btnForgotPassword?.nextFocusUpId = R.id.btn_login_submit
                 btnForgotPassword?.nextFocusDownId = R.id.btn_reset_account
                 btnResetAccount?.nextFocusUpId = R.id.btn_forgot_password
-                btnResetAccount?.nextFocusDownId = R.id.btn_config_credentials
-                btnConfig.nextFocusUpId = R.id.btn_reset_account
+                btnResetAccount?.nextFocusDownId = R.id.btn_login_proxy
+                btnLoginProxy?.nextFocusUpId = R.id.btn_reset_account
+                btnLoginProxy?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_proxy
 
                 btnForgotPassword?.setOnClickListener {
                     telegramManager.requestPasswordRecovery()
@@ -4740,8 +4883,10 @@ class MainActivity : AppCompatActivity() {
                 btnForgotPassword?.visibility = View.GONE
                 btnResetAccount?.visibility = View.GONE
 
-                btnSubmit.nextFocusDownId = R.id.btn_config_credentials
-                btnConfig.nextFocusUpId = R.id.btn_login_submit
+                btnSubmit.nextFocusDownId = R.id.btn_login_proxy
+                btnLoginProxy?.nextFocusUpId = R.id.btn_login_submit
+                btnLoginProxy?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_proxy
 
                 etLoginInput?.hint = "123456"
                 etLoginInput?.setText("")
@@ -4766,8 +4911,10 @@ class MainActivity : AppCompatActivity() {
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
                 btnUseSim?.visibility = View.GONE
-                btnSubmit.nextFocusDownId = R.id.btn_config_credentials
-                btnConfig.nextFocusUpId = R.id.btn_login_submit
+                btnSubmit.nextFocusDownId = R.id.btn_login_proxy
+                btnLoginProxy?.nextFocusUpId = R.id.btn_login_submit
+                btnLoginProxy?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_proxy
                 val errorMessage = "⚠️ Error: ${state.message}"
                 tvStatus.text = errorMessage
                 tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
@@ -5117,6 +5264,7 @@ class MainActivity : AppCompatActivity() {
         val etHash = livHash?.editText
         val spTimeout = view.findViewById<Spinner>(R.id.sp_keypad_timeout)
         val btnBgPush = view.findViewById<Button>(R.id.btn_toggle_bg_notifications)
+        val btnSyncContacts = view.findViewById<Button>(R.id.btn_sync_contacts)
         val btnEditProfile = view.findViewById<Button>(R.id.btn_edit_profile)
         view.findViewById<Button>(R.id.btn_telegram_privacy)?.setOnClickListener { featureMenus.privacy() }
         view.findViewById<Button>(R.id.btn_two_step)?.setOnClickListener { featureMenus.twoStep() }
@@ -5233,6 +5381,35 @@ class MainActivity : AppCompatActivity() {
             updateBgPushLabel(newState)
             TeleFlipNotificationService.startOrStop(this, newState)
             showToast(if (newState) "Closed-flip background notifications enabled" else "Background notifications disabled")
+        }
+
+        fun updateSyncContactsLabel(enabled: Boolean) {
+            btnSyncContacts?.text = if (enabled) "👥 Sync Contacts: ON" else "👥 Sync Contacts: OFF"
+        }
+        updateSyncContactsLabel(telegramManager.syncContactsEnabled)
+        btnSyncContacts?.setOnClickListener {
+            val newState = !telegramManager.syncContactsEnabled
+            telegramManager.syncContactsEnabled = newState
+            updateSyncContactsLabel(newState)
+            if (newState) {
+                val hasPerm =
+                    ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.READ_CONTACTS,
+                    ) == PackageManager.PERMISSION_GRANTED
+                if (hasPerm) {
+                    telegramManager.syncContacts()
+                    showToast("Contact sync enabled")
+                } else {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.READ_CONTACTS),
+                        REQ_PHONE_PERM,
+                    )
+                }
+            } else {
+                showToast("Contact sync disabled")
+            }
         }
 
         val tvSettingsInputMode = view.findViewById<TextView>(R.id.tv_settings_input_mode)
@@ -6605,7 +6782,12 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == REQ_LOC_PERM && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             activeChat?.let { sendLocationFlow(it) }
         }
-        if (requestCode == REQ_PHONE_PERM && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == REQ_PHONE_PERM && grantResults.isNotEmpty()) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                if (telegramManager.authState.value is AuthState.Ready && telegramManager.syncContactsEnabled) {
+                    telegramManager.syncContacts()
+                }
+            }
             if (currentScreen == Screen.LOGIN) {
                 showLoginScreen(telegramManager.authState.value)
             }

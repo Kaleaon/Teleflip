@@ -5,6 +5,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.teleflip.app.R
@@ -16,34 +17,45 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
+@Config(sdk = [33])
 class PollDialogTest {
     private lateinit var context: Application
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        context.setTheme(R.style.Theme_TeleFlip)
     }
 
     @Test
-    fun testOnKeyDown_dpadRightConsumedAsInputKeyWhenEditTextFocused() {
+    fun testInitialFocusIsOnQuestion() {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
+        dialog.show()
+
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        assertTrue(etQuestion.isFocused)
+    }
+
+    @Test
+    fun testKeypadNumberTypingInQuestion() {
+        val dialog = PollDialog(context, timeoutMs = 200L, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
         val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         etQuestion.requestFocus()
 
-        val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)
-        val handled = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, event)
+        // Press '2' once -> "A" (in Default Abc mode, first char of 2 is uppercase)
+        val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
+        dialog.onKeyDown(KeyEvent.KEYCODE_2, event2)
 
-        assertTrue("KEYCODE_DPAD_RIGHT should be consumed as input key in PollDialog when EditText is focused", handled)
+        assertEquals("A", etQuestion.text.toString())
     }
 
     @Test
-    fun testDpadRightCommitsCharacterInPollDialog() {
-        val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
+    fun testDpadRightCommitsCharacter() {
+        val dialog = PollDialog(context, timeoutMs = 1000L, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
         val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
@@ -430,5 +442,176 @@ class PollDialogTest {
         assertEquals(View.VISIBLE, layoutStep1.visibility)
         assertEquals(View.GONE, layoutStep2.visibility)
         assertTrue("Dialog should remain showing when navigating back from Step 2", dialog.isShowing)
+    }
+
+    @Test
+    fun testSoftkeyBarBindingAndLabels() {
+        val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
+        dialog.show()
+
+        val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
+
+        assertNotNull("LSK view should be bound", tvLeft)
+        assertNotNull("Center softkey view should be bound", tvCenter)
+        assertNotNull("RSK view should be bound", tvRight)
+
+        // Step 1 labels
+        assertEquals("Clear", tvLeft.text.toString())
+        assertEquals("Next", tvCenter.text.toString())
+        assertEquals("Cancel", tvRight.text.toString())
+    }
+
+    @Test
+    fun testSoftkeyActions() {
+        var pollCreated = false
+        var capturedQuestion = ""
+        var capturedOpts = listOf<String>()
+        var capturedAnon = false
+
+        val dialog =
+            PollDialog(
+                context,
+                onCreatePoll = { q, opts, anon ->
+                    pollCreated = true
+                    capturedQuestion = q
+                    capturedOpts = opts
+                    capturedAnon = anon
+                },
+            )
+        dialog.show()
+
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+        val etOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText
+
+        etQuestion.setText("Sample Question")
+        etOpt1.setText("Option 1")
+        etOpt2.setText("Option 2")
+
+        // Test LSK clears focused EditText
+        etQuestion.requestFocus()
+        val softLeftEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SOFT_LEFT)
+        val handledLeft = dialog.onKeyDown(KeyEvent.KEYCODE_SOFT_LEFT, softLeftEvent)
+        assertTrue("LSK should be handled", handledLeft)
+        assertEquals("", etQuestion.text.toString())
+
+        // Restore question text
+        etQuestion.setText("Sample Question")
+
+        // Test Center key when on EditText triggers Next (advance to Step 2)
+        val centerEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER)
+        val handledNext = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER, centerEvent)
+        assertTrue("Center key on Step 1 should advance to Step 2", handledNext)
+
+        // Now on Step 2
+        val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
+        assertEquals("Submit", tvCenter.text.toString())
+        assertEquals("Back", tvRight.text.toString())
+
+        val btnAnon = dialog.findViewById<Button>(R.id.btn_poll_anonymous_toggle)
+        btnAnon.requestFocus()
+        val handledCenterBtn = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER, centerEvent)
+        assertTrue("Center key on Button should be handled", handledCenterBtn)
+        assertEquals("☐ Anonymous Voting: OFF", btnAnon.text.toString())
+
+        // Test Center key on non-button submits the poll
+        val etExplanation = dialog.findViewById<LabeledInputView>(R.id.liv_poll_explanation).editText
+        etExplanation.requestFocus()
+        val handledSubmit = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER, centerEvent)
+        assertTrue("Center key should trigger submit", handledSubmit)
+        assertTrue("Poll should be created", pollCreated)
+        assertEquals("Sample Question", capturedQuestion)
+        assertEquals(2, capturedOpts.size)
+        assertFalse("Anonymous voting was toggled OFF", capturedAnon)
+        assertFalse("Dialog should be dismissed", dialog.isShowing)
+
+        // Test RSK dismisses dialog on Step 1
+        val dialog2 = PollDialog(context, onCreatePoll = { _, _, _ -> })
+        dialog2.show()
+        val softRightEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SOFT_RIGHT)
+        val handledRight = dialog2.onKeyDown(KeyEvent.KEYCODE_SOFT_RIGHT, softRightEvent)
+        assertTrue("RSK should be handled", handledRight)
+        assertFalse("Dialog should be dismissed by RSK on Step 1", dialog2.isShowing)
+    }
+
+    @Test
+    fun testVerticalDpadFocusMovementSequence() {
+        val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
+        dialog.show()
+
+        val livQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question)
+        val livOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1)
+        val livOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2)
+        val livOpt3 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt3)
+        val livOpt4 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt4)
+        val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
+        val btnCancel = dialog.findViewById<Button>(R.id.btn_poll_cancel)
+
+        assertEquals(R.id.liv_poll_opt1, livQuestion.nextFocusDownId)
+        assertEquals(R.id.btn_poll_cancel, livQuestion.nextFocusUpId)
+
+        assertEquals(R.id.liv_poll_opt2, livOpt1.nextFocusDownId)
+        assertEquals(R.id.liv_poll_question, livOpt1.nextFocusUpId)
+
+        assertEquals(R.id.liv_poll_opt3, livOpt2.nextFocusDownId)
+        assertEquals(R.id.liv_poll_opt1, livOpt2.nextFocusUpId)
+
+        assertEquals(R.id.liv_poll_opt4, livOpt3.nextFocusDownId)
+        assertEquals(R.id.liv_poll_opt2, livOpt3.nextFocusUpId)
+
+        assertEquals(R.id.btn_poll_next, livOpt4.nextFocusDownId)
+        assertEquals(R.id.liv_poll_opt3, livOpt4.nextFocusUpId)
+
+        assertEquals(R.id.btn_poll_cancel, btnNext.nextFocusDownId)
+        assertEquals(R.id.liv_poll_opt4, btnNext.nextFocusUpId)
+
+        assertEquals(R.id.liv_poll_question, btnCancel.nextFocusDownId)
+        assertEquals(R.id.btn_poll_next, btnCancel.nextFocusUpId)
+    }
+
+    @Test
+    fun testMultiTapCharacterCommittedOnDpadNavigation() {
+        val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
+        dialog.show()
+
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+
+        etQuestion.requestFocus()
+
+        // Press KEYCODE_2 -> multi-tap buffer has uncommitted 'A'
+        val key2Event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
+        dialog.onKeyDown(KeyEvent.KEYCODE_2, key2Event)
+        assertEquals("A", etQuestion.text.toString())
+
+        // Press DPAD_DOWN
+        val dpadDownEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN)
+        dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_DOWN, dpadDownEvent)
+
+        // Character 'A' must be committed before focus moves
+        assertEquals("A", etQuestion.text.toString())
+
+        // Focus etOpt1 and type KEYCODE_3 ('D')
+        etOpt1.requestFocus()
+        val key3Event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_3)
+        dialog.onKeyDown(KeyEvent.KEYCODE_3, key3Event)
+        assertEquals("D", etOpt1.text.toString())
+
+        // Press DPAD_UP
+        val dpadUpEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP)
+        dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_UP, dpadUpEvent)
+
+        // Character 'D' must be committed
+        assertEquals("D", etOpt1.text.toString())
+
+        // Test DPAD_LEFT and DPAD_RIGHT committing multi-tap
+        val key4Event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_4)
+        dialog.onKeyDown(KeyEvent.KEYCODE_4, key4Event)
+        val dpadLeftEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT)
+        dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_LEFT, dpadLeftEvent)
+        assertTrue(etOpt1.text.toString().contains("g", ignoreCase = true))
     }
 }
