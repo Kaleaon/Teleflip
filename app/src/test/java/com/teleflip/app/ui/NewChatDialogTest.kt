@@ -84,7 +84,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<LabeledInputView>(R.id.liv_new_chat_input).editText
         val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
         val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
         val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
