@@ -50,12 +50,7 @@ class PollDialog(
         setContentView(R.layout.dialog_create_poll)
         setupDismissKeys()
 
-        val tvStepTitle = findViewById<TextView>(R.id.tv_poll_step_title)
         val tvMode = findViewById<TextView>(R.id.tv_poll_input_mode)
-
-        val layoutStep1 = findViewById<LinearLayout>(R.id.layout_step1)
-        val layoutStep2 = findViewById<LinearLayout>(R.id.layout_step2)
-
         val etQuestion = findViewById<EditText>(R.id.et_poll_question)
         val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
         val etOpt2 = findViewById<EditText>(R.id.et_poll_opt2)
@@ -64,17 +59,11 @@ class PollDialog(
         val btnNext = findViewById<Button>(R.id.btn_poll_next)
         val btnCancel = findViewById<Button>(R.id.btn_poll_cancel)
 
-        val tvQuestionSummary = findViewById<TextView>(R.id.tv_poll_step2_question_summary)
         val btnAnon = findViewById<Button>(R.id.btn_poll_anonymous_toggle)
         val btnModeToggle = findViewById<Button>(R.id.btn_poll_mode_toggle)
-
-        val layoutQuizSettings = findViewById<LinearLayout>(R.id.layout_quiz_settings)
         val btnCorrectChoice = findViewById<Button>(R.id.btn_poll_correct_choice)
         val etExplanation = findViewById<EditText>(R.id.et_poll_explanation)
-
-        val layoutRegularSettings = findViewById<LinearLayout>(R.id.layout_regular_settings)
         val btnMultipleAnswersToggle = findViewById<Button>(R.id.btn_poll_multiple_answers_toggle)
-
         val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
         val btnBack = findViewById<Button>(R.id.btn_poll_back)
 
@@ -96,128 +85,8 @@ class PollDialog(
                 )
         }
 
-        fun getValidOptions(): List<String> {
-            return listOfNotNull(
-                etOpt1?.text?.toString()?.trim(),
-                etOpt2?.text?.toString()?.trim(),
-                etOpt3?.text?.toString()?.trim(),
-                etOpt4?.text?.toString()?.trim(),
-            ).filter { it.isNotBlank() }
-        }
-
-        fun validateStep1Inputs(): Boolean {
-            etQuestion?.error = null
-            etOpt1?.error = null
-            etOpt2?.error = null
-            etOpt3?.error = null
-            etOpt4?.error = null
-
-            val question = etQuestion?.text?.toString()?.trim().orEmpty()
-            val opt1 = etOpt1?.text?.toString()?.trim().orEmpty()
-            val opt2 = etOpt2?.text?.toString()?.trim().orEmpty()
-            val opts = getValidOptions()
-
-            if (question.isBlank()) {
-                val errorMsg = "Question cannot be empty"
-                etQuestion?.error = errorMsg
-                etQuestion?.requestFocus()
-                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
-                return false
-            } else if (opts.size < 2) {
-                val errorMsg = "At least 2 options required"
-                val targetField =
-                    when {
-                        opt1.isBlank() -> etOpt1
-                        opt2.isBlank() -> etOpt2
-                        else -> etOpt1
-                    }
-                targetField?.error = errorMsg
-                targetField?.requestFocus()
-                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
-                return false
-            }
-
-            return true
-        }
-
-        fun updateCorrectChoiceButtonText() {
-            val opts = getValidOptions()
-            if (opts.isEmpty()) return
-            if (correctOptionIndex !in opts.indices) {
-                correctOptionIndex = 0
-            }
-            btnCorrectChoice?.text = "Correct Answer: ${correctOptionIndex + 1}. ${opts[correctOptionIndex]}"
-        }
-
-        fun updateStepVisibility() {
-            if (currentStep == 1) {
-                layoutStep1?.visibility = View.VISIBLE
-                layoutStep2?.visibility = View.GONE
-                tvStepTitle?.text = "📊 Create Poll (Step 1/2)"
-                softkeyManager?.update(
-                    left = "Clear",
-                    center = "Next",
-                    right = "Cancel",
-                    onLeft = {
-                        val focusedEdit = currentFocus as? EditText
-                        if (focusedEdit != null) {
-                            engines[focusedEdit.id]?.commitCurrentChar()
-                            focusedEdit.setText("")
-                        }
-                    },
-                    onCenter = { btnNext?.performClick() },
-                    onRight = {
-                        engines.values.forEach { it.commitCurrentChar() }
-                        dismiss()
-                    },
-                )
-            } else {
-                layoutStep1?.visibility = View.GONE
-                layoutStep2?.visibility = View.VISIBLE
-                tvStepTitle?.text = "⚙️ Poll Settings (Step 2/2)"
-
-                val q = etQuestion?.text?.toString()?.trim().orEmpty()
-                tvQuestionSummary?.text = "Q: $q"
-
-                updateCorrectChoiceButtonText()
-
-                if (isQuiz) {
-                    layoutQuizSettings?.visibility = View.VISIBLE
-                    layoutRegularSettings?.visibility = View.GONE
-                } else {
-                    layoutQuizSettings?.visibility = View.GONE
-                    layoutRegularSettings?.visibility = View.VISIBLE
-                }
-
-                softkeyManager?.update(
-                    left = "Clear",
-                    center = "Send",
-                    right = "Back",
-                    onLeft = {
-                        val focusedEdit = currentFocus as? EditText
-                        if (focusedEdit != null) {
-                            engines[focusedEdit.id]?.commitCurrentChar()
-                            focusedEdit.setText("")
-                        }
-                    },
-                    onCenter = { btnSubmit?.performClick() },
-                    onRight = {
-                        engines.values.forEach { it.commitCurrentChar() }
-                        currentStep = 1
-                        updateStepVisibility()
-                        etQuestion?.requestFocus()
-                    },
-                )
-            }
-        }
-
         btnNext?.setOnClickListener {
-            engines.values.forEach { it.commitCurrentChar() }
-            if (validateStep1Inputs()) {
-                currentStep = 2
-                updateStepVisibility()
-                btnModeToggle?.requestFocus()
-            }
+            handleNextStep()
         }
 
         btnCancel?.setOnClickListener {
@@ -233,7 +102,7 @@ class PollDialog(
         btnModeToggle?.setOnClickListener {
             isQuiz = !isQuiz
             btnModeToggle.text = if (isQuiz) "Poll Type: 💡 Trivia Quiz" else "Poll Type: 📊 Regular Survey"
-            updateStepVisibility()
+            updateStepViews()
         }
 
         btnCorrectChoice?.setOnClickListener {
@@ -251,43 +120,164 @@ class PollDialog(
         }
 
         btnBack?.setOnClickListener {
-            engines.values.forEach { it.commitCurrentChar() }
-            currentStep = 1
-            updateStepVisibility()
-            etQuestion?.requestFocus()
+            handleBackOrCancel()
         }
 
         btnSubmit?.setOnClickListener {
-            engines.values.forEach { it.commitCurrentChar() }
-            if (!validateStep1Inputs()) {
-                return@setOnClickListener
-            }
-            val question = etQuestion?.text?.toString()?.trim().orEmpty()
-            val opts = getValidOptions()
-            val explanation = etExplanation?.text?.toString()?.trim().orEmpty()
-
-            dismiss()
-            val safeCorrectIndex =
-                if (isQuiz && opts.isNotEmpty()) {
-                    correctOptionIndex.coerceIn(0, opts.size - 1)
-                } else {
-                    -1
-                }
-            onCreatePoll(
-                question,
-                opts,
-                isAnonymous,
-                isQuiz,
-                safeCorrectIndex,
-                if (isQuiz) explanation else "",
-                if (!isQuiz) allowsMultipleAnswers else false,
-            )
+            handleSubmit()
         }
 
+        updateStepViews()
+        etQuestion?.requestFocus()
+    }
+
+    private fun handleNextStep() {
+        engines.values.forEach { it.commitCurrentChar() }
+        if (validateStep1Inputs()) {
+            currentStep = 2
+            updateStepViews()
+            findViewById<Button>(R.id.btn_poll_mode_toggle)?.requestFocus()
+        }
+    }
+
+    private fun handleSubmit() {
+        engines.values.forEach { it.commitCurrentChar() }
+        if (!validateStep1Inputs()) {
+            return
+        }
+        val question = findViewById<EditText>(R.id.et_poll_question)?.text?.toString()?.trim().orEmpty()
+        val opts = getValidOptions()
+        val explanation = findViewById<EditText>(R.id.et_poll_explanation)?.text?.toString()?.trim().orEmpty()
+
+        dismiss()
+        val safeCorrectIndex =
+            if (isQuiz && opts.isNotEmpty()) {
+                correctOptionIndex.coerceIn(0, opts.size - 1)
+            } else {
+                -1
+            }
+        onCreatePoll(
+            question,
+            opts,
+            isAnonymous,
+            isQuiz,
+            safeCorrectIndex,
+            if (isQuiz) explanation else "",
+            if (!isQuiz) allowsMultipleAnswers else false,
+        )
+    }
+
+    private fun validateStep1Inputs(): Boolean {
+        val etQuestion = findViewById<EditText>(R.id.et_poll_question)
+        val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
+        val etOpt2 = findViewById<EditText>(R.id.et_poll_opt2)
+        val etOpt3 = findViewById<EditText>(R.id.et_poll_opt3)
+        val etOpt4 = findViewById<EditText>(R.id.et_poll_opt4)
+
+        etQuestion?.error = null
+        etOpt1?.error = null
+        etOpt2?.error = null
+        etOpt3?.error = null
+        etOpt4?.error = null
+
+        val question = etQuestion?.text?.toString()?.trim().orEmpty()
+        val opt1 = etOpt1?.text?.toString()?.trim().orEmpty()
+        val opt2 = etOpt2?.text?.toString()?.trim().orEmpty()
+        val opts = getValidOptions()
+
+        val isValid =
+            when {
+                question.isBlank() -> {
+                    val errorMsg = "Question cannot be empty"
+                    etQuestion?.error = errorMsg
+                    etQuestion?.requestFocus()
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                    false
+                }
+                opts.size < 2 -> {
+                    val errorMsg = "At least 2 options required"
+                    val targetField =
+                        when {
+                            opt1.isBlank() -> etOpt1
+                            opt2.isBlank() -> etOpt2
+                            else -> etOpt1
+                        }
+                    targetField?.error = errorMsg
+                    targetField?.requestFocus()
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                    false
+                }
+                else -> true
+            }
+
+        return isValid
+    }
+
+    private fun getValidOptions(): List<String> {
+        return listOfNotNull(
+            findViewById<EditText>(R.id.et_poll_opt1)?.text?.toString()?.trim(),
+            findViewById<EditText>(R.id.et_poll_opt2)?.text?.toString()?.trim(),
+            findViewById<EditText>(R.id.et_poll_opt3)?.text?.toString()?.trim(),
+            findViewById<EditText>(R.id.et_poll_opt4)?.text?.toString()?.trim(),
+        ).filter { it.isNotBlank() }
+    }
+
+    private fun updateCorrectChoiceButtonText() {
+        val opts = getValidOptions()
+        if (opts.isEmpty()) return
+        if (correctOptionIndex !in opts.indices) {
+            correctOptionIndex = 0
+        }
+        findViewById<Button>(R.id.btn_poll_correct_choice)?.text =
+            "Correct Answer: ${correctOptionIndex + 1}. ${opts[correctOptionIndex]}"
+    }
+
+    private fun updateStepViews() {
+        val layoutStep1 = findViewById<LinearLayout>(R.id.layout_step1)
+        val layoutStep2 = findViewById<LinearLayout>(R.id.layout_step2)
+        val tvStepTitle = findViewById<TextView>(R.id.tv_poll_step_title)
+        val tvQuestionSummary = findViewById<TextView>(R.id.tv_poll_step2_question_summary)
+        val layoutQuizSettings = findViewById<LinearLayout>(R.id.layout_quiz_settings)
+        val layoutRegularSettings = findViewById<LinearLayout>(R.id.layout_regular_settings)
+        val btnModeToggle = findViewById<Button>(R.id.btn_poll_mode_toggle)
+        val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
+        val etQuestion = findViewById<EditText>(R.id.et_poll_question)
+
+        if (currentStep == 1) {
+            layoutStep1?.visibility = View.VISIBLE
+            layoutStep2?.visibility = View.GONE
+            tvStepTitle?.text = "📊 Create Poll (Step 1/2)"
+        } else {
+            layoutStep1?.visibility = View.GONE
+            layoutStep2?.visibility = View.VISIBLE
+            tvStepTitle?.text = "⚙️ Poll Settings (Step 2/2)"
+
+            val q = etQuestion?.text?.toString()?.trim().orEmpty()
+            tvQuestionSummary?.text = "Q: $q"
+
+            updateCorrectChoiceButtonText()
+
+            if (isQuiz) {
+                layoutQuizSettings?.visibility = View.VISIBLE
+                layoutRegularSettings?.visibility = View.GONE
+                btnModeToggle?.nextFocusDownId = R.id.btn_poll_correct_choice
+                btnSubmit?.nextFocusUpId = R.id.et_poll_explanation
+            } else {
+                layoutQuizSettings?.visibility = View.GONE
+                layoutRegularSettings?.visibility = View.VISIBLE
+                btnModeToggle?.nextFocusDownId = R.id.btn_poll_multiple_answers_toggle
+                btnSubmit?.nextFocusUpId = R.id.btn_poll_multiple_answers_toggle
+            }
+        }
+        updateSoftkeys()
+    }
+
+    private fun updateSoftkeys() {
+        val isFirstStep = currentStep == 1
         setupSoftkeys(
             left = "Clear",
-            center = "Next",
-            right = "Cancel",
+            center = if (isFirstStep) "Next" else "Submit",
+            right = if (isFirstStep) "Cancel" else "Back",
             onLeft = {
                 val focusedEdit = currentFocus as? EditText
                 if (focusedEdit != null) {
@@ -296,78 +286,93 @@ class PollDialog(
                 }
             },
             onCenter = {
-                if (currentStep == 1) {
-                    btnNext?.performClick()
+                engines.values.forEach { it.commitCurrentChar() }
+                val current = currentFocus
+                if (current is Button) {
+                    current.performClick()
+                } else if (isFirstStep) {
+                    findViewById<Button>(R.id.btn_poll_next)?.performClick()
                 } else {
-                    btnSubmit?.performClick()
+                    findViewById<Button>(R.id.btn_poll_submit)?.performClick()
                 }
+                Unit
             },
             onRight = {
-                engines.values.forEach { it.commitCurrentChar() }
-                if (currentStep == 2) {
-                    currentStep = 1
-                    updateStepVisibility()
-                    etQuestion?.requestFocus()
-                } else {
-                    dismiss()
-                }
+                handleBackOrCancel()
             },
         )
-
-        updateStepVisibility()
-        etQuestion?.requestFocus()
     }
 
     override fun onBackPressed() {
-        engines.values.forEach { it.commitCurrentChar() }
-        if (currentStep == 2) {
-            currentStep = 1
-            findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
-            findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
-            findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
-            findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
-        } else {
-            dismiss()
-        }
+        handleBackOrCancel()
     }
 
     override fun onKeyDown(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (isBackOrRightSoftKey(keyCode)) {
-            engines.values.forEach { it.commitCurrentChar() }
-            if (currentStep == 2) {
-                currentStep = 1
-                findViewById<LinearLayout>(R.id.layout_step1)?.visibility = View.VISIBLE
-                findViewById<LinearLayout>(R.id.layout_step2)?.visibility = View.GONE
-                findViewById<TextView>(R.id.tv_poll_step_title)?.text = "📊 Create Poll (Step 1/2)"
-                findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
-            } else {
-                dismiss()
-            }
+        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
             return true
         }
 
+        if (isBackOrRightSoftKey(keyCode)) {
+            handleBackOrCancel()
+            return true
+        }
+
+        if (isDpadNavigationKey(keyCode)) {
+            engines.values.forEach { it.commitCurrentChar() }
+        }
+
         val focusedEdit = currentFocus as? EditText
-        if (focusedEdit != null) {
-            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
-                engines[focusedEdit.id]?.commitCurrentChar()
-                focusedEdit.setText("")
-                return true
-            }
-            val isInputKey =
-                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
-                    keyCode == KeyEvent.KEYCODE_STAR ||
-                    keyCode == KeyEvent.KEYCODE_POUND ||
-                    keyCode == KeyEvent.KEYCODE_DEL ||
-                    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-            if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
-                return true
-            }
-            engines[focusedEdit.id]?.commitCurrentChar()
+        if (focusedEdit != null && handleFocusedEditKey(focusedEdit, keyCode, event)) {
+            return true
         }
 
         return super.onKeyDown(keyCode, event)
+    }
+
+    private fun handleBackOrCancel() {
+        engines.values.forEach { it.commitCurrentChar() }
+        if (currentStep == 2) {
+            currentStep = 1
+            updateStepViews()
+            findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
+        } else {
+            dismiss()
+        }
+    }
+
+    private fun isDpadNavigationKey(keyCode: Int): Boolean =
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            -> true
+            else -> false
+        }
+
+    private fun handleFocusedEditKey(
+        focusedEdit: EditText,
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+            engines[focusedEdit.id]?.commitCurrentChar()
+            focusedEdit.setText("")
+            return true
+        }
+        val isInputKey =
+            (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                keyCode == KeyEvent.KEYCODE_STAR ||
+                keyCode == KeyEvent.KEYCODE_POUND ||
+                keyCode == KeyEvent.KEYCODE_DEL ||
+                keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+        val handled = isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true
+        if (!handled) {
+            engines[focusedEdit.id]?.commitCurrentChar()
+        }
+        return handled
     }
 }

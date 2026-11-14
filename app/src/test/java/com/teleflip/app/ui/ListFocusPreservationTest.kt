@@ -209,9 +209,6 @@ class ListFocusPreservationTest {
         assertTrue("D-pad DOWN on empty results should focus active tab", tabChats.hasFocus())
 
         // D-pad DOWN on empty search results when tab is focused keeps focus on tab
-        tabChats.isFocusableInTouchMode = true
-        tabChats.requestFocus()
-        assertTrue(tabChats.hasFocus())
         dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_DOWN, dpadDown)
         assertTrue("D-pad DOWN on empty results should keep focus on tab", tabChats.hasFocus())
 

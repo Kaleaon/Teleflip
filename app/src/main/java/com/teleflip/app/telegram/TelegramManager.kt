@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -188,6 +189,18 @@ class TelegramManager(
     private val _activeCall = MutableStateFlow<ActiveCall?>(null)
     val activeCall: StateFlow<ActiveCall?> = _activeCall.asStateFlow()
 
+    private val _contacts = MutableStateFlow<List<ContactModel>>(emptyList())
+    val contacts: StateFlow<List<ContactModel>> = _contacts.asStateFlow()
+
+    var syncContactsEnabled: Boolean
+        get() = prefs.getBoolean("pref_sync_contacts", true)
+        set(value) {
+            prefs.edit().putBoolean("pref_sync_contacts", value).apply()
+            if (value && authState.value is AuthState.Ready) {
+                syncContacts()
+            }
+        }
+
     private val callDispatcher by lazy { callTaskDispatcher ?: Executors.newSingleThreadExecutor { task -> Thread(task, "TeleFlipCall").apply { isDaemon = true } }.asCoroutineDispatcher() }
     private val callAudio by lazy { audioFactory(context) }
     private val callTonePlayer by lazy { tonePlayerFactory(context) }
@@ -350,6 +363,10 @@ class TelegramManager(
     private val prefMutedChatsKey = "teleflip_muted_chat_ids"
     private val prefMutedSoundChatsKey = "teleflip_muted_sound_chat_ids"
     private val prefChatSoundUriPrefix = "teleflip_chat_sound_uri_"
+    private val prefSavedStickersKey = "teleflip_saved_stickers"
+    private val prefSavedGifsKey = "teleflip_saved_gifs"
+    private val localSavedStickers = java.util.concurrent.CopyOnWriteArrayList<StickerItem>()
+    private val localSavedGifs = java.util.concurrent.CopyOnWriteArrayList<SavedGifItem>()
     val fileDownloadWaiters =
         java.util.concurrent.ConcurrentHashMap<Int, CopyOnWriteArrayList<CompletableDeferred<String?>>>()
 
@@ -1022,6 +1039,62 @@ class TelegramManager(
         }
     }
 
+    fun editMessageCaption(
+        chatId: Long,
+        messageId: Long,
+        newCaption: String,
+        onComplete: ((Boolean) -> Unit)? = null,
+    ) {
+        val trimmed = newCaption.trim()
+
+        val currentMap = _messages.value.toMutableMap()
+        val chatMsgs = (currentMap[chatId] ?: emptyList()).toMutableList()
+        val idx = chatMsgs.indexOfFirst { it.id == messageId }
+        if (idx >= 0) {
+            val updatedMsg = chatMsgs[idx].copy(mediaCaption = trimmed, isEdited = true)
+            chatMsgs[idx] = updatedMsg
+            currentMap[chatId] = chatMsgs
+            _messages.value = currentMap
+
+            if (idx == chatMsgs.lastIndex) {
+                _chats.value =
+                    _chats.value.map {
+                        if (it.id == chatId) {
+                            val newSummary = updatedMsg.text.ifBlank { trimmed }
+                            it.copy(lastMessage = newSummary)
+                        } else {
+                            it
+                        }
+                    }
+            }
+        }
+
+        val client = tdClient
+        if (client == null) {
+            onComplete?.invoke(idx >= 0)
+            return
+        }
+
+        try {
+            val req =
+                TdApi.EditMessageCaption().apply {
+                    this.chatId = chatId
+                    this.messageId = messageId
+                    this.replyMarkup = null
+                    this.caption = TdApi.FormattedText(trimmed, emptyArray())
+                }
+            client.send(req) { result ->
+                val ok = result is TdApi.Message || result is TdApi.Ok
+                scope.launch(Dispatchers.Main) {
+                    onComplete?.invoke(ok)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to edit message caption via TDLib: ${e.message}")
+            onComplete?.invoke(idx >= 0)
+        }
+    }
+
     fun toggleMessageReaction(
         chatId: Long,
         messageId: Long,
@@ -1635,10 +1708,131 @@ class TelegramManager(
         }
     }
 
+    fun getLocalSavedStickers(): List<StickerItem> {
+        val set = prefs.getStringSet(prefSavedStickersKey, emptySet()) ?: emptySet()
+        val list =
+            set.mapNotNull { entry ->
+                val parts = entry.split("::")
+                if (parts.size < 4) return@mapNotNull null
+                val it = parts.iterator()
+                val id = it.next().toIntOrNull() ?: return@mapNotNull null
+                val emoji = it.next()
+                val path = it.next().ifBlank { null }
+                val setName = it.next()
+                StickerItem(id, emoji, path, setName)
+            }
+        return (localSavedStickers + list).distinctBy { it.fileId }
+    }
+
+    fun addLocalSavedSticker(item: StickerItem) {
+        localSavedStickers.add(item)
+        val currentSet = prefs.getStringSet(prefSavedStickersKey, emptySet())?.toMutableSet() ?: mutableSetOf()
+        currentSet.add("${item.fileId}::${item.emoji}::${item.filePath.orEmpty()}::${item.setName}")
+        prefs.edit().putStringSet(prefSavedStickersKey, currentSet).apply()
+    }
+
+    fun getLocalSavedGifs(): List<SavedGifItem> {
+        val set = prefs.getStringSet(prefSavedGifsKey, emptySet()) ?: emptySet()
+        val list =
+            set.mapNotNull { entry ->
+                val parts = entry.split("::")
+                if (parts.size < 4) return@mapNotNull null
+                val it = parts.iterator()
+                val id = it.next().toIntOrNull() ?: return@mapNotNull null
+                val path = it.next().ifBlank { null }
+                val dur = it.next().toIntOrNull() ?: 0
+                val caption = it.next()
+                SavedGifItem(id, path, dur, caption)
+            }
+        return (localSavedGifs + list).distinctBy { it.fileId }
+    }
+
+    fun addLocalSavedGif(item: SavedGifItem) {
+        localSavedGifs.add(item)
+        val currentSet = prefs.getStringSet(prefSavedGifsKey, emptySet())?.toMutableSet() ?: mutableSetOf()
+        currentSet.add("${item.fileId}::${item.filePath.orEmpty()}::${item.durationSeconds}::${item.caption}")
+        prefs.edit().putStringSet(prefSavedGifsKey, currentSet).apply()
+    }
+
+    fun saveSticker(
+        fileId: Int,
+        emoji: String = "",
+        setName: String = "",
+        filePath: String? = null,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val item = StickerItem(fileId, emoji, filePath, setName)
+        addLocalSavedSticker(item)
+        val client = tdClient
+        if (client != null && fileId > 0) {
+            client.send(TdApi.AddFavoriteSticker(TdApi.InputFileId(fileId))) { result ->
+                val success = result is TdApi.Ok
+                scope.launch(Dispatchers.Main) { onResult?.invoke(success) }
+            }
+        } else {
+            onResult?.invoke(true)
+        }
+    }
+
+    fun saveGif(
+        fileId: Int,
+        duration: Int = 0,
+        caption: String = "",
+        filePath: String? = null,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val item = SavedGifItem(fileId, filePath, duration, caption)
+        addLocalSavedGif(item)
+        val client = tdClient
+        if (client != null && fileId > 0) {
+            client.send(TdApi.AddSavedAnimation(TdApi.InputFileId(fileId))) { result ->
+                val success = result is TdApi.Ok
+                scope.launch(Dispatchers.Main) { onResult?.invoke(success) }
+            }
+        } else {
+            onResult?.invoke(true)
+        }
+    }
+
+    fun loadSavedStickers(onResult: (List<StickerItem>) -> Unit) {
+        val client = tdClient
+        val localList = getLocalSavedStickers()
+        if (client == null) {
+            onResult(localList)
+            return
+        }
+        client.send(TdApi.GetFavoriteStickers()) { obj ->
+            val remoteList = mutableListOf<StickerItem>()
+            if (obj is TdApi.Stickers) {
+                for (st in obj.stickers) {
+                    val path =
+                        if (st.sticker.local.isDownloadingCompleted && st.sticker.local.path.isNotBlank()) {
+                            st.sticker.local.path
+                        } else {
+                            null
+                        }
+                    remoteList.add(
+                        StickerItem(
+                            fileId = st.sticker.id,
+                            emoji = st.emoji,
+                            filePath = path,
+                            setName = "Favorites",
+                        ),
+                    )
+                }
+            }
+            val merged = (remoteList + localList).distinctBy { it.fileId }
+            scope.launch(Dispatchers.Main) {
+                onResult(merged)
+            }
+        }
+    }
+
     fun loadSavedGifs(onResult: (List<SavedGifItem>) -> Unit) {
         val client = tdClient
+        val localList = getLocalSavedGifs()
         if (client == null) {
-            onResult(emptyList())
+            onResult(localList)
             return
         }
         client.send(TdApi.GetSavedAnimations()) { obj ->
@@ -1665,8 +1859,9 @@ class TelegramManager(
                     )
                 }
             }
+            val merged = (list + localList).distinctBy { it.fileId }
             scope.launch(Dispatchers.Main) {
-                onResult(list)
+                onResult(merged)
             }
         }
     }
@@ -2104,21 +2299,66 @@ class TelegramManager(
     fun setSelfDestructTimer(
         chatId: Long,
         seconds: Int,
-        onResult: ((Int) -> Unit)? = null,
+        onResult: ((Boolean, String?, Int) -> Unit)? = null,
     ) {
         scope.launch {
             try {
                 val validSeconds = seconds.coerceAtLeast(0)
-                sendQuery(TdApi.SetChatMessageAutoDeleteTime(chatId, validSeconds))
-                synchronized(chatMap) {
-                    val existing = chatMap[chatId]
-                    if (existing != null) chatMap[chatId] = existing.copy(selfDestructTimerSec = validSeconds)
+                val targetChat = _chats.value.find { it.id == chatId }
+                if (targetChat != null && (targetChat.chatType == ChatType.GROUP || targetChat.chatType == ChatType.CHANNEL)) {
+                    val me = sendQuery(TdApi.GetMe()) as? TdApi.User
+                    if (me != null) {
+                        val member = sendQuery(TdApi.GetChatMember(chatId, TdApi.MessageSenderUser(me.id))) as? TdApi.ChatMember
+                        val status = member?.status
+                        val isAdminOrCreator = status is TdApi.ChatMemberStatusCreator || status is TdApi.ChatMemberStatusAdministrator
+                        if (!isAdminOrCreator) {
+                            val errStr = "Only administrators can change auto-delete timer in groups or channels"
+                            reportOperationError(errStr)
+                            withContext(Dispatchers.Main) { onResult?.invoke(false, errStr, 0) }
+                            return@launch
+                        }
+                    }
                 }
-                _chats.value = synchronized(chatMap) { chatMap.values.toList() }
-                withContext(Dispatchers.Main) { onResult?.invoke(validSeconds) }
+                sendQuery(TdApi.SetChatMessageAutoDeleteTime(chatId, validSeconds))
+                handleChatMessageAutoDeleteTimeUpdated(chatId, validSeconds)
+                withContext(Dispatchers.Main) { onResult?.invoke(true, null, validSeconds) }
             } catch (e: Exception) {
-                reportOperationError(e.message ?: "Could not update message timer")
+                val errMsg = e.message ?: "Could not update message timer"
+                reportOperationError(errMsg)
+                withContext(Dispatchers.Main) { onResult?.invoke(false, errMsg, 0) }
             }
+        }
+    }
+
+    fun setSelfDestructTimer(
+        chatId: Long,
+        seconds: Int,
+        onResult: ((Int) -> Unit)?,
+    ) {
+        setSelfDestructTimer(chatId, seconds) { success, _, appliedSec ->
+            if (success) {
+                onResult?.invoke(appliedSec)
+            }
+        }
+    }
+
+    fun handleChatMessageAutoDeleteTimeUpdated(
+        chatId: Long,
+        autoDeleteTime: Int,
+    ) {
+        synchronized(pendingChats) {
+            pendingChats[chatId]?.let {
+                pendingChats[chatId] = it.copy(selfDestructTimerSec = autoDeleteTime)
+            }
+        }
+        synchronized(chatMap) {
+            val existing = chatMap[chatId]
+            if (existing != null) {
+                chatMap[chatId] = existing.copy(selfDestructTimerSec = autoDeleteTime)
+            }
+        }
+        _chats.update { chats ->
+            chats.map { if (it.id == chatId) it.copy(selfDestructTimerSec = autoDeleteTime) else it }
         }
     }
 
@@ -3382,10 +3622,22 @@ class TelegramManager(
     // =========================================================================
     // Contact Management
     // =========================================================================
-    fun loadContacts(onResult: (List<ContactModel>) -> Unit) {
+    fun loadContacts(onResult: ((List<ContactModel>) -> Unit)? = null) {
         val client = tdClient
         if (client == null) {
-            onResult(emptyList())
+            val fallbackContacts =
+                _chats.value.filter { it.chatType == ChatType.DIRECT }.map {
+                    ContactModel(
+                        userId = it.id,
+                        firstName = it.title,
+                        lastName = "",
+                        phoneNumber = "",
+                        username = "",
+                        isOnline = false,
+                    )
+                }
+            _contacts.value = fallbackContacts
+            onResult?.invoke(fallbackContacts)
             return
         }
 
@@ -3393,7 +3645,8 @@ class TelegramManager(
             if (obj is TdApi.Users) {
                 val userIds = obj.userIds
                 if (userIds.isEmpty()) {
-                    scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+                    _contacts.value = emptyList()
+                    scope.launch(Dispatchers.Main) { onResult?.invoke(emptyList()) }
                     return@send
                 }
                 val contacts = mutableListOf<ContactModel>()
@@ -3415,12 +3668,108 @@ class TelegramManager(
                         }
                         if (latch.decrementAndGet() == 0) {
                             val sorted = contacts.sortedBy { "${it.firstName} ${it.lastName}".trim().lowercase() }
-                            scope.launch(Dispatchers.Main) { onResult(sorted) }
+                            _contacts.value = sorted
+                            scope.launch(Dispatchers.Main) { onResult?.invoke(sorted) }
                         }
                     }
                 }
             } else {
-                scope.launch(Dispatchers.Main) { onResult(emptyList()) }
+                _contacts.value = emptyList()
+                scope.launch(Dispatchers.Main) { onResult?.invoke(emptyList()) }
+            }
+        }
+    }
+
+    fun syncContacts(onComplete: ((Boolean, Int) -> Unit)? = null) {
+        if (!syncContactsEnabled) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "Contact sync disabled in settings")
+            onComplete?.invoke(false, 0)
+            return
+        }
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.READ_CONTACTS,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            com.teleflip.app.report.AdbReporter.reportInfo(tag, "READ_CONTACTS permission not granted; skipping contact sync")
+            onComplete?.invoke(false, 0)
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val contentResolver = context.contentResolver
+                val projection =
+                    arrayOf(
+                        android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER,
+                        android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    )
+                val cursor =
+                    contentResolver.query(
+                        android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                        projection,
+                        null,
+                        null,
+                        null,
+                    )
+                val importedList = mutableListOf<TdApi.ImportedContact>()
+                val seenPhones = mutableSetOf<String>()
+                cursor?.use { c ->
+                    val numIdx = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                    val nameIdx = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                    while (c.moveToNext()) {
+                        val rawNum = if (numIdx >= 0) c.getString(numIdx) else null
+                        val rawName = if (nameIdx >= 0) c.getString(nameIdx) else null
+                        if (rawNum.isNullOrBlank()) continue
+                        val cleanPhone = org.telegram.PhoneFormat.PhoneFormat.stripExceptNumbers(rawNum, true) ?: continue
+                        if (cleanPhone.isBlank()) continue
+                        val normalizedPhone = if (!cleanPhone.startsWith("+")) "+$cleanPhone" else cleanPhone
+                        if (seenPhones.add(normalizedPhone)) {
+                            val nameStr = rawName?.trim().orEmpty()
+                            val parts = nameStr.split("\\s+".toRegex(), 2)
+                            val first = parts.getOrNull(0)?.ifBlank { normalizedPhone } ?: normalizedPhone
+                            val last = parts.getOrNull(1) ?: ""
+                            importedList.add(
+                                TdApi.ImportedContact().apply {
+                                    phoneNumber = normalizedPhone
+                                    firstName = first
+                                    lastName = last
+                                },
+                            )
+                        }
+                    }
+                }
+                if (importedList.isEmpty()) {
+                    com.teleflip.app.report.AdbReporter.reportInfo(tag, "No contacts found in device phonebook to sync")
+                    withContext(Dispatchers.Main) { onComplete?.invoke(true, 0) }
+                    return@launch
+                }
+                val client = tdClient
+                if (client == null) {
+                    com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib client null during contact sync")
+                    withContext(Dispatchers.Main) { onComplete?.invoke(false, 0) }
+                    return@launch
+                }
+                val req = TdApi.ImportContacts(importedList.toTypedArray())
+                client.send(req) { obj ->
+                    scope.launch(Dispatchers.Main) {
+                        if (obj is TdApi.ImportedContacts) {
+                            com.teleflip.app.report.AdbReporter.reportInfo(
+                                tag,
+                                "Successfully imported ${importedList.size} contacts to Telegram",
+                            )
+                            loadContacts { onComplete?.invoke(true, importedList.size) }
+                        } else {
+                            com.teleflip.app.report.AdbReporter.reportError(
+                                tag,
+                                "ImportContacts returned unexpected object: $obj",
+                            )
+                            onComplete?.invoke(false, 0)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                com.teleflip.app.report.AdbReporter.reportError(tag, "Error during phonebook contact sync", e)
+                withContext(Dispatchers.Main) { onComplete?.invoke(false, 0) }
             }
         }
     }
@@ -4866,6 +5215,10 @@ class TelegramManager(
                 val draftText = (updateDraft.draftMessage?.content as? TdApi.DraftMessageContentText)?.text?.text.orEmpty()
                 handleChatDraftUpdated(updateDraft.chatId, draftText)
             }
+            TdApi.UpdateChatMessageAutoDeleteTime.CONSTRUCTOR -> {
+                val update = obj as TdApi.UpdateChatMessageAutoDeleteTime
+                handleChatMessageAutoDeleteTimeUpdated(update.chatId, update.messageAutoDeleteTime)
+            }
             TdApi.UpdateChatNotificationSettings.CONSTRUCTOR -> {
                 val update = obj as TdApi.UpdateChatNotificationSettings
                 handleChatNotificationSettingsUpdated(update.chatId, update.notificationSettings)
@@ -5089,6 +5442,7 @@ class TelegramManager(
                 loadCurrentUser()
                 loadChatFolders()
                 loadScopeNotificationSettings()
+                syncContacts()
             }
             TdApi.AuthorizationStateClosing.CONSTRUCTOR -> {
                 com.teleflip.app.report.AdbReporter.reportInfo(tag, "TDLib is closing gracefully...")
@@ -5314,6 +5668,7 @@ class TelegramManager(
                 order = mainPosition?.order ?: existingModel?.order ?: 0L,
                 lastMessageDate = lastMsg?.date?.toLong() ?: existingModel?.lastMessageDate ?: 0L,
                 lastMessageId = lastMsg?.id ?: existingModel?.lastMessageId ?: 0L,
+                selfDestructTimerSec = chat.messageAutoDeleteTime,
             )
 
         synchronized(pendingChats) {
@@ -6014,19 +6369,17 @@ class TelegramManager(
     }
 
     private fun extractMediaCaption(content: TdApi.MessageContent?): String {
-        if (content == null) return ""
-        return when (content.constructor) {
-            TdApi.MessagePhoto.CONSTRUCTOR -> (content as TdApi.MessagePhoto).caption.text
-            TdApi.MessageDocument.CONSTRUCTOR -> {
-                val doc = content as TdApi.MessageDocument
-                doc.caption.text.ifBlank { doc.document.fileName }
+        val formattedText =
+            when (content) {
+                is TdApi.MessagePhoto -> content.caption
+                is TdApi.MessageDocument -> content.caption
+                is TdApi.MessageVideo -> content.caption
+                is TdApi.MessageAnimation -> content.caption
+                is TdApi.MessageAudio -> content.caption
+                is TdApi.MessagePaidMedia -> content.caption
+                else -> null
             }
-            TdApi.MessageVideo.CONSTRUCTOR -> (content as TdApi.MessageVideo).caption.text
-            TdApi.MessageAnimation.CONSTRUCTOR -> (content as TdApi.MessageAnimation).caption.text
-            TdApi.MessageAudio.CONSTRUCTOR -> (content as TdApi.MessageAudio).caption.text
-            TdApi.MessagePaidMedia.CONSTRUCTOR -> (content as TdApi.MessagePaidMedia).caption.text
-            else -> ""
-        }
+        return formattedText?.text.orEmpty()
     }
 
     private fun extractMediaFileInfo(content: TdApi.MessageContent?): Pair<Int, String?> {
@@ -6296,19 +6649,25 @@ class TelegramManager(
         }
     }
 
+    private suspend fun enableProxyInternal(proxyId: Int): ProxyItem? {
+        val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
+        val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
+        ProxyStorage.deleteProxy(context, proxyId)
+        val updated = ProxyStorage.saveProxy(context, item.copy(id = added.id, isEnabled = true))
+        activeProxyId = added.id
+        return updated
+    }
+
     fun enableProxy(
         proxyId: Int,
         callback: ((Boolean, String?) -> Unit)? = null,
     ) {
         scope.launch {
             try {
-                val item = ProxyStorage.getProxies(context).find { it.id == proxyId } ?: error("Proxy not found")
-                val added = sendQuery(TdApi.AddProxy(buildTdApiProxy(item), true, "")) as TdApi.AddedProxy
-                ProxyStorage.enableProxy(context, proxyId)
-                activeProxyId = added.id
-                callback?.invoke(true, null)
+                enableProxyInternal(proxyId)
+                withContext(Dispatchers.Main) { callback?.invoke(true, null) }
             } catch (e: Exception) {
-                callback?.invoke(false, e.message ?: "Could not enable proxy")
+                withContext(Dispatchers.Main) { callback?.invoke(false, e.message ?: "Could not enable proxy") }
             }
         }
     }
@@ -6339,6 +6698,27 @@ class TelegramManager(
                 callback?.invoke(true, null)
             } catch (e: Exception) {
                 callback?.invoke(false, e.message ?: "Could not delete proxy")
+            }
+        }
+    }
+
+    fun pingProxy(
+        proxy: ProxyItem,
+        callback: (Long?) -> Unit,
+    ) {
+        scope.launch {
+            try {
+                val tdProxy = buildTdApiProxy(proxy)
+                val result = sendQuery(TdApi.PingProxy(tdProxy))
+                val latencyMs =
+                    if (result is TdApi.Seconds) {
+                        (result.seconds * 1000.0).toLong()
+                    } else {
+                        null
+                    }
+                withContext(Dispatchers.Main) { callback(latencyMs) }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { callback(null) }
             }
         }
     }
@@ -6377,6 +6757,62 @@ class TelegramManager(
             } catch (_: Exception) {
                 null
             }
+        }
+    }
+
+    fun pingProxy(
+        proxyId: Int,
+        callback: (Long?) -> Unit,
+    ) {
+        val proxy = getProxies().find { it.id == proxyId }
+        if (proxy != null) {
+            pingProxy(proxy, callback)
+        } else {
+            callback(null)
+        }
+    }
+
+    fun parseProxyUri(uri: Uri): ProxyItem? {
+        val scheme = uri.scheme?.lowercase(Locale.getDefault()) ?: return null
+        val host = uri.host?.lowercase(Locale.getDefault()) ?: ""
+        val path = uri.path?.lowercase(Locale.getDefault()) ?: ""
+
+        val isMtproto: Boolean
+        val isSocks5: Boolean
+
+        if (scheme == "tg") {
+            isMtproto = host == "proxy"
+            isSocks5 = host == "socks"
+        } else if (scheme == "http" || scheme == "https") {
+            if (host != "t.me" && host != "telegram.me") return null
+            isMtproto = path.startsWith("/proxy")
+            isSocks5 = path.startsWith("/socks")
+        } else {
+            return null
+        }
+
+        if (!isMtproto && !isSocks5) return null
+
+        val server = uri.getQueryParameter("server") ?: uri.getQueryParameter("host") ?: ""
+        if (server.isBlank()) return null
+
+        val port = uri.getQueryParameter("port")?.toIntOrNull() ?: 1080
+
+        return if (isMtproto) {
+            val secret = uri.getQueryParameter("secret") ?: ""
+            ProxyItem(server = server, port = port, type = ProxyType.MTPROTO, secret = secret)
+        } else {
+            val username = uri.getQueryParameter("user") ?: uri.getQueryParameter("username") ?: ""
+            val password = uri.getQueryParameter("pass") ?: uri.getQueryParameter("password") ?: ""
+            ProxyItem(server = server, port = port, type = ProxyType.SOCKS5, username = username, password = password)
+        }
+    }
+
+    fun parseProxyUrl(url: String): ProxyItem? {
+        return try {
+            parseProxyUri(Uri.parse(url))
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -6431,12 +6867,17 @@ class TelegramManager(
                     "Selected best proxy: ${bestProxy.server}:${bestProxy.port} with latency ${pingMs}ms",
                 )
 
-                enableProxy(bestProxy.id) { success, _ ->
-                    if (success) {
+                try {
+                    val updatedProxy = enableProxyInternal(bestProxy.id)
+                    val activeProxy = ProxyStorage.getEnabledProxy(context) ?: updatedProxy
+                    if (updatedProxy != null) {
                         retryConnection()
+                        callback?.invoke(activeProxy, pingMs)
+                    } else {
+                        callback?.invoke(null, null)
                     }
-                    val activeProxy = ProxyStorage.getEnabledProxy(context) ?: bestProxy
-                    callback?.invoke(activeProxy, pingMs)
+                } catch (_: Exception) {
+                    callback?.invoke(null, null)
                 }
             } else {
                 _failoverStatus.value = "🔴 Proxy failover: All stored proxies unreachable"
@@ -6484,16 +6925,15 @@ class TelegramManager(
         scope.launch {
             val ping = pingProxy(savedProxy, timeoutMs = 3000L)
             if (ping != null) {
-                enableProxy(savedProxy.id) { success, err ->
-                    if (success) {
-                        val msg = "🟢 Proxy deep-link activated: ${savedProxy.server}:${savedProxy.port} (${ping}ms)"
-                        _failoverStatus.value = msg
-                        callback?.invoke(true, msg)
-                    } else {
-                        val msg = "🔴 Failed to enable deep-link proxy: ${err ?: "Unknown error"}"
-                        _failoverStatus.value = msg
-                        callback?.invoke(false, msg)
-                    }
+                try {
+                    enableProxyInternal(savedProxy.id)
+                    val msg = "🟢 Proxy deep-link activated: ${savedProxy.server}:${savedProxy.port} (${ping}ms)"
+                    _failoverStatus.value = msg
+                    callback?.invoke(true, msg)
+                } catch (e: Exception) {
+                    val msg = "🔴 Failed to enable deep-link proxy: ${e.message ?: "Unknown error"}"
+                    _failoverStatus.value = msg
+                    callback?.invoke(false, msg)
                 }
             } else {
                 val msg = "🔴 Deep-link proxy failed latency ping test: ${savedProxy.server}:${savedProxy.port}"

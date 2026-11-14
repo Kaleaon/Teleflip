@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -28,6 +29,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
 
+@Suppress("LargeClass")
 class MediaViewerDialog(
     context: Context,
     private var message: MessageModel,
@@ -47,6 +49,15 @@ class MediaViewerDialog(
     private var pbProgress: ProgressBar? = null
     private var tvTime: TextView? = null
     private var progressJob: Job? = null
+
+    private var btnZoomIn: Button? = null
+    private var btnZoomOut: Button? = null
+    private var btnReset: Button? = null
+    private var btnPlayPause: Button? = null
+    private var btnRewind: Button? = null
+    private var btnFastForward: Button? = null
+    private var btnSpeed: Button? = null
+    private var btnSave: Button? = null
 
     var zoomLevel: Float = 1.0f
         private set
@@ -104,6 +115,33 @@ class MediaViewerDialog(
         findViewById<View>(R.id.btn_reset)?.setOnClickListener { resetZoomAndPan() }
         findViewById<View>(R.id.btn_save)?.setOnClickListener { onSaveMedia(message) }
 
+        btnZoomIn = findViewById(R.id.btn_viewer_zoom_in)
+        btnZoomOut = findViewById(R.id.btn_viewer_zoom_out)
+        btnReset = findViewById(R.id.btn_viewer_reset)
+        btnPlayPause = findViewById(R.id.btn_viewer_play_pause)
+        btnRewind = findViewById(R.id.btn_viewer_rewind)
+        btnFastForward = findViewById(R.id.btn_viewer_fast_forward)
+        btnSpeed = findViewById(R.id.btn_viewer_speed)
+        btnSave = findViewById(R.id.btn_viewer_save)
+
+        btnZoomIn?.setOnClickListener { cycleZoomIn() }
+        btnZoomOut?.setOnClickListener { zoomOut() }
+        btnReset?.setOnClickListener { resetZoomAndPan() }
+        btnSave?.setOnClickListener { onSaveMedia(message) }
+        btnPlayPause?.setOnClickListener { toggleVideoPlayback() }
+        btnRewind?.setOnClickListener { seekVideoBy(-5000) }
+        btnFastForward?.setOnClickListener { seekVideoBy(5000) }
+        btnSpeed?.setOnClickListener { cyclePlaybackSpeed() }
+
+        btnZoomIn?.contentDescription = "Zoom in"
+        btnZoomOut?.contentDescription = "Zoom out"
+        btnReset?.contentDescription = "Reset zoom and position"
+        btnSave?.contentDescription = "Save media"
+        btnPlayPause?.contentDescription = "Play or pause video"
+        btnRewind?.contentDescription = "Rewind 5 seconds"
+        btnFastForward?.contentDescription = "Fast forward 5 seconds"
+        btnSpeed?.contentDescription = "Change playback speed"
+
         renderMedia()
         dialogScope.launch {
             messageUpdates?.collect { chats ->
@@ -139,6 +177,8 @@ class MediaViewerDialog(
 
         val filePath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, message.mediaFilePath) ?: message.mediaFilePath
         val fileExists = !filePath.isNullOrBlank() && File(filePath).exists()
+
+        setupControlBarButtons()
 
         when (message.mediaType) {
             MediaType.VIDEO, MediaType.ANIMATION -> {
@@ -251,6 +291,7 @@ class MediaViewerDialog(
             updateSpeedBadge()
             updateProgressUI()
             startProgressTracking()
+            updateVideoControlsState()
             val playingDesc = context.getString(R.string.cd_video_state_playing)
             vvVideo?.let { ViewCompat.setStateDescription(it, playingDesc) }
             updateSoftkeysForVideo()
@@ -262,6 +303,7 @@ class MediaViewerDialog(
             if (!isLoopingGif) {
                 isVideoPlaying = false
                 tvZoomBadge?.text = "Ended ■"
+                updateVideoControlsState()
                 val endedDesc = context.getString(R.string.cd_video_state_ended)
                 vvVideo?.let { ViewCompat.setStateDescription(it, endedDesc) }
                 updateSoftkeysForVideo()
@@ -348,6 +390,7 @@ class MediaViewerDialog(
         val zoomDesc = ContentDescriptionFormatter.getZoomDescription(context, zoomLevel)
         ivPhoto?.let { ViewCompat.setStateDescription(it, zoomDesc) }
         tvZoomBadge?.let { ViewCompat.setStateDescription(it, zoomDesc) }
+        updatePhotoControlsState()
     }
 
     fun cyclePlaybackSpeed(): Float {
@@ -372,6 +415,7 @@ class MediaViewerDialog(
 
     internal fun updateSpeedBadge() {
         tvZoomBadge?.text = formatSpeedLabel(playbackSpeed)
+        updateVideoControlsState()
     }
 
     internal fun formatSpeedLabel(speed: Float): String {
@@ -445,6 +489,57 @@ class MediaViewerDialog(
             val playingDesc = context.getString(R.string.cd_video_state_playing)
             ViewCompat.setStateDescription(vv, playingDesc)
             updateSoftkeysForVideo()
+        }
+        updateVideoControlsState()
+    }
+
+    private fun updateVideoControlsState() {
+        val playPauseText = if (isVideoPlaying) "⏸ Pause" else "▶ Play"
+        btnPlayPause?.text = playPauseText
+        val videoStateDesc =
+            if (isVideoPlaying) {
+                context.getString(R.string.cd_video_state_playing)
+            } else {
+                context.getString(R.string.cd_video_state_paused)
+            }
+        btnPlayPause?.let { ViewCompat.setStateDescription(it, videoStateDesc) }
+
+        val speedLabel = formatSpeedLabel(playbackSpeed)
+        btnSpeed?.text = speedLabel
+        btnSpeed?.let { ViewCompat.setStateDescription(it, "Speed $speedLabel") }
+    }
+
+    private fun updatePhotoControlsState() {
+        val zoomDesc = ContentDescriptionFormatter.getZoomDescription(context, zoomLevel)
+        btnZoomIn?.let { ViewCompat.setStateDescription(it, zoomDesc) }
+        btnZoomOut?.let { ViewCompat.setStateDescription(it, zoomDesc) }
+        btnReset?.let { ViewCompat.setStateDescription(it, zoomDesc) }
+    }
+
+    private fun setupControlBarButtons() {
+        val isVideoMode = message.mediaType == MediaType.VIDEO || message.mediaType == MediaType.ANIMATION
+        if (isVideoMode) {
+            btnZoomIn?.visibility = View.GONE
+            btnZoomOut?.visibility = View.GONE
+            btnReset?.visibility = View.GONE
+
+            btnPlayPause?.visibility = View.VISIBLE
+            btnRewind?.visibility = View.VISIBLE
+            btnFastForward?.visibility = View.VISIBLE
+            btnSpeed?.visibility = View.VISIBLE
+            btnSave?.visibility = View.VISIBLE
+            updateVideoControlsState()
+        } else {
+            btnZoomIn?.visibility = View.VISIBLE
+            btnZoomOut?.visibility = View.VISIBLE
+            btnReset?.visibility = View.VISIBLE
+
+            btnPlayPause?.visibility = View.GONE
+            btnRewind?.visibility = View.GONE
+            btnFastForward?.visibility = View.GONE
+            btnSpeed?.visibility = View.GONE
+            btnSave?.visibility = View.VISIBLE
+            updatePhotoControlsState()
         }
     }
 

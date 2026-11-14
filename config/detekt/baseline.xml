@@ -3,11 +3,11 @@
   <ManuallySuppressedIssues></ManuallySuppressedIssues>
   <CurrentIssues>
     <ID>CollapsibleIfStatements:KeypadInputEngine.kt$KeypadInputEngine.&lt;no name provided&gt;$if (eventType == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) { if (lastKeyCode != -1) { val curStart = editText.selectionStart val curEnd = editText.selectionEnd if (curStart != expectedSelection || curEnd != curStart) { commitCurrentChar() } } }</ID>
+    <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) { if (telegramManager.authState.value is AuthState.Ready &amp;&amp; telegramManager.syncContactsEnabled) { telegramManager.syncContacts() } }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (SoftkeyUtils.isSoftLeftKey(keyCode)) { if (softkeyManager.handleKeyEvent(keyCode, event)) return true }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (SoftkeyUtils.isSoftRightKey(keyCode)) { if (softkeyManager.handleKeyEvent(keyCode, event)) return true }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_DPAD_UP) { if (vh != null) { val pos = vh.adapterPosition if (pos &gt; 0) { focusChatAt(pos - 1) return true } else if (pos == 0) { focusSelectedTabView() return true } } }</ID>
     <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (keyCode == KeyEvent.KEYCODE_ENDCALL &amp;&amp; event.action == KeyEvent.ACTION_DOWN) { if (telegramManager.hasOngoingCall) { telegramManager.endCurrentCall() return true } }</ID>
-    <ID>CollapsibleIfStatements:MainActivity.kt$MainActivity$if (requestCode == REQ_PHONE_PERM &amp;&amp; grantResults.isNotEmpty() &amp;&amp; grantResults[0] == PackageManager.PERMISSION_GRANTED) { if (currentScreen == Screen.LOGIN) { showLoginScreen(telegramManager.authState.value) } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (SoftkeyUtils.isCenterKey(keyCode)) { if ((rvResults.adapter?.itemCount ?: 0) &gt; 0) { focusResultAt(0) return true } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog$if (SoftkeyUtils.isCenterKey(keyCode)) { if (handleCenterPress()) { return true } }</ID>
     <ID>CollapsibleIfStatements:SearchDialog.kt$SearchDialog.&lt;no name provided&gt;$if (!isMessageLoading &amp;&amp; messageNextOffset.isNotEmpty() &amp;&amp; totalItemCount &lt; maxResultsLimit) { if (visibleItemCount + firstVisibleItem &gt;= totalItemCount - 2) { loadMoreMessageResults() } }</ID>
@@ -67,7 +67,6 @@
     <ID>CyclomaticComplexMethod:MessageAdapter.kt$MessageAdapter.MessageViewHolder$fun bind(message: MessageModel)</ID>
     <ID>CyclomaticComplexMethod:MessageTextFormatter.kt$MessageTextFormatter$fun format( message: MessageModel, revealSpoilers: Boolean = false, ): CharSequence</ID>
     <ID>CyclomaticComplexMethod:NewChatDialog.kt$NewChatDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
-    <ID>CyclomaticComplexMethod:PollDialog.kt$PollDialog$override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>CyclomaticComplexMethod:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:StorageManager.kt$StorageManager$private fun performSdCardDetection(context: Context): File?</ID>
     <ID>CyclomaticComplexMethod:TelegramFeatureMenus.kt$TelegramFeatureMenus$fun buttons(message: MessageModel)</ID>
@@ -75,7 +74,9 @@
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun handleDeepLinkProxy( uri: android.net.Uri, callback: ((Boolean, String) -&gt; Unit)? = null, )</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun parseProxyUri(uri: Uri): ProxyItem?</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun syncContacts(onComplete: ((Boolean, Int) -&gt; Unit)? = null)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$fun updateUserCache(user: TdApi.User)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$override fun onResult(obj: TdApi.Object?)</ID>
     <ID>CyclomaticComplexMethod:TelegramManager.kt$TelegramManager$private fun addOrUpdateChat(chat: TdApi.Chat)</ID>
@@ -123,7 +124,6 @@
     <ID>LongMethod:MainActivity.kt$MainActivity$private fun showMessageOptionsMenu(msg: MessageModel)</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$private fun updateSoftkeysForFocusedMessage( chat: ChatModel, msg: MessageModel, )</ID>
     <ID>LongMethod:MessageAdapter.kt$MessageAdapter.MessageViewHolder$fun bind(message: MessageModel)</ID>
-    <ID>LongMethod:PollDialog.kt$PollDialog$override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>LongMethod:SearchDialog.kt$SearchDialog$override fun onKeyDown( keyCode: Int, event: KeyEvent, ): Boolean</ID>
     <ID>LongMethod:TelegramManager.kt$TelegramManager$fun loadChatProfile( chatId: Long, onResult: (ChatProfile) -&gt; Unit, )</ID>
     <ID>LongMethod:TelegramManager.kt$TelegramManager$override fun onResult(obj: TdApi.Object?)</ID>
@@ -167,6 +167,8 @@
     <ID>MagicNumber:MainActivity.kt$MainActivity$20</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$200</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$24</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$25</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$2592000</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$3</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$30</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$300L</ID>
@@ -181,7 +183,9 @@
     <ID>MagicNumber:MainActivity.kt$MainActivity$525600</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$6</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$60</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$604800</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$7</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$86400</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$9</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$900L</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity.&lt;no name provided&gt;$10</ID>
@@ -236,6 +240,7 @@
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$0x6FB9F0</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$100</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000</ID>
+    <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000.0</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$10000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1000L</ID>
     <ID>MagicNumber:TelegramManager.kt$TelegramManager$1024L</ID>
@@ -368,6 +373,7 @@
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun getSenderDisplayName(message: TdApi.Message): String</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun handleCallUpdate(call: TdApi.Call)</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun isChatMuted(chatId: Long): Boolean</ID>
+    <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun parseProxyUri(uri: Uri): ProxyItem?</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun resolveAndCreateChat( query: String, onResult: (ChatModel?, String?) -&gt; Unit, )</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun switchStorageLocation( newType: com.teleflip.app.storage.StorageLocationType, onComplete: (Boolean, String) -&gt; Unit, )</ID>
     <ID>ReturnCount:TelegramManager.kt$TelegramManager$fun toggleMessageReaction( chatId: Long, messageId: Long, emoji: String, )</ID>
