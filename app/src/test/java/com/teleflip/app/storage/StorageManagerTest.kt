@@ -46,6 +46,35 @@ class StorageManagerTest {
     }
 
     @Test
+    fun testGetFilesDirectoryForType() {
+        val internalFilesDir = StorageManager.getFilesDirectoryForType(context, StorageLocationType.INTERNAL)
+        assertNotNull(internalFilesDir)
+        assertTrue(internalFilesDir.exists())
+        assertEquals("Telegram", internalFilesDir.name)
+
+        val sdFilesDir = StorageManager.getFilesDirectoryForType(context, StorageLocationType.SD_CARD)
+        assertNotNull(sdFilesDir)
+        assertTrue(sdFilesDir.exists())
+        assertEquals("Telegram", sdFilesDir.name)
+    }
+
+    @Test
+    fun testSetSelectedStorageTypeWithTelegramManagerDelegation() {
+        val telegramManager = org.mockito.Mockito.mock(com.teleflip.app.telegram.TelegramManager::class.java)
+        val onComplete: (Boolean, String) -> Unit = { _, _ -> }
+        val result =
+            StorageManager.setSelectedStorageType(
+                context = context,
+                type = StorageLocationType.INTERNAL,
+                telegramManager = telegramManager,
+                onComplete = onComplete,
+            )
+        assertTrue(result)
+        assertEquals(StorageLocationType.INTERNAL, StorageManager.getSelectedStorageType(context))
+        org.mockito.Mockito.verify(telegramManager).switchStorageLocation(StorageLocationType.INTERNAL, onComplete)
+    }
+
+    @Test
     fun testCacheExpirationAfterTtl() {
         var currentTime = 1_000_000L
         StorageManager.timeProvider = { currentTime }
