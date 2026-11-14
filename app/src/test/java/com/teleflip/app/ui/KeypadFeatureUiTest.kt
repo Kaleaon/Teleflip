@@ -87,7 +87,16 @@ class KeypadFeatureUiTest {
     }
 
     @Test fun spoilersStayMaskedWithUtf16OffsetsAndMalformedEntitiesAreIgnored() {
-        val message = MessageModel(1, 2, "Sender", "👋 secret", "", false, formatting = listOf(MessageFormatting(3, 6, "spoiler"), MessageFormatting(Int.MAX_VALUE, 8, "bold")))
+        val message =
+            MessageModel(
+                1,
+                2,
+                "Sender",
+                "👋 secret",
+                "",
+                false,
+                formatting = listOf(MessageFormatting(3, 6, "spoiler"), MessageFormatting(Int.MAX_VALUE, 8, "bold")),
+            )
         assertEquals("👋 ██████", MessageTextFormatter.format(message).toString())
         assertEquals("👋 secret", MessageTextFormatter.format(message, revealSpoilers = true).toString())
     }
