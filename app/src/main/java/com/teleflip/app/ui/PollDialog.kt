@@ -8,6 +8,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.widget.doAfterTextChanged
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 
@@ -77,6 +79,11 @@ class PollDialog(
 
         val editFields = listOfNotNull(etQuestion, etOpt1, etOpt2, etOpt3, etOpt4, etExplanation)
         editFields.forEach { field ->
+            field.doAfterTextChanged {
+                if (field.error != null) {
+                    field.error = null
+                }
+            }
             engines[field.id] =
                 KeypadInputEngine(
                     editText = field,
@@ -136,44 +143,84 @@ class PollDialog(
 
     private fun handleNextStep() {
         engines.values.forEach { it.commitCurrentChar() }
-        val question = findViewById<EditText>(R.id.et_poll_question)?.text?.toString()?.trim().orEmpty()
-        val opts = getValidOptions()
-
-        if (question.isNotBlank() && opts.size >= 2) {
+        if (validateStep1Inputs()) {
             currentStep = 2
             updateStepViews()
             findViewById<Button>(R.id.btn_poll_mode_toggle)?.requestFocus()
-        } else if (question.isBlank()) {
-            findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
-        } else {
-            findViewById<EditText>(R.id.et_poll_opt2)?.requestFocus()
         }
     }
 
     private fun handleSubmit() {
         engines.values.forEach { it.commitCurrentChar() }
+        if (!validateStep1Inputs()) {
+            return
+        }
         val question = findViewById<EditText>(R.id.et_poll_question)?.text?.toString()?.trim().orEmpty()
         val opts = getValidOptions()
         val explanation = findViewById<EditText>(R.id.et_poll_explanation)?.text?.toString()?.trim().orEmpty()
 
-        if (question.isNotBlank() && opts.size >= 2) {
-            dismiss()
-            val safeCorrectIndex =
-                if (isQuiz && opts.isNotEmpty()) {
-                    correctOptionIndex.coerceIn(0, opts.size - 1)
-                } else {
-                    -1
+        dismiss()
+        val safeCorrectIndex =
+            if (isQuiz && opts.isNotEmpty()) {
+                correctOptionIndex.coerceIn(0, opts.size - 1)
+            } else {
+                -1
+            }
+        onCreatePoll(
+            question,
+            opts,
+            isAnonymous,
+            isQuiz,
+            safeCorrectIndex,
+            if (isQuiz) explanation else "",
+            if (!isQuiz) allowsMultipleAnswers else false,
+        )
+    }
+
+    private fun validateStep1Inputs(): Boolean {
+        val etQuestion = findViewById<EditText>(R.id.et_poll_question)
+        val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
+        val etOpt2 = findViewById<EditText>(R.id.et_poll_opt2)
+        val etOpt3 = findViewById<EditText>(R.id.et_poll_opt3)
+        val etOpt4 = findViewById<EditText>(R.id.et_poll_opt4)
+
+        etQuestion?.error = null
+        etOpt1?.error = null
+        etOpt2?.error = null
+        etOpt3?.error = null
+        etOpt4?.error = null
+
+        val question = etQuestion?.text?.toString()?.trim().orEmpty()
+        val opt1 = etOpt1?.text?.toString()?.trim().orEmpty()
+        val opt2 = etOpt2?.text?.toString()?.trim().orEmpty()
+        val opts = getValidOptions()
+
+        val isValid =
+            when {
+                question.isBlank() -> {
+                    val errorMsg = "Question cannot be empty"
+                    etQuestion?.error = errorMsg
+                    etQuestion?.requestFocus()
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                    false
                 }
-            onCreatePoll(
-                question,
-                opts,
-                isAnonymous,
-                isQuiz,
-                safeCorrectIndex,
-                if (isQuiz) explanation else "",
-                if (!isQuiz) allowsMultipleAnswers else false,
-            )
-        }
+                opts.size < 2 -> {
+                    val errorMsg = "At least 2 options required"
+                    val targetField =
+                        when {
+                            opt1.isBlank() -> etOpt1
+                            opt2.isBlank() -> etOpt2
+                            else -> etOpt1
+                        }
+                    targetField?.error = errorMsg
+                    targetField?.requestFocus()
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                    false
+                }
+                else -> true
+            }
+
+        return isValid
     }
 
     private fun getValidOptions(): List<String> {
