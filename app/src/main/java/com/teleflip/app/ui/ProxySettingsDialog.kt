@@ -29,6 +29,7 @@ class ProxySettingsDialog(
     private var tvError: TextView? = null
 
     override fun getErrorTextView(): TextView? = tvError
+
     private var softkeyManager: SoftkeyManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {

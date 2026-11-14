@@ -239,6 +239,7 @@ class ProxySettingsDialogTest {
         assertEquals("Select", tvCenter.text.toString())
         assertEquals("Close", tvRight.text.toString())
     }
+
     @Test
     fun testDpadDirectionalNavigationCommitsCharacter() {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
@@ -380,6 +381,5 @@ class ProxySettingsDialogTest {
         }
 
         assertTrue(java.io.File("/tmp/proxy_settings_dialog.png").exists())
->>>>>>> origin/main
     }
 }

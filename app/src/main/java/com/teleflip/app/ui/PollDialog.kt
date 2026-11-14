@@ -47,6 +47,7 @@ class PollDialog(
     private var tvError: TextView? = null
 
     override fun getErrorTextView(): TextView? = tvError
+
     private lateinit var softkeyManager: SoftkeyManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
