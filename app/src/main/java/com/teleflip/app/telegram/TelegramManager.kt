@@ -6887,6 +6887,7 @@ class TelegramManager(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod", "MagicNumber")
     fun handleDeepLinkProxy(
         uri: android.net.Uri,
         callback: ((Boolean, String) -> Unit)? = null,
