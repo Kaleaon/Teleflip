@@ -173,6 +173,22 @@ class ProxySettingsDialogTest {
     }
 
     @Test
+    fun testEmptyServerSubmission_showsInlineErrorAndFocusesServerField() {
+        val dialog = ProxySettingsDialog(context, mockTelegramManager)
+        dialog.show()
+
+        val btnSaveEnable = dialog.findViewById<Button>(R.id.btn_proxy_save_enable)
+        val tvError = dialog.findViewById<TextView>(R.id.tv_proxy_error)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
+
+        btnSaveEnable.performClick()
+
+        assertEquals(View.VISIBLE, tvError.visibility)
+        assertEquals("Please enter a valid server address", tvError.text.toString())
+        assertTrue("etServer should have focus when server is empty", etServer.hasFocus())
+    }
+
+    @Test
     fun testSoftkeyBarBoundAndVisible() {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()

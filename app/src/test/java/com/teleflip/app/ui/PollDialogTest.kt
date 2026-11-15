@@ -30,6 +30,71 @@ class PollDialogTest {
     }
 
     @Test
+    fun testPollSubmission_missingQuestion_showsInlineErrorAndFocusesQuestionInput() {
+        val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
+        dialog.show()
+
+        val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
+        val tvError = dialog.findViewById<TextView>(R.id.tv_poll_error)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+
+        btnNext.performClick()
+
+        assertEquals(View.VISIBLE, tvError.visibility)
+        assertEquals("Please enter a poll question", tvError.text.toString())
+        assertTrue("et_poll_question should have focus when question is missing", etQuestion.hasFocus())
+    }
+
+    @Test
+    fun testPollSubmission_missingOptions_showsInlineErrorAndFocusesOptionInput() {
+        val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
+        dialog.show()
+
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
+        val tvError = dialog.findViewById<TextView>(R.id.tv_poll_error)
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+
+        etQuestion.setText("Sample Question")
+        btnNext.performClick()
+
+        assertEquals(View.VISIBLE, tvError.visibility)
+        assertEquals("Please enter at least 2 poll options", tvError.text.toString())
+        assertTrue("et_poll_opt1 should have focus when options are missing", etOpt1.hasFocus())
+    }
+
+    @Test
+    fun testPollSubmission_validInput_clearsErrorAndSubmits() {
+        var createdQuestion = ""
+        var createdOptions = emptyList<String>()
+        val dialog =
+            PollDialog(
+                context,
+                onCreatePoll = { q, opts, _ ->
+                    createdQuestion = q
+                    createdOptions = opts
+                },
+            )
+        dialog.show()
+
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+        val etOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText
+        val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
+        val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
+
+        etQuestion.setText("Favorite Color?")
+        etOpt1.setText("Red")
+        etOpt2.setText("Blue")
+
+        btnNext.performClick()
+        btnSubmit.performClick()
+
+        assertEquals("Favorite Color?", createdQuestion)
+        assertEquals(listOf("Red", "Blue"), createdOptions)
+    }
+
+    @Test
     fun testInitialFocusIsOnQuestion() {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
