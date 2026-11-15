@@ -39,6 +39,8 @@ class ProxyManagerTest {
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         context = ApplicationProvider.getApplicationContext()
+        ProxyStorage.clearCache()
+        ProxyStorage.setAutoProxyFailoverEnabled(context, true)
         ProxyStorage.disableAllProxies(context)
         ProxyStorage.getProxies(context).forEach {
             ProxyStorage.deleteProxy(context, it.id)
