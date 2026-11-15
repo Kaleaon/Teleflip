@@ -44,6 +44,10 @@ class PollDialog(
     private var correctOptionIndex = 0
     private var allowsMultipleAnswers = false
     private var currentStep = 1
+    private var tvError: TextView? = null
+
+    override fun getErrorTextView(): TextView? = tvError
+
     private lateinit var softkeyManager: SoftkeyManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +55,7 @@ class PollDialog(
         setContentView(R.layout.dialog_create_poll)
         setupDismissKeys()
 
+        tvError = findViewById(R.id.tv_poll_error)
         val tvMode = findViewById<TextView>(R.id.tv_poll_input_mode)
         val etQuestion = findViewById<EditText>(R.id.et_poll_question)
         val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
@@ -144,6 +149,7 @@ class PollDialog(
     private fun handleNextStep() {
         engines.values.forEach { it.commitCurrentChar() }
         if (validateStep1Inputs()) {
+            clearDialogError()
             currentStep = 2
             updateStepViews()
             findViewById<Button>(R.id.btn_poll_mode_toggle)?.requestFocus()
@@ -155,6 +161,7 @@ class PollDialog(
         if (!validateStep1Inputs()) {
             return
         }
+        clearDialogError()
         val question = findViewById<EditText>(R.id.et_poll_question)?.text?.toString()?.trim().orEmpty()
         val opts = getValidOptions()
         val explanation = findViewById<EditText>(R.id.et_poll_explanation)?.text?.toString()?.trim().orEmpty()
@@ -184,6 +191,7 @@ class PollDialog(
         val etOpt3 = findViewById<EditText>(R.id.et_poll_opt3)
         val etOpt4 = findViewById<EditText>(R.id.et_poll_opt4)
 
+        clearDialogError()
         etQuestion?.error = null
         etOpt1?.error = null
         etOpt2?.error = null
@@ -200,7 +208,7 @@ class PollDialog(
                 question.isBlank() -> {
                     val errorMsg = "Question cannot be empty"
                     etQuestion?.error = errorMsg
-                    etQuestion?.requestFocus()
+                    showDialogError("Please enter a poll question", etQuestion)
                     Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
                     false
                 }
@@ -213,11 +221,14 @@ class PollDialog(
                             else -> etOpt1
                         }
                     targetField?.error = errorMsg
-                    targetField?.requestFocus()
+                    showDialogError("Please enter at least 2 poll options", targetField ?: etOpt1)
                     Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
                     false
                 }
-                else -> true
+                else -> {
+                    clearDialogError()
+                    true
+                }
             }
 
         return isValid
