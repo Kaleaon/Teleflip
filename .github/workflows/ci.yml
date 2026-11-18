@@ -35,4 +35,4 @@ jobs:
         run: ./gradlew detekt
 
       - name: Build, Lint and Test
-        run: ./gradlew lintDebug testDebugUnitTest assembleDebug
+        run: ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug
