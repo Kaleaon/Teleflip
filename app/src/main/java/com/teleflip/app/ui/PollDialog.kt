@@ -57,18 +57,27 @@ class PollDialog(
 
         tvError = findViewById(R.id.tv_poll_error)
         val tvMode = findViewById<TextView>(R.id.tv_poll_input_mode)
-        val etQuestion = findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = findViewById<EditText>(R.id.et_poll_opt2)
-        val etOpt3 = findViewById<EditText>(R.id.et_poll_opt3)
-        val etOpt4 = findViewById<EditText>(R.id.et_poll_opt4)
+
+        val livQuestion = findViewById<LabeledInputView>(R.id.liv_poll_question)
+        val livOpt1 = findViewById<LabeledInputView>(R.id.liv_poll_opt1)
+        val livOpt2 = findViewById<LabeledInputView>(R.id.liv_poll_opt2)
+        val livOpt3 = findViewById<LabeledInputView>(R.id.liv_poll_opt3)
+        val livOpt4 = findViewById<LabeledInputView>(R.id.liv_poll_opt4)
+        val livExplanation = findViewById<LabeledInputView>(R.id.liv_poll_explanation)
+
+        val etQuestion = livQuestion?.editText
+        val etOpt1 = livOpt1?.editText
+        val etOpt2 = livOpt2?.editText
+        val etOpt3 = livOpt3?.editText
+        val etOpt4 = livOpt4?.editText
+        val etExplanation = livExplanation?.editText
+
         val btnNext = findViewById<Button>(R.id.btn_poll_next)
         val btnCancel = findViewById<Button>(R.id.btn_poll_cancel)
 
         val btnAnon = findViewById<Button>(R.id.btn_poll_anonymous_toggle)
         val btnModeToggle = findViewById<Button>(R.id.btn_poll_mode_toggle)
         val btnCorrectChoice = findViewById<Button>(R.id.btn_poll_correct_choice)
-        val etExplanation = findViewById<EditText>(R.id.et_poll_explanation)
         val btnMultipleAnswersToggle = findViewById<Button>(R.id.btn_poll_multiple_answers_toggle)
         val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
         val btnBack = findViewById<Button>(R.id.btn_poll_back)
@@ -162,9 +171,11 @@ class PollDialog(
             return
         }
         clearDialogError()
-        val question = findViewById<EditText>(R.id.et_poll_question)?.text?.toString()?.trim().orEmpty()
+        val question =
+            findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText?.text?.toString()?.trim().orEmpty()
         val opts = getValidOptions()
-        val explanation = findViewById<EditText>(R.id.et_poll_explanation)?.text?.toString()?.trim().orEmpty()
+        val explanation =
+            findViewById<LabeledInputView>(R.id.liv_poll_explanation)?.editText?.text?.toString()?.trim().orEmpty()
 
         dismiss()
         val safeCorrectIndex =
@@ -185,11 +196,11 @@ class PollDialog(
     }
 
     private fun validateStep1Inputs(): Boolean {
-        val etQuestion = findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = findViewById<EditText>(R.id.et_poll_opt2)
-        val etOpt3 = findViewById<EditText>(R.id.et_poll_opt3)
-        val etOpt4 = findViewById<EditText>(R.id.et_poll_opt4)
+        val etQuestion = findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText
+        val etOpt1 = findViewById<LabeledInputView>(R.id.liv_poll_opt1)?.editText
+        val etOpt2 = findViewById<LabeledInputView>(R.id.liv_poll_opt2)?.editText
+        val etOpt3 = findViewById<LabeledInputView>(R.id.liv_poll_opt3)?.editText
+        val etOpt4 = findViewById<LabeledInputView>(R.id.liv_poll_opt4)?.editText
 
         clearDialogError()
         etQuestion?.error = null
@@ -236,10 +247,10 @@ class PollDialog(
 
     private fun getValidOptions(): List<String> {
         return listOfNotNull(
-            findViewById<EditText>(R.id.et_poll_opt1)?.text?.toString()?.trim(),
-            findViewById<EditText>(R.id.et_poll_opt2)?.text?.toString()?.trim(),
-            findViewById<EditText>(R.id.et_poll_opt3)?.text?.toString()?.trim(),
-            findViewById<EditText>(R.id.et_poll_opt4)?.text?.toString()?.trim(),
+            findViewById<LabeledInputView>(R.id.liv_poll_opt1)?.editText?.text?.toString()?.trim(),
+            findViewById<LabeledInputView>(R.id.liv_poll_opt2)?.editText?.text?.toString()?.trim(),
+            findViewById<LabeledInputView>(R.id.liv_poll_opt3)?.editText?.text?.toString()?.trim(),
+            findViewById<LabeledInputView>(R.id.liv_poll_opt4)?.editText?.text?.toString()?.trim(),
         ).filter { it.isNotBlank() }
     }
 
@@ -262,7 +273,7 @@ class PollDialog(
         val layoutRegularSettings = findViewById<LinearLayout>(R.id.layout_regular_settings)
         val btnModeToggle = findViewById<Button>(R.id.btn_poll_mode_toggle)
         val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
-        val etQuestion = findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText
 
         if (currentStep == 1) {
             layoutStep1?.visibility = View.VISIBLE
@@ -282,7 +293,7 @@ class PollDialog(
                 layoutQuizSettings?.visibility = View.VISIBLE
                 layoutRegularSettings?.visibility = View.GONE
                 btnModeToggle?.nextFocusDownId = R.id.btn_poll_correct_choice
-                btnSubmit?.nextFocusUpId = R.id.et_poll_explanation
+                btnSubmit?.nextFocusUpId = R.id.liv_poll_explanation
             } else {
                 layoutQuizSettings?.visibility = View.GONE
                 layoutRegularSettings?.visibility = View.VISIBLE
@@ -359,7 +370,7 @@ class PollDialog(
         if (currentStep == 2) {
             currentStep = 1
             updateStepViews()
-            findViewById<EditText>(R.id.et_poll_question)?.requestFocus()
+            findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText?.requestFocus()
         } else {
             dismiss()
         }

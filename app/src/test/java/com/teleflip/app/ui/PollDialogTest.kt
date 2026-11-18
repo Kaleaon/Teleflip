@@ -4,7 +4,6 @@ import android.app.Application
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
@@ -37,7 +36,7 @@ class PollDialogTest {
 
         val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
         val tvError = dialog.findViewById<TextView>(R.id.tv_poll_error)
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
 
         btnNext.performClick()
 
@@ -51,10 +50,10 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
         val tvError = dialog.findViewById<TextView>(R.id.tv_poll_error)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
 
         etQuestion.setText("Sample Question")
         btnNext.performClick()
@@ -78,9 +77,9 @@ class PollDialogTest {
             )
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = dialog.findViewById<EditText>(R.id.et_poll_opt2)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+        val etOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText
         val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
         val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
 
@@ -100,7 +99,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         assertTrue(etQuestion.isFocused)
     }
 
@@ -109,7 +108,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, timeoutMs = 200L, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         etQuestion.requestFocus()
 
         // Press '2' once -> "A" (in Default Abc mode, first char of 2 is uppercase)
@@ -124,7 +123,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, timeoutMs = 1000L, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         etQuestion.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -145,7 +144,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         etQuestion.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -163,7 +162,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         etQuestion.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -176,8 +175,8 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
 
         etQuestion.requestFocus()
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -199,7 +198,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> callbackCalled = true })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
 
         btnSubmit.performClick()
@@ -216,9 +215,9 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> callbackCalled = true })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = dialog.findViewById<EditText>(R.id.et_poll_opt2)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+        val etOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText
         val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
 
         etQuestion.setText("Valid Question?")
@@ -247,9 +246,9 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> callbackCalled = true })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = dialog.findViewById<EditText>(R.id.et_poll_opt2)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+        val etOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText
         val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
 
         etQuestion.setText("Question?")
@@ -268,7 +267,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
 
         btnSubmit.performClick()
@@ -284,7 +283,7 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> callbackCalled = true })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
         val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
         val layoutStep1 = dialog.findViewById<LinearLayout>(R.id.layout_step1)
 
@@ -302,9 +301,9 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> callbackCalled = true })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = dialog.findViewById<EditText>(R.id.et_poll_opt2)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+        val etOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText
         val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
         val layoutStep1 = dialog.findViewById<LinearLayout>(R.id.layout_step1)
 
@@ -345,9 +344,9 @@ class PollDialogTest {
             )
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = dialog.findViewById<EditText>(R.id.et_poll_opt2)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+        val etOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText
         val btnSubmit = dialog.findViewById<Button>(R.id.btn_poll_submit)
 
         etQuestion.setText("What is your favorite color?")
@@ -370,9 +369,9 @@ class PollDialogTest {
 
         val layoutStep1 = dialog.findViewById<LinearLayout>(R.id.layout_step1)
         val layoutStep2 = dialog.findViewById<LinearLayout>(R.id.layout_step2)
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = dialog.findViewById<EditText>(R.id.et_poll_opt2)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+        val etOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText
         val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
 
         // Step 1 initially visible
@@ -424,10 +423,10 @@ class PollDialogTest {
             )
         dialog.show()
 
-        dialog.findViewById<EditText>(R.id.et_poll_question).setText("What is 5 x 5?")
-        dialog.findViewById<EditText>(R.id.et_poll_opt1).setText("10")
-        dialog.findViewById<EditText>(R.id.et_poll_opt2).setText("25")
-        dialog.findViewById<EditText>(R.id.et_poll_opt3).setText("50")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText.setText("What is 5 x 5?")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText.setText("10")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText.setText("25")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt3).editText.setText("50")
 
         dialog.findViewById<Button>(R.id.btn_poll_next).performClick()
 
@@ -442,7 +441,7 @@ class PollDialogTest {
         // Cycle correct answer to index 1 ("25")
         btnCorrectChoice.performClick() // correctOptionIndex becomes 1
 
-        dialog.findViewById<EditText>(R.id.et_poll_explanation).setText("5 multiplied by 5 is 25")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_explanation).editText.setText("5 multiplied by 5 is 25")
 
         // Submit poll
         dialog.findViewById<Button>(R.id.btn_poll_submit).performClick()
@@ -469,9 +468,9 @@ class PollDialogTest {
             )
         dialog.show()
 
-        dialog.findViewById<EditText>(R.id.et_poll_question).setText("Which fruits do you like?")
-        dialog.findViewById<EditText>(R.id.et_poll_opt1).setText("Apple")
-        dialog.findViewById<EditText>(R.id.et_poll_opt2).setText("Banana")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText.setText("Which fruits do you like?")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText.setText("Apple")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText.setText("Banana")
 
         dialog.findViewById<Button>(R.id.btn_poll_next).performClick()
 
@@ -490,9 +489,9 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        dialog.findViewById<EditText>(R.id.et_poll_question).setText("Test Question")
-        dialog.findViewById<EditText>(R.id.et_poll_opt1).setText("Opt 1")
-        dialog.findViewById<EditText>(R.id.et_poll_opt2).setText("Opt 2")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText.setText("Test Question")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText.setText("Opt 1")
+        dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText.setText("Opt 2")
 
         dialog.findViewById<Button>(R.id.btn_poll_next).performClick()
 
@@ -548,9 +547,9 @@ class PollDialogTest {
             )
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = dialog.findViewById<EditText>(R.id.et_poll_opt2)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
+        val etOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2).editText
 
         etQuestion.setText("Sample Question")
         etOpt1.setText("Option 1")
@@ -584,7 +583,7 @@ class PollDialogTest {
         assertEquals("☐ Anonymous Voting: OFF", btnAnon.text.toString())
 
         // Test Center key on non-button submits the poll
-        val etExplanation = dialog.findViewById<EditText>(R.id.et_poll_explanation)
+        val etExplanation = dialog.findViewById<LabeledInputView>(R.id.liv_poll_explanation).editText
         etExplanation.requestFocus()
         val handledSubmit = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER, centerEvent)
         assertTrue("Center key should trigger submit", handledSubmit)
@@ -608,33 +607,33 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = dialog.findViewById<EditText>(R.id.et_poll_opt2)
-        val etOpt3 = dialog.findViewById<EditText>(R.id.et_poll_opt3)
-        val etOpt4 = dialog.findViewById<EditText>(R.id.et_poll_opt4)
+        val livQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question)
+        val livOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1)
+        val livOpt2 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt2)
+        val livOpt3 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt3)
+        val livOpt4 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt4)
         val btnNext = dialog.findViewById<Button>(R.id.btn_poll_next)
         val btnCancel = dialog.findViewById<Button>(R.id.btn_poll_cancel)
 
-        assertEquals(R.id.et_poll_opt1, etQuestion.nextFocusDownId)
-        assertEquals(R.id.btn_poll_cancel, etQuestion.nextFocusUpId)
+        assertEquals(R.id.liv_poll_opt1, livQuestion.nextFocusDownId)
+        assertEquals(R.id.btn_poll_cancel, livQuestion.nextFocusUpId)
 
-        assertEquals(R.id.et_poll_opt2, etOpt1.nextFocusDownId)
-        assertEquals(R.id.et_poll_question, etOpt1.nextFocusUpId)
+        assertEquals(R.id.liv_poll_opt2, livOpt1.nextFocusDownId)
+        assertEquals(R.id.liv_poll_question, livOpt1.nextFocusUpId)
 
-        assertEquals(R.id.et_poll_opt3, etOpt2.nextFocusDownId)
-        assertEquals(R.id.et_poll_opt1, etOpt2.nextFocusUpId)
+        assertEquals(R.id.liv_poll_opt3, livOpt2.nextFocusDownId)
+        assertEquals(R.id.liv_poll_opt1, livOpt2.nextFocusUpId)
 
-        assertEquals(R.id.et_poll_opt4, etOpt3.nextFocusDownId)
-        assertEquals(R.id.et_poll_opt2, etOpt3.nextFocusUpId)
+        assertEquals(R.id.liv_poll_opt4, livOpt3.nextFocusDownId)
+        assertEquals(R.id.liv_poll_opt2, livOpt3.nextFocusUpId)
 
-        assertEquals(R.id.btn_poll_next, etOpt4.nextFocusDownId)
-        assertEquals(R.id.et_poll_opt3, etOpt4.nextFocusUpId)
+        assertEquals(R.id.btn_poll_next, livOpt4.nextFocusDownId)
+        assertEquals(R.id.liv_poll_opt3, livOpt4.nextFocusUpId)
 
         assertEquals(R.id.btn_poll_cancel, btnNext.nextFocusDownId)
-        assertEquals(R.id.et_poll_opt4, btnNext.nextFocusUpId)
+        assertEquals(R.id.liv_poll_opt4, btnNext.nextFocusUpId)
 
-        assertEquals(R.id.et_poll_question, btnCancel.nextFocusDownId)
+        assertEquals(R.id.liv_poll_question, btnCancel.nextFocusDownId)
         assertEquals(R.id.btn_poll_next, btnCancel.nextFocusUpId)
     }
 
@@ -643,8 +642,8 @@ class PollDialogTest {
         val dialog = PollDialog(context, onCreatePoll = { _, _, _ -> })
         dialog.show()
 
-        val etQuestion = dialog.findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = dialog.findViewById<EditText>(R.id.et_poll_opt1)
+        val etQuestion = dialog.findViewById<LabeledInputView>(R.id.liv_poll_question).editText
+        val etOpt1 = dialog.findViewById<LabeledInputView>(R.id.liv_poll_opt1).editText
 
         etQuestion.requestFocus()
 

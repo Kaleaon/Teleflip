@@ -54,59 +54,17 @@
             android:layout_marginBottom="16dp" />
 
         <!-- Input Field Container -->
-        <LinearLayout
-            android:id="@+id/layout_login_input_container"
+        <com.teleflip.app.ui.LabeledInputView
+            android:id="@+id/liv_login_input"
+            xmlns:app="http://schemas.android.com/apk/res-auto"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginBottom="16dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="4dp">
-
-                <TextView
-                    android:id="@+id/tv_input_label"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Phone Number:"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tv_login_input_mode"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="[#] Abc"
-                    android:textColor="@color/focus_highlight_gold"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <EditText
-                android:id="@+id/et_login_input"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:hint="+1 555 123 4567"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_hint"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:background="@drawable/bg_edittext_selector"
-                android:inputType="textVisiblePassword"
-                android:singleLine="true"
-                android:maxLines="1"
-                android:nextFocusDown="@+id/btn_login_submit"
-                android:focusable="true"
-                android:focusableInTouchMode="true" />
-
-        </LinearLayout>
+            android:layout_marginBottom="16dp"
+            app:inputLabel="Phone Number:"
+            app:inputHint="+1 555 123 4567"
+            app:inputType="textVisiblePassword"
+            app:inputSingleLine="true"
+            app:inputMaxLines="1" />
 
         <!-- QR Code Container -->
         <LinearLayout
@@ -163,7 +121,7 @@
             android:textStyle="bold"
             android:background="@drawable/bg_button_selector"
             android:focusable="true"
-            android:nextFocusUp="@+id/et_login_input"
+            android:nextFocusUp="@+id/liv_login_input"
             android:nextFocusDown="@+id/btn_retry_connection"
             android:layout_marginBottom="12dp" />
 

@@ -4,7 +4,6 @@ import android.app.Application
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -40,7 +39,7 @@ class NewChatDialogTest {
         dialog.show()
 
         val btnDirect = dialog.findViewById<Button>(R.id.btn_start_direct_chat)
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<LabeledInputView>(R.id.liv_new_chat_input).editText
 
         assertTrue("Direct chat button should have focus initially", btnDirect.hasFocus())
         assertFalse("Input field should not have focus initially", etInput.hasFocus())
@@ -85,7 +84,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<LabeledInputView>(R.id.liv_new_chat_input).editText
         val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
         val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
         val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
@@ -238,7 +237,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<LabeledInputView>(R.id.liv_new_chat_input).editText
         etInput.requestFocus()
         assertTrue("Input should have focus when requested", etInput.hasFocus())
 
@@ -261,7 +260,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<LabeledInputView>(R.id.liv_new_chat_input).editText
         etInput.requestFocus()
         assertTrue("Input should have focus when requested", etInput.hasFocus())
 
@@ -308,7 +307,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<LabeledInputView>(R.id.liv_new_chat_input).editText
         etInput.requestFocus()
         etInput.clearFocus()
         assertFalse("Input focus cleared", etInput.hasFocus())
@@ -364,7 +363,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_new_chat_input).editText
         etInput.setText("Test Query")
 
         val softLeftEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SOFT_LEFT)
@@ -386,7 +385,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<LabeledInputView>(R.id.liv_new_chat_input).editText
         etInput.setText("Sample Query")
 
         val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
@@ -433,7 +432,7 @@ class NewChatDialogTest {
             )
         dialog.show()
 
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<LabeledInputView>(R.id.liv_new_chat_input).editText
         etInput.setText("alice")
 
         val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
@@ -483,7 +482,7 @@ class NewChatDialogTest {
         dialog.show()
 
         val btnDirect = dialog.findViewById<Button>(R.id.btn_start_direct_chat)
-        val etInput = dialog.findViewById<EditText>(R.id.et_new_chat_input)
+        val etInput = dialog.findViewById<LabeledInputView>(R.id.liv_new_chat_input).editText
 
         assertTrue(btnDirect.hasFocus())
         assertFalse(etInput.hasFocus())

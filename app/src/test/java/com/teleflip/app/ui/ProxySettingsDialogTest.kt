@@ -4,7 +4,6 @@ import android.app.Application
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -39,7 +38,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -54,7 +53,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)
@@ -81,7 +80,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -100,7 +99,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -121,8 +120,8 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
-        val etPort = dialog.findViewById<EditText>(R.id.et_proxy_port)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
+        val etPort = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_port).editText
         val tvMode = dialog.findViewById<TextView>(R.id.tv_proxy_input_mode)
 
         etServer.requestFocus()
@@ -143,7 +142,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -161,7 +160,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val event2 = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2)
@@ -180,7 +179,7 @@ class ProxySettingsDialogTest {
 
         val btnSaveEnable = dialog.findViewById<Button>(R.id.btn_proxy_save_enable)
         val tvError = dialog.findViewById<TextView>(R.id.tv_proxy_error)
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
 
         btnSaveEnable.performClick()
 
@@ -211,7 +210,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
         val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
         val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
@@ -245,7 +244,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
 
         val dpadKeys =
             listOf(
@@ -278,7 +277,7 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
         etServer.requestFocus()
 
         val centerEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER)
@@ -307,33 +306,33 @@ class ProxySettingsDialogTest {
         val dialog = ProxySettingsDialog(context, mockTelegramManager)
         dialog.show()
 
-        val etServer = dialog.findViewById<EditText>(R.id.et_proxy_server)
-        val etPort = dialog.findViewById<EditText>(R.id.et_proxy_port)
-        val etUsername = dialog.findViewById<EditText>(R.id.et_proxy_username)
-        val etPassword = dialog.findViewById<EditText>(R.id.et_proxy_password)
-        val etSecret = dialog.findViewById<EditText>(R.id.et_proxy_secret)
+        val etServer = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_server).editText
+        val etPort = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_port).editText
+        val etUsername = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_username).editText
+        val etPassword = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_password).editText
+        val etSecret = dialog.findViewById<LabeledInputView>(R.id.liv_proxy_secret).editText
         val btnSaveEnable = dialog.findViewById<Button>(R.id.btn_proxy_save_enable)
         val btnMtproto = dialog.findViewById<Button>(R.id.btn_proxy_type_mtproto)
         val btnSocks5 = dialog.findViewById<Button>(R.id.btn_proxy_type_socks5)
 
         // SOCKS5 default
-        assertEquals(R.id.et_proxy_port, etServer.nextFocusDownId)
-        assertEquals(R.id.et_proxy_username, etPort.nextFocusDownId)
-        assertEquals(R.id.et_proxy_password, etUsername.nextFocusDownId)
+        assertEquals(R.id.liv_proxy_port, etServer.nextFocusDownId)
+        assertEquals(R.id.liv_proxy_username, etPort.nextFocusDownId)
+        assertEquals(R.id.liv_proxy_password, etUsername.nextFocusDownId)
         assertEquals(R.id.btn_proxy_save_enable, etPassword.nextFocusDownId)
-        assertEquals(R.id.et_proxy_password, btnSaveEnable.nextFocusUpId)
+        assertEquals(R.id.liv_proxy_password, btnSaveEnable.nextFocusUpId)
 
         // Switch to MTProto
         btnMtproto.performClick()
-        assertEquals(R.id.et_proxy_secret, etPort.nextFocusDownId)
+        assertEquals(R.id.liv_proxy_secret, etPort.nextFocusDownId)
         assertEquals(R.id.btn_proxy_save_enable, etSecret.nextFocusDownId)
-        assertEquals(R.id.et_proxy_port, etSecret.nextFocusUpId)
-        assertEquals(R.id.et_proxy_secret, btnSaveEnable.nextFocusUpId)
+        assertEquals(R.id.liv_proxy_port, etSecret.nextFocusUpId)
+        assertEquals(R.id.liv_proxy_secret, btnSaveEnable.nextFocusUpId)
 
         // Switch back to SOCKS5
         btnSocks5.performClick()
-        assertEquals(R.id.et_proxy_username, etPort.nextFocusDownId)
-        assertEquals(R.id.et_proxy_password, btnSaveEnable.nextFocusUpId)
+        assertEquals(R.id.liv_proxy_username, etPort.nextFocusDownId)
+        assertEquals(R.id.liv_proxy_password, btnSaveEnable.nextFocusUpId)
     }
 
     @Test
