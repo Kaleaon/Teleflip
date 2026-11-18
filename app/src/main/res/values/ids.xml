@@ -20,4 +20,8 @@
     <item name="action_message_unpin" type="id" />
 
     <item name="action_search_jump" type="id" />
+
+    <item name="tv_search_softkey_left" type="id" />
+    <item name="tv_search_softkey_center" type="id" />
+    <item name="tv_search_softkey_right" type="id" />
 </resources>

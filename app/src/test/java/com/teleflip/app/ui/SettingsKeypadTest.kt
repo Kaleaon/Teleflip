@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.view.KeyEvent
 import android.widget.Button
-import android.widget.EditText
 import androidx.test.core.app.ApplicationProvider
 import com.teleflip.app.MainActivity
 import com.teleflip.app.R
@@ -60,8 +59,8 @@ class SettingsKeypadTest {
         dispatchKey(activity, KeyEvent.KEYCODE_0)
         assertEquals(Screen.SETTINGS, activity.currentScreen)
 
-        val etApiId = activity.findViewById<EditText>(R.id.et_api_id)
-        val etApiHash = activity.findViewById<EditText>(R.id.et_api_hash)
+        val etApiId = activity.findViewById<LabeledInputView>(R.id.liv_api_id).editText
+        val etApiHash = activity.findViewById<LabeledInputView>(R.id.liv_api_hash).editText
         assertNotNull(etApiId)
         assertNotNull(etApiHash)
 
@@ -106,7 +105,7 @@ class SettingsKeypadTest {
         dispatchKey(activity, KeyEvent.KEYCODE_0)
         assertEquals(Screen.SETTINGS, activity.currentScreen)
 
-        val etApiHash = activity.findViewById<EditText>(R.id.et_api_hash)
+        val etApiHash = activity.findViewById<LabeledInputView>(R.id.liv_api_hash).editText
         assertNotNull(etApiHash)
 
         etApiHash.requestFocus()
@@ -137,8 +136,8 @@ class SettingsKeypadTest {
         dispatchKey(activity, KeyEvent.KEYCODE_0)
         assertEquals(Screen.SETTINGS, activity.currentScreen)
 
-        val etApiId = activity.findViewById<EditText>(R.id.et_api_id)
-        val etApiHash = activity.findViewById<EditText>(R.id.et_api_hash)
+        val etApiId = activity.findViewById<LabeledInputView>(R.id.liv_api_id).editText
+        val etApiHash = activity.findViewById<LabeledInputView>(R.id.liv_api_hash).editText
         val btnSave = activity.findViewById<Button>(R.id.btn_save_config)
 
         etApiId.requestFocus()

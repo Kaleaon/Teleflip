@@ -133,6 +133,55 @@ class LayoutAccessibilityXmlTest {
     }
 
     @Test
+    fun testFormLayoutsUseLabeledInputView() {
+        val formLayoutsWithExpectedIds =
+            mapOf(
+                "view_login.xml" to listOf("@+id/liv_login_input"),
+                "dialog_search.xml" to listOf("@+id/liv_search_input"),
+                "dialog_create_poll.xml" to
+                    listOf(
+                        "@+id/liv_poll_question",
+                        "@+id/liv_poll_opt1",
+                        "@+id/liv_poll_opt2",
+                        "@+id/liv_poll_opt3",
+                        "@+id/liv_poll_opt4",
+                        "@+id/liv_poll_explanation",
+                    ),
+                "dialog_new_chat.xml" to listOf("@+id/liv_new_chat_input"),
+                "dialog_proxy_settings.xml" to
+                    listOf(
+                        "@+id/liv_proxy_server",
+                        "@+id/liv_proxy_port",
+                        "@+id/liv_proxy_username",
+                        "@+id/liv_proxy_password",
+                        "@+id/liv_proxy_secret",
+                    ),
+                "view_settings.xml" to
+                    listOf(
+                        "@+id/liv_api_id",
+                        "@+id/liv_api_hash",
+                    ),
+            )
+
+        for ((layoutName, expectedIds) in formLayoutsWithExpectedIds) {
+            val file = getLayoutFile(layoutName)
+            val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
+            for (id in expectedIds) {
+                val node = findNodeById(doc, id)
+                assertNotNull("Expected node $id in $layoutName", node)
+                assertEquals(
+                    "Node $id in $layoutName must be LabeledInputView",
+                    "com.teleflip.app.ui.LabeledInputView",
+                    node?.nodeName,
+                )
+            }
+
+            val directEditTexts = findNodesByTagName(doc, "EditText")
+            assertEquals("Form layout $layoutName should not contain direct EditText elements", 0, directEditTexts.size)
+        }
+    }
+
+    @Test
     fun testPinnedBannerFocusableAndSelector() {
         val file = getLayoutFile("view_chat_conversation.xml")
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)

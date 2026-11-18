@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import com.teleflip.app.MainActivity
 import com.teleflip.app.R
@@ -66,7 +67,35 @@ abstract class BaseDialog(
         context.findMainActivity()?.onDialogDismissed()
     }
 
-    protected fun setupSoftkeys(
+    override fun setContentView(layoutResID: Int) {
+        super.setContentView(layoutResID)
+        initSoftkeyManager()
+    }
+
+    override fun setContentView(view: View) {
+        super.setContentView(view)
+        initSoftkeyManager()
+    }
+
+    override fun setContentView(
+        view: View,
+        params: ViewGroup.LayoutParams?,
+    ) {
+        super.setContentView(view, params)
+        initSoftkeyManager()
+    }
+
+    protected fun initSoftkeyManager() {
+        val bar = findViewById<View>(R.id.softkey_bar)
+        val tvLeft = findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
+        if (tvLeft != null && tvCenter != null && tvRight != null) {
+            softkeyManager = SoftkeyManager(bar, tvLeft, tvCenter, tvRight)
+        }
+    }
+
+    fun setupSoftkeys(
         left: String = "",
         center: String = "",
         right: String = "",
@@ -74,17 +103,35 @@ abstract class BaseDialog(
         onCenter: (() -> Unit)? = null,
         onRight: (() -> Unit)? = null,
     ) {
-        val bar: View? = findViewById(R.id.softkey_bar)
-        val tvLeft: TextView? = findViewById(R.id.tv_softkey_left)
-        val tvCenter: TextView? = findViewById(R.id.tv_softkey_center)
-        val tvRight: TextView? = findViewById(R.id.tv_softkey_right)
-
-        if (tvLeft != null && tvCenter != null && tvRight != null) {
-            if (softkeyManager == null) {
-                softkeyManager = SoftkeyManager(bar, tvLeft, tvCenter, tvRight)
-            }
-            softkeyManager?.update(left, center, right, onLeft, onCenter, onRight)
+        if (softkeyManager == null) {
+            initSoftkeyManager()
         }
+        softkeyManager?.update(left, center, right, onLeft, onCenter, onRight)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (softkeyManager?.handleKeyEvent(event.keyCode, event) == true) {
+            return true
+        }
+        val isBack = event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK
+        if (isBack) {
+            onBackPressed()
+        }
+        return isBack || super.dispatchKeyEvent(event)
+    }
+
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
+            return true
+        }
+        val isBack = keyCode == KeyEvent.KEYCODE_BACK
+        if (isBack) {
+            onBackPressed()
+        }
+        return isBack || super.onKeyDown(keyCode, event)
     }
 
     protected fun isSoftLeftKey(keyCode: Int): Boolean = SoftkeyUtils.isSoftLeftKey(keyCode)
@@ -94,14 +141,4 @@ abstract class BaseDialog(
     protected fun isBackOrRightSoftKey(keyCode: Int): Boolean = SoftkeyUtils.isBackOrSoftRightKey(keyCode)
 
     protected fun isCenterKey(keyCode: Int): Boolean = SoftkeyUtils.isCenterKey(keyCode)
-
-    override fun onKeyDown(
-        keyCode: Int,
-        event: KeyEvent,
-    ): Boolean {
-        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
-    }
 }

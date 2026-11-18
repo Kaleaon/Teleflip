@@ -40,11 +40,17 @@ class ProxySettingsDialog(
         val tvStatus = findViewById<TextView>(R.id.tv_proxy_active_status)
         val btnSocks5 = findViewById<Button>(R.id.btn_proxy_type_socks5)
         val btnMtproto = findViewById<Button>(R.id.btn_proxy_type_mtproto)
-        val etServer = findViewById<EditText>(R.id.et_proxy_server)
-        val etPort = findViewById<EditText>(R.id.et_proxy_port)
-        val etUsername = findViewById<EditText>(R.id.et_proxy_username)
-        val etPassword = findViewById<EditText>(R.id.et_proxy_password)
-        val etSecret = findViewById<EditText>(R.id.et_proxy_secret)
+        val livServer = findViewById<LabeledInputView>(R.id.liv_proxy_server)
+        val livPort = findViewById<LabeledInputView>(R.id.liv_proxy_port)
+        val livUsername = findViewById<LabeledInputView>(R.id.liv_proxy_username)
+        val livPassword = findViewById<LabeledInputView>(R.id.liv_proxy_password)
+        val livSecret = findViewById<LabeledInputView>(R.id.liv_proxy_secret)
+
+        val etServer = livServer?.editText
+        val etPort = livPort?.editText
+        val etUsername = livUsername?.editText
+        val etPassword = livPassword?.editText
+        val etSecret = livSecret?.editText
         val layoutSocks5 = findViewById<LinearLayout>(R.id.layout_socks5_credentials)
         val layoutMtproto = findViewById<LinearLayout>(R.id.layout_mtproto_credentials)
         val btnSaveEnable = findViewById<Button>(R.id.btn_proxy_save_enable)
@@ -102,6 +108,17 @@ class ProxySettingsDialog(
             updateSoftkeys()
         }
 
+        etServer?.nextFocusUpId = R.id.btn_proxy_type_socks5
+        etServer?.nextFocusDownId = R.id.liv_proxy_port
+        etPort?.nextFocusUpId = R.id.liv_proxy_server
+        etPort?.nextFocusDownId = R.id.liv_proxy_username
+        etUsername?.nextFocusUpId = R.id.liv_proxy_port
+        etUsername?.nextFocusDownId = R.id.liv_proxy_password
+        etPassword?.nextFocusUpId = R.id.liv_proxy_username
+        etPassword?.nextFocusDownId = R.id.btn_proxy_save_enable
+        etSecret?.nextFocusUpId = R.id.liv_proxy_port
+        etSecret?.nextFocusDownId = R.id.btn_proxy_save_enable
+
         fun updateTypeSelection(type: ProxyType) {
             selectedType = type
             if (type == ProxyType.SOCKS5) {
@@ -109,15 +126,17 @@ class ProxySettingsDialog(
                 btnMtproto?.setBackgroundResource(R.drawable.bg_item_selector)
                 layoutSocks5?.visibility = View.VISIBLE
                 layoutMtproto?.visibility = View.GONE
-                etPort?.nextFocusDownId = R.id.et_proxy_username
-                btnSaveEnable?.nextFocusUpId = R.id.et_proxy_password
+                livPort?.nextFocusDownId = R.id.liv_proxy_username
+                etPort?.nextFocusDownId = R.id.liv_proxy_username
+                btnSaveEnable?.nextFocusUpId = R.id.liv_proxy_password
             } else {
                 btnSocks5?.setBackgroundResource(R.drawable.bg_item_selector)
                 btnMtproto?.setBackgroundResource(R.drawable.bg_button_selector)
                 layoutSocks5?.visibility = View.GONE
                 layoutMtproto?.visibility = View.VISIBLE
-                etPort?.nextFocusDownId = R.id.et_proxy_secret
-                btnSaveEnable?.nextFocusUpId = R.id.et_proxy_secret
+                livPort?.nextFocusDownId = R.id.liv_proxy_secret
+                etPort?.nextFocusDownId = R.id.liv_proxy_secret
+                btnSaveEnable?.nextFocusUpId = R.id.liv_proxy_secret
             }
         }
 
@@ -356,17 +375,6 @@ class ProxySettingsDialog(
             engines.values.forEach { it.commitCurrentChar() }
             dismiss()
         }
-
-        setupSoftkeys(
-            left = "",
-            center = "Save",
-            right = "Close",
-            onCenter = { btnSaveEnable?.performClick() },
-            onRight = {
-                engines.values.forEach { it.commitCurrentChar() }
-                dismiss()
-            },
-        )
     }
 
     private fun updateSoftkeys() {

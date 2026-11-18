@@ -153,7 +153,6 @@ class SymbolsDialog(
             dismiss()
             return true
         }
-
         return super.onKeyDown(keyCode, event)
     }
 
