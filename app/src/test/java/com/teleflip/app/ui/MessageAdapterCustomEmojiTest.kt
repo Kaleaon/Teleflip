@@ -52,7 +52,7 @@ class MessageAdapterCustomEmojiTest {
             fetchedList = items
         }
         assertNotNull("Fetched custom emoji stickers should not be null", fetchedList)
-        assertTrue("Fetched list should contain fallback/default custom emoji stickers", fetchedList!!.isNotEmpty())
+        assertTrue("No client must not fabricate custom emoji files", fetchedList!!.isEmpty())
     }
 
     @Test
@@ -74,7 +74,7 @@ class MessageAdapterCustomEmojiTest {
         // Toggle custom emoji reaction
         telegramManager.toggleMessageReaction(1L, 101L, "custom_emoji_1001")
         var currentMsgs = telegramManager.messages.value[1L] ?: emptyList()
-        assertTrue("Message reactions should contain custom_emoji_1001", currentMsgs.first().reactions.contains("custom_emoji_1001"))
+        assertTrue("No client must not claim a reaction was accepted", currentMsgs.first().reactions.isEmpty())
 
         // Untoggle custom emoji reaction
         telegramManager.toggleMessageReaction(1L, 101L, "custom_emoji_1001")
@@ -161,5 +161,46 @@ class MessageAdapterCustomEmojiTest {
         assertTrue("tvReactions text should not be empty", tvReactions2.text.isNotEmpty())
 
         tempImageFile.delete()
+    }
+
+    @Test
+    fun testGetCustomEmojiFilePathDoesNotPerformDiskCheck() {
+        val nonExistentPath = "/tmp/non_existent_custom_emoji_888.png"
+        val customItem =
+            StickerItem(
+                fileId = 888,
+                emoji = "🔥",
+                filePath = nonExistentPath,
+                setName = "Fire Set",
+            )
+        TelegramManager.registerCustomEmojiSticker("custom_emoji_888", customItem)
+
+        // getCustomEmojiFilePath should return nonExistentPath directly without calling File.exists()
+        val path = TelegramManager.getCustomEmojiFilePath("custom_emoji_888")
+        assertEquals(nonExistentPath, path)
+    }
+
+    @Test
+    fun testViewRecycledDisposesPendingRequests() {
+        val parent = FrameLayout(context)
+        val adapter = MessageAdapter()
+        val holder = adapter.onCreateViewHolder(parent, 0)
+
+        val msg =
+            MessageModel(
+                id = 10L,
+                chatId = 100L,
+                senderName = "Bob",
+                text = "Recycle test",
+                time = "10:05",
+                isOutbound = false,
+                reactions = listOf("custom_emoji_999"),
+            )
+
+        holder.bind(msg)
+        adapter.onViewRecycled(holder)
+        // Verify recycled view holder clears state cleanly without throwing
+        val tvReactions = holder.itemView.findViewById<TextView>(R.id.tv_reactions)
+        assertNotNull(tvReactions)
     }
 }

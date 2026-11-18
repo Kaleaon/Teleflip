@@ -42,9 +42,10 @@ class NotificationHelperTest {
         verify(notificationManager, times(1)).createNotificationChannels(captor.capture())
 
         val channels = captor.value
-        assertEquals(3, channels.size)
+        assertEquals(4, channels.size)
         val channelIds = channels.map { it.id }.toSet()
         assertTrue(channelIds.contains(NotificationHelper.CHANNEL_MESSAGES))
+        assertTrue(channelIds.contains(NotificationHelper.CHANNEL_MESSAGES_SILENT))
         assertTrue(channelIds.contains(NotificationHelper.CHANNEL_CALLS))
         assertTrue(channelIds.contains(NotificationHelper.CHANNEL_BACKGROUND_SYNC))
     }
@@ -100,14 +101,17 @@ class NotificationHelperTest {
         NotificationHelper.ensureChannels(context)
 
         val channelMessages = notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_MESSAGES)
+        val channelMessagesSilent = notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_MESSAGES_SILENT)
         val channelCalls = notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_CALLS)
         val channelSync = notificationManager.getNotificationChannel(NotificationHelper.CHANNEL_BACKGROUND_SYNC)
 
         assertNotNull(channelMessages)
+        assertNotNull(channelMessagesSilent)
         assertNotNull(channelCalls)
         assertNotNull(channelSync)
 
         assertEquals("Telegram Messages", channelMessages.name)
+        assertEquals("Telegram Messages (Silent)", channelMessagesSilent.name)
         assertEquals("Telegram Voice Calls", channelCalls.name)
         assertEquals("Background Flip-Closed Push Sync", channelSync.name)
     }

@@ -25,6 +25,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:scaleType="centerCrop"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
                 android:contentDescription="@string/cd_contact_avatar"
                 android:visibility="gone" />
 
@@ -37,6 +39,8 @@
                 android:textColor="@color/text_primary"
                 android:textSize="12sp"
                 android:textStyle="bold"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
                 android:background="@drawable/bg_tab_indicator" />
         </FrameLayout>
 
@@ -61,6 +65,8 @@
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:maxLines="1"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
                     android:ellipsize="end" />
 
                 <TextView
@@ -104,12 +110,14 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@color/bg_dark_card"
+        android:background="@drawable/bg_item_selector"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:paddingTop="4dp"
         android:paddingBottom="4dp"
         android:focusable="true"
+        android:clickable="true"
+        android:nextFocusDown="@+id/rv_messages"
         android:visibility="gone">
 
         <TextView
@@ -147,6 +155,23 @@
             android:layout_gravity="center"
             android:visibility="gone" />
 
+        <!-- Jump to Bottom Button -->
+        <Button
+            android:id="@+id/btn_jump_to_bottom"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_button_selector"
+            android:focusable="true"
+            android:clickable="true"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="⬇ Jump to Bottom"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
     </FrameLayout>
 
     <!-- Reply / Edit Context Banner (Visible when replying to or editing a message) -->
@@ -161,6 +186,8 @@
         android:paddingEnd="8dp"
         android:paddingTop="4dp"
         android:paddingBottom="4dp"
+        android:focusable="true"
+        android:clickable="true"
         android:visibility="gone">
 
         <TextView
@@ -225,6 +252,40 @@
             android:textColor="@color/text_primary"
             android:textSize="12sp"
             android:accessibilityLiveRegion="polite"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+    </LinearLayout>
+
+    <!-- Slow Mode Cooldown Banner -->
+    <LinearLayout
+        android:id="@+id/layout_slow_mode_banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1E2A38"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏳"
+            android:textSize="12sp"
+            android:layout_marginEnd="6dp" />
+
+        <TextView
+            android:id="@+id/tv_slow_mode_banner_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Slow mode active: wait 00:00 to send next message"
+            android:textColor="@color/focus_highlight_gold"
+            android:textSize="12sp"
             android:ellipsize="end"
             android:maxLines="1" />
 

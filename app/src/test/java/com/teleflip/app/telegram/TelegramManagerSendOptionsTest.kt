@@ -153,4 +153,32 @@ class TelegramManagerSendOptionsTest {
         val photoSched = sendReq.options.schedulingState as TdApi.MessageSchedulingStateSendAtDate
         assertEquals(futureSec, photoSched.sendDate)
     }
+
+    @Test
+    fun testSendMessageReplyWithSilentAndScheduledOptions() {
+        val manager = TelegramManager(mockContext)
+        manager.setTdClientForTesting(mockClient)
+
+        val futureSec = (System.currentTimeMillis() / 1000).toInt() + 7200
+        val schedulingState = TdApi.MessageSchedulingStateSendAtDate(futureSec, 0)
+
+        manager.sendMessage(
+            chatId = 789L,
+            text = "Replying with options",
+            replyToMessageId = 1001L,
+            replyToPreview = "Alice: Original message",
+            disableNotification = true,
+            schedulingState = schedulingState,
+        )
+
+        val captor = ArgumentCaptor.forClass(TdApi.Function::class.java)
+        verify(mockClient, atLeastOnce()).send(captor.capture(), any())
+
+        val sendReq = captor.allValues.filterIsInstance<TdApi.SendMessage>().first()
+        assertNotNull(sendReq.options)
+        assertEquals(true, sendReq.options.disableNotification)
+        assertNotNull(sendReq.options.schedulingState)
+        val replySched = sendReq.options.schedulingState as TdApi.MessageSchedulingStateSendAtDate
+        assertEquals(futureSec, replySched.sendDate)
+    }
 }

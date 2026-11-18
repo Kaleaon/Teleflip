@@ -172,4 +172,142 @@ class MessageAdapterTest {
         // Text remains unaffected
         assertEquals("Hello world", tvText.text.toString())
     }
+
+    @Test
+    fun testMediaCaptionRenderingAndEditedBadge() {
+        val parent = FrameLayout(context)
+
+        val photoMsg =
+            MessageModel(
+                id = 201L,
+                chatId = 1L,
+                senderName = "You",
+                text = "📷 [Photo] Updated photo caption",
+                time = "10:10 AM",
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.PHOTO,
+                mediaCaption = "Updated photo caption",
+                isEdited = true,
+            )
+        val viewHolderPhoto = adapter.onCreateViewHolder(parent, 0)
+        adapter.submitList(listOf(photoMsg)) {
+            adapter.onBindViewHolder(viewHolderPhoto, 0)
+
+            val tvMediaPhoto = viewHolderPhoto.itemView.findViewById<TextView>(R.id.tv_media_indicator)
+            val tvTimePhoto = viewHolderPhoto.itemView.findViewById<TextView>(R.id.tv_message_time)
+            assertEquals("📷 Updated photo caption", tvMediaPhoto.text.toString())
+            assertEquals("edited 10:10 AM", tvTimePhoto.text.toString())
+        }
+
+        val videoMsg =
+            MessageModel(
+                id = 202L,
+                chatId = 1L,
+                senderName = "You",
+                text = "📹 [Video]",
+                time = "10:11 AM",
+                isOutbound = true,
+                status = MessageStatus.SENT,
+                mediaType = MediaType.VIDEO,
+                mediaCaption = "Sunset clip",
+                durationSeconds = 12,
+                isEdited = true,
+            )
+        val viewHolderVideo = adapter.onCreateViewHolder(parent, 0)
+        adapter.submitList(listOf(videoMsg)) {
+            adapter.onBindViewHolder(viewHolderVideo, 0)
+
+            val tvMediaVideo = viewHolderVideo.itemView.findViewById<TextView>(R.id.tv_media_indicator)
+            assertEquals("📹 [Video (12s)] Sunset clip", tvMediaVideo.text.toString())
+        }
+    }
+
+    @Test
+    fun testQuotePreviewClickTriggersCallback() {
+        var clickedQuoteId: Long? = null
+        val customAdapter = MessageAdapter(onQuoteClick = { clickedQuoteId = it })
+        val parent = FrameLayout(context)
+        val viewHolder = customAdapter.onCreateViewHolder(parent, 0)
+
+        val msgWithReply = msg1Text.copy(id = 105L, replyToMessageId = 101L, replyToPreview = "Quoted text")
+        customAdapter.submitList(listOf(msgWithReply))
+        customAdapter.onBindViewHolder(viewHolder, 0)
+
+        val tvQuote = viewHolder.itemView.findViewById<TextView>(R.id.tv_reply_quote)
+        assertNotNull(tvQuote)
+        assertEquals(android.view.View.VISIBLE, tvQuote.visibility)
+        assertEquals(true, tvQuote.isFocusable)
+        assertEquals(true, tvQuote.isClickable)
+
+        tvQuote.performClick()
+        assertEquals(101L, clickedQuoteId)
+    }
+
+    @Test
+    fun testTranscribeButtonIsFocusable() {
+        val parent = FrameLayout(context)
+        val viewHolder = adapter.onCreateViewHolder(parent, 0)
+
+        adapter.onBindViewHolder(viewHolder, 1) // msg2Voice
+
+        val btnTranscribe = viewHolder.itemView.findViewById<TextView>(R.id.btn_transcribe)
+        assertNotNull(btnTranscribe)
+        assertEquals(android.view.View.VISIBLE, btnTranscribe.visibility)
+        assertEquals(true, btnTranscribe.isFocusable)
+    }
+
+    @Test
+    fun testReplyQuoteAndReactionsCallbacksAndFocusability() {
+        var replyQuoteClickedMsg: MessageModel? = null
+        var reactionsClickedMsg: MessageModel? = null
+
+        val customAdapter =
+            MessageAdapter(
+                onReplyQuoteClick = { replyQuoteClickedMsg = it },
+                onReactionsClick = { reactionsClickedMsg = it },
+            )
+
+        val msgWithReplyAndReactions =
+            MessageModel(
+                id = 201L,
+                chatId = 1L,
+                senderName = "Alice",
+                text = "Replying with reactions",
+                time = "11:00 AM",
+                isOutbound = false,
+                replyToMessageId = 101L,
+                replyToPreview = "Original quote",
+                reactions = listOf("👍", "❤️"),
+            )
+
+        customAdapter.submitList(listOf(msgWithReplyAndReactions))
+
+        val parent = FrameLayout(context)
+        val viewHolder = customAdapter.onCreateViewHolder(parent, 0)
+        customAdapter.onBindViewHolder(viewHolder, 0)
+
+        val tvReplyQuote = viewHolder.itemView.findViewById<TextView>(R.id.tv_reply_quote)
+        val tvReactions = viewHolder.itemView.findViewById<TextView>(R.id.tv_reactions)
+
+        assertNotNull(tvReplyQuote)
+        assertNotNull(tvReactions)
+
+        assertEquals(android.view.View.VISIBLE, tvReplyQuote.visibility)
+        assertEquals(android.view.View.VISIBLE, tvReactions.visibility)
+
+        org.junit.Assert.assertTrue("tv_reply_quote should be focusable", tvReplyQuote.isFocusable)
+        org.junit.Assert.assertTrue("tv_reply_quote should be clickable", tvReplyQuote.isClickable)
+        org.junit.Assert.assertTrue("tv_reactions should be focusable", tvReactions.isFocusable)
+        org.junit.Assert.assertTrue("tv_reactions should be clickable", tvReactions.isClickable)
+
+        assertEquals("Quoted reply: Original quote", tvReplyQuote.contentDescription.toString())
+        assertEquals("Reactions: 👍, ❤️", tvReactions.contentDescription.toString())
+
+        tvReplyQuote.performClick()
+        assertEquals(201L, replyQuoteClickedMsg?.id)
+
+        tvReactions.performClick()
+        assertEquals(201L, reactionsClickedMsg?.id)
+    }
 }

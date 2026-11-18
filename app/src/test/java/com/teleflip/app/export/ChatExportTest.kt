@@ -25,6 +25,8 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -341,8 +343,11 @@ class ChatExportTest {
             msg1.senderId = TdApi.MessageSenderUser(1L)
             msg1.content = TdApi.MessageText(TdApi.FormattedText("Msg 1", emptyArray()), null, null)
 
+            val batchStarted = CountDownLatch(1)
+            val releaseBatch = CountDownLatch(1)
             `when`(mockManager.getChatHistoryBatch(777L, 0L, 100)).thenAnswer {
-                Thread.sleep(10)
+                batchStarted.countDown()
+                check(releaseBatch.await(5, TimeUnit.SECONDS)) { "Test did not release the history read" }
                 listOf(msg1)
             }
             `when`(mockManager.resolveSenderName(msg1.senderId)).thenReturn("User1")
@@ -365,12 +370,14 @@ class ChatExportTest {
                     },
                 )
 
-            // Cancel job
+            // Cancel while a history read is in progress, before it can finish exporting.
+            assertTrue("History read must start", batchStarted.await(5, TimeUnit.SECONDS))
             exportJob.cancel()
+            releaseBatch.countDown()
             exportJob.join()
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
 
-            val result = completionDeferred.await()
+            val result = kotlinx.coroutines.withTimeout(5000) { completionDeferred.await() }
             assertTrue(result.isFailure)
             assertTrue(result.exceptionOrNull() is CancellationException)
         }

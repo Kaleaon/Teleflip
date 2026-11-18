@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
-import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
@@ -17,6 +16,7 @@ import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageSearchResult
 import com.teleflip.app.model.MessageStatus
 import com.teleflip.app.telegram.TelegramManager
+import com.teleflip.app.ui.LabeledInputView
 import com.teleflip.app.ui.SearchDialog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -170,23 +170,105 @@ class SearchDialogTest {
     }
 
     @Test
-    fun testDpadLeftRightDoNotSwitchTabsWhenSearchInputHasFocus() {
+    fun testDpadLeftRightSwitchTabsWhenSearchInputHasFocus() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val tm = createTelegramManager()
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         assertTrue("Search input should have focus initially", etSearchInput.hasFocus())
         assertEquals(SearchDialog.SearchTab.CHATS, dialog.currentTab)
 
         val dpadRightDown = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT, 0)
         dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, dpadRightDown)
-        assertEquals("Tab should not change when search input has focus", SearchDialog.SearchTab.CHATS, dialog.currentTab)
+        assertEquals(
+            "DPAD_RIGHT should switch tab to CONTACTS when input has focus and no multi-tap active",
+            SearchDialog.SearchTab.CONTACTS,
+            dialog.currentTab,
+        )
+
+        dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, dpadRightDown)
+        assertEquals("DPAD_RIGHT should switch tab to MESSAGES", SearchDialog.SearchTab.MESSAGES, dialog.currentTab)
 
         val dpadLeftDown = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, 0)
         dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_LEFT, dpadLeftDown)
-        assertEquals("Tab should not change when search input has focus", SearchDialog.SearchTab.CHATS, dialog.currentTab)
+        assertEquals("DPAD_LEFT should switch tab back to CONTACTS", SearchDialog.SearchTab.CONTACTS, dialog.currentTab)
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testVendorSoftkeyKeycodes() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val etSearchInput = dialog.findViewById<LabeledInputView>(R.id.liv_search_input).editText
+        etSearchInput.setText("Hello")
+        assertEquals("Hello", etSearchInput.text.toString())
+
+        // Vendor soft left key (132) -> Clear
+        val softLeftEvent = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, 132, 0)
+        val handledLeft = dialog.onKeyDown(132, softLeftEvent)
+        assertTrue(handledLeft)
+        assertEquals("", etSearchInput.text.toString())
+
+        // Vendor soft left key (228) -> Clear
+        etSearchInput.setText("World")
+        val softLeft228Event = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, 228, 0)
+        dialog.onKeyDown(228, softLeft228Event)
+        assertEquals("", etSearchInput.text.toString())
+
+        // Vendor soft right key (229) -> Dismiss
+        val softRightEvent = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, 229, 0)
+        val handledRight = dialog.onKeyDown(229, softRightEvent)
+        assertTrue(handledRight)
+        assertFalse("Dialog should be dismissed on vendor soft right key 229", dialog.isShowing)
+    }
+
+    @Test
+    fun testSoftkeyManagerIntegrationAndLabels() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
+
+        assertEquals("Clear", tvLeft.text.toString())
+        assertEquals("Select", tvCenter.text.toString())
+        assertEquals("Back", tvRight.text.toString())
+
+        val etSearchInput = dialog.findViewById<LabeledInputView>(R.id.liv_search_input).editText
+        etSearchInput.setText("Test Query")
+
+        tvLeft.performClick()
+        assertEquals("", etSearchInput.text.toString())
+
+        tvRight.performClick()
+        assertFalse("Dialog should be dismissed when right softkey clicked", dialog.isShowing)
+    }
+
+    @Test
+    fun testDpadDownWhenEmptyFocusesActiveTabHeader() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val etSearchInput = dialog.findViewById<LabeledInputView>(R.id.liv_search_input).editText
+        val tabChats = dialog.findViewById<TextView>(R.id.tab_search_chats)
+        assertTrue(etSearchInput.hasFocus())
+
+        val dpadDownEvent = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN, 0)
+        val handled = dialog.onKeyDown(KeyEvent.KEYCODE_DPAD_DOWN, dpadDownEvent)
+
+        assertTrue(handled)
+        assertTrue("Tab chats should have focus when search results are empty", tabChats.hasFocus())
 
         dialog.dismiss()
     }
@@ -198,7 +280,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         val tabChats = dialog.findViewById<android.view.View>(R.id.tab_search_chats)
 
         tabChats.isFocusableInTouchMode = true
@@ -228,7 +310,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val etSearchInput = dialog.findViewById<EditText>(R.id.et_search_input)
+        val etSearchInput = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         assertTrue("Search input should have focus", etSearchInput.hasFocus())
 
         // Key '2' -> 'A' (CAP_FIRST mode)
@@ -268,7 +350,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val input = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         input.setText("News")
 
         // Before 300ms delay: no search should be dispatched
@@ -302,7 +384,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val input = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
 
         // Rapid keypresses
         input.setText("N")
@@ -350,7 +432,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val input = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         val progressBar = dialog.findViewById<ProgressBar>(R.id.progress_search)
 
         // First query
@@ -389,7 +471,7 @@ class SearchDialogTest {
         val dialog = SearchDialog(context, tm, {}, { _, _ -> })
         dialog.show()
 
-        val input = dialog.findViewById<EditText>(R.id.et_search_input)
+        val input = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
         val progressBar = dialog.findViewById<ProgressBar>(R.id.progress_search)
         val emptyLayout = dialog.findViewById<View>(R.id.layout_search_empty)
         val emptyTitle = dialog.findViewById<TextView>(R.id.tv_search_empty_title)
@@ -410,5 +492,100 @@ class SearchDialogTest {
         assertEquals("Type a keyword to search", emptyTitle.text.toString())
 
         dialog.dismiss()
+    }
+
+    @Test
+    fun testDismissCommitsCharacterInSearchDialog() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val input = dialog.findViewById<com.teleflip.app.ui.LabeledInputView>(R.id.liv_search_input).editText
+        assertTrue("Search input should have focus", input.hasFocus())
+
+        val key2Down = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2, 0)
+        dialog.onKeyDown(KeyEvent.KEYCODE_2, key2Down)
+        assertEquals("A", input.text.toString())
+
+        val backEvent = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0)
+        dialog.onKeyDown(KeyEvent.KEYCODE_BACK, backEvent)
+
+        assertEquals("A", input.text.toString())
+    }
+
+    @Test
+    fun testVendorSoftLeftKeycodesClearSearchInput() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val input = dialog.findViewById<LabeledInputView>(R.id.liv_search_input).editText
+        val vendorLeftCodes = listOf(132, 60, 228)
+
+        for (code in vendorLeftCodes) {
+            input.setText("TestQuery")
+            val event = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, code, 0)
+            val handled = dialog.onKeyDown(code, event)
+            assertTrue("Vendor soft left keycode $code should be handled by SearchDialog", handled)
+            assertEquals("Search input should be cleared by keycode $code", "", input.text.toString())
+        }
+
+        dialog.dismiss()
+    }
+
+    @Test
+    fun testVendorSoftRightKeycodesDismissSearchDialog() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        val tm = createTelegramManager()
+        val vendorRightCodes = listOf(229, 230, 61, 158)
+
+        for (code in vendorRightCodes) {
+            val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+            dialog.show()
+            assertTrue("SearchDialog should be showing", dialog.isShowing)
+
+            val event = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, code, 0)
+            val handled = dialog.onKeyDown(code, event)
+            assertTrue("Vendor soft right keycode $code should be handled", handled)
+            assertFalse("SearchDialog should be dismissed after keycode $code", dialog.isShowing)
+        }
+    }
+
+    @Test
+    fun testSearchDialogSoftkeyBarInitializedWithLabelsAndClickListener() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.setTheme(R.style.Theme_TeleFlip)
+
+        val tm = createTelegramManager()
+        val dialog = SearchDialog(context, tm, {}, { _, _ -> })
+        dialog.show()
+
+        val tvLeft = dialog.findViewById<TextView>(R.id.tv_softkey_left)
+        val tvCenter = dialog.findViewById<TextView>(R.id.tv_softkey_center)
+        val tvRight = dialog.findViewById<TextView>(R.id.tv_softkey_right)
+
+        assertNotNull("tv_softkey_left should exist", tvLeft)
+        assertNotNull("tv_softkey_center should exist", tvCenter)
+        assertNotNull("tv_softkey_right should exist", tvRight)
+
+        assertEquals("Clear", tvLeft.text.toString())
+        assertEquals("Select", tvCenter.text.toString())
+        assertEquals("Back", tvRight.text.toString())
+
+        val input = dialog.findViewById<LabeledInputView>(R.id.liv_search_input).editText
+        input.setText("Some Text")
+        tvLeft.performClick()
+        assertEquals("Clicking left softkey view should clear input", "", input.text.toString())
+
+        tvRight.performClick()
+        assertFalse("Clicking right softkey view should dismiss dialog", dialog.isShowing)
     }
 }

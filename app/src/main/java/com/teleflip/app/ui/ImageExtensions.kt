@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
+import coil.dispose
 import coil.load
 import coil.transform.CircleCropTransformation
 import java.io.File
@@ -44,21 +45,23 @@ fun decodeSampledBitmapFromFile(
     filePath: String,
     reqWidth: Int,
     reqHeight: Int,
+    context: android.content.Context? = null,
 ): Bitmap? {
     return try {
-        val file = File(filePath)
+        val resolvedPath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, filePath) ?: filePath
+        val file = File(resolvedPath)
         if (!file.exists()) return null
 
         val options =
             BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
-        BitmapFactory.decodeFile(filePath, options)
+        BitmapFactory.decodeFile(resolvedPath, options)
 
         options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
         options.inJustDecodeBounds = false
 
-        BitmapFactory.decodeFile(filePath, options)
+        BitmapFactory.decodeFile(resolvedPath, options)
     } catch (_: Throwable) {
         null
     }
@@ -77,6 +80,8 @@ fun ImageView.loadCircularAvatarOrFallback(
     fallbackTextView: TextView?,
 ) {
     if (path.isNullOrEmpty()) {
+        dispose()
+        setImageDrawable(null)
         visibility = View.GONE
         fallbackTextView?.visibility = View.VISIBLE
         fallbackTextView?.text = fallbackLetters ?: ""
@@ -84,7 +89,9 @@ fun ImageView.loadCircularAvatarOrFallback(
     }
 
     try {
-        val file = File(path)
+        val resolvedPath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, path) ?: path
+        val file = File(resolvedPath)
+        visibility = View.VISIBLE
         load(file) {
             transformations(CircleCropTransformation())
             listener(
@@ -107,45 +114,21 @@ fun ImageView.loadCircularAvatarOrFallback(
 }
 
 /**
- * Extension function for [ImageView] to handle loading standard image attachments from file paths safely.
- *
- * @param path The local file path to the image file.
- */
-fun ImageView.loadBitmapFromFile(path: String?) {
-    if (path.isNullOrEmpty()) {
-        visibility = View.GONE
-        return
-    }
-
-    try {
-        val file = File(path)
-        load(file) {
-            listener(
-                onSuccess = { _, _ ->
-                    visibility = View.VISIBLE
-                },
-                onError = { _, _ ->
-                    visibility = View.GONE
-                },
-            )
-        }
-    } catch (_: Throwable) {
-        visibility = View.GONE
-    }
-}
-
-/**
  * Extension function for [ImageView] to load photos, stickers, and animated GIFs safely.
  */
 fun ImageView.loadMediaFromFile(path: String?) {
     if (path.isNullOrEmpty()) {
+        dispose()
+        setImageDrawable(null)
         setImageDrawable(null)
         visibility = View.GONE
         return
     }
 
     try {
-        val file = File(path)
+        val resolvedPath = com.teleflip.app.storage.FallbackMediaResolver.resolvePath(context, path) ?: path
+        val file = File(resolvedPath)
+        visibility = View.VISIBLE
         load(file) {
             listener(
                 onSuccess = { _, _ ->

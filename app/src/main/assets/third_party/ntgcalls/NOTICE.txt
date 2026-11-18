@@ -1,0 +1,6 @@
+NTgCalls 3.0.5
+Copyright NTgCalls contributors.
+Licensed under the GNU Lesser General Public License v3.0.
+Source and build instructions: https://github.com/pytgcalls/ntgcalls/tree/v3.0.5
+Unmodified Android binaries: io.github.pytgcalls:ntgcalls:3.0.5, from Maven Central.
+The Java adapter and application integration are included in TeleFlip's source.

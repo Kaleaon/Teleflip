@@ -79,4 +79,41 @@ class PasscodeLockAccessibilityTest {
         }
         scenario.close()
     }
+
+    @Test
+    fun testIncompletePasscodeCenterKeyConsumesEventAndDoesNotTriggerLogout() {
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        scenario.onActivity { activity ->
+            val tvDots = activity.findViewById<TextView>(R.id.tv_passcode_dots)
+            assertNotNull("Passcode lock screen dots view must exist", tvDots)
+
+            // D-Pad center key with 0 digits entered
+            val centerEventZero = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER)
+            val consumedZero = activity.dispatchKeyEvent(centerEventZero)
+            assertEquals(true, consumedZero)
+            assertEquals("0 of 4 digits entered", tvDots.contentDescription)
+
+            // Key in 2 digits ('1', '2')
+            activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_1))
+            activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_2))
+            assertEquals("2 of 4 digits entered", tvDots.contentDescription)
+
+            // D-Pad center key with 2 digits entered (incomplete)
+            val centerEventIncomplete = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER)
+            val consumedIncomplete = activity.dispatchKeyEvent(centerEventIncomplete)
+            assertEquals(true, consumedIncomplete)
+
+            // Passcode screen should remain active and digits preserved
+            val tvDotsAfter = activity.findViewById<TextView>(R.id.tv_passcode_dots)
+            assertNotNull("Passcode lock screen must remain active", tvDotsAfter)
+            assertEquals("2 of 4 digits entered", tvDotsAfter.contentDescription)
+
+            // Also test KEYCODE_ENTER as center key
+            val enterEventIncomplete = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER)
+            val consumedEnter = activity.dispatchKeyEvent(enterEventIncomplete)
+            assertEquals(true, consumedEnter)
+            assertEquals("2 of 4 digits entered", tvDotsAfter.contentDescription)
+        }
+        scenario.close()
+    }
 }

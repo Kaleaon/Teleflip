@@ -80,11 +80,6 @@ class SoftkeyAndBackNavigationTest {
         val handled = softkeyManager.handleKeyEvent(KeyEvent.KEYCODE_BACK, event)
         assertFalse("KEYCODE_BACK should NOT be handled by SoftkeyManager", handled)
         assertFalse("KEYCODE_BACK should NOT trigger Right Softkey callback", rightTriggered)
-
-        @Suppress("DEPRECATION")
-        val backHandled = softkeyManager.handleBack()
-        assertFalse("handleBack() should return false and NOT trigger softkey callback", backHandled)
-        assertFalse("handleBack() should NOT trigger Right Softkey action", rightTriggered)
     }
 
     @Test
@@ -134,6 +129,42 @@ class SoftkeyAndBackNavigationTest {
             assertTrue("Keycode $code should be handled as Center Softkey", handled)
             assertTrue("Center action should be triggered for keycode $code", centerTriggered)
             centerTriggered = false
+        }
+    }
+
+    @Test
+    fun testIsBackOrSoftRightKeyEvaluation() {
+        val validCodes =
+            listOf(
+                KeyEvent.KEYCODE_BACK,
+                KeyEvent.KEYCODE_SOFT_RIGHT,
+                229,
+                230,
+                61,
+                158,
+            )
+        for (code in validCodes) {
+            assertTrue(
+                "Keycode $code should return true for isBackOrSoftRightKey",
+                SoftkeyUtils.isBackOrSoftRightKey(code),
+            )
+        }
+
+        val invalidCodes =
+            listOf(
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_SOFT_LEFT,
+                KeyEvent.KEYCODE_MENU,
+                132,
+                60,
+                228,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+            )
+        for (code in invalidCodes) {
+            assertFalse(
+                "Keycode $code should return false for isBackOrSoftRightKey",
+                SoftkeyUtils.isBackOrSoftRightKey(code),
+            )
         }
     }
 }

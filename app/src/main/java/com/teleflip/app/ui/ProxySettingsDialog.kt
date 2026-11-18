@@ -8,10 +8,12 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.teleflip.app.R
+import com.teleflip.app.input.InputMode
 import com.teleflip.app.input.KeypadInputEngine
+import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.model.ProxyType
+import com.teleflip.app.storage.ProxyStorage
 import com.teleflip.app.telegram.TelegramManager
 
 @Suppress("MagicNumber", "LongMethod", "ComplexMethod")
@@ -19,34 +21,71 @@ class ProxySettingsDialog(
     context: Context,
     private val telegramManager: TelegramManager,
     private val timeoutMs: Long = 500L,
+    private val initialProxyItem: ProxyItem? = null,
     private val onProxyChanged: (() -> Unit)? = null,
 ) : BaseDialog(context) {
     private val engines = mutableMapOf<Int, KeypadInputEngine>()
     private var selectedType = ProxyType.SOCKS5
+    private var tvError: TextView? = null
+
+    override fun getErrorTextView(): TextView? = tvError
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_proxy_settings)
         setupDismissKeys()
 
+        tvError = findViewById(R.id.tv_proxy_error)
         val tvMode = findViewById<TextView>(R.id.tv_proxy_input_mode)
         val tvStatus = findViewById<TextView>(R.id.tv_proxy_active_status)
         val btnSocks5 = findViewById<Button>(R.id.btn_proxy_type_socks5)
         val btnMtproto = findViewById<Button>(R.id.btn_proxy_type_mtproto)
-        val etServer = findViewById<EditText>(R.id.et_proxy_server)
-        val etPort = findViewById<EditText>(R.id.et_proxy_port)
-        val etUsername = findViewById<EditText>(R.id.et_proxy_username)
-        val etPassword = findViewById<EditText>(R.id.et_proxy_password)
-        val etSecret = findViewById<EditText>(R.id.et_proxy_secret)
+        val livServer = findViewById<LabeledInputView>(R.id.liv_proxy_server)
+        val livPort = findViewById<LabeledInputView>(R.id.liv_proxy_port)
+        val livUsername = findViewById<LabeledInputView>(R.id.liv_proxy_username)
+        val livPassword = findViewById<LabeledInputView>(R.id.liv_proxy_password)
+        val livSecret = findViewById<LabeledInputView>(R.id.liv_proxy_secret)
+
+        val etServer = livServer?.editText
+        val etPort = livPort?.editText
+        val etUsername = livUsername?.editText
+        val etPassword = livPassword?.editText
+        val etSecret = livSecret?.editText
         val layoutSocks5 = findViewById<LinearLayout>(R.id.layout_socks5_credentials)
         val layoutMtproto = findViewById<LinearLayout>(R.id.layout_mtproto_credentials)
         val btnSaveEnable = findViewById<Button>(R.id.btn_proxy_save_enable)
         val btnDisable = findViewById<Button>(R.id.btn_proxy_disable)
+        val btnAutoFailoverToggle = findViewById<Button>(R.id.btn_auto_failover_toggle)
         val btnClose = findViewById<Button>(R.id.btn_proxy_close)
         val containerSaved = findViewById<LinearLayout>(R.id.layout_saved_proxies_container)
 
+        fun updateAutoFailoverButton() {
+            val autoEnabled = ProxyStorage.isAutoProxyFailoverEnabled(context)
+            btnAutoFailoverToggle?.text = if (autoEnabled) "🔄 Auto Failover: Enabled" else "⏸️ Auto Failover: Disabled (Manual)"
+            btnAutoFailoverToggle?.setTextColor(context.getColor(if (autoEnabled) R.color.focus_highlight_gold else R.color.text_secondary))
+        }
+
+        btnAutoFailoverToggle?.setOnClickListener {
+            val current = ProxyStorage.isAutoProxyFailoverEnabled(context)
+            ProxyStorage.setAutoProxyFailoverEnabled(context, !current)
+            updateAutoFailoverButton()
+            clearDialogError()
+            StatusMessageDispatcher.showStatus(
+                context,
+                if (!current) "Auto failover enabled" else "Auto failover disabled (manual mode)",
+                isError = false,
+            )
+        }
+        updateAutoFailoverButton()
+
+        val focusChangeListener =
+            View.OnFocusChangeListener { _, _ ->
+                updateSoftkeys()
+            }
+
         val editTexts = listOfNotNull(etServer, etPort, etUsername, etPassword, etSecret)
         editTexts.forEach { field ->
+            field.onFocusChangeListener = focusChangeListener
             engines[field.id] =
                 KeypadInputEngine(
                     editText = field,
@@ -57,6 +96,28 @@ class ProxySettingsDialog(
                     },
                 )
         }
+        etPort?.id?.let { portId ->
+            engines[portId]?.setMode(InputMode.NUMERIC)
+        }
+
+        listOfNotNull(btnSocks5, btnMtproto, btnSaveEnable, btnDisable, btnAutoFailoverToggle, btnClose).forEach {
+            it.onFocusChangeListener = focusChangeListener
+        }
+
+        window?.decorView?.viewTreeObserver?.addOnGlobalFocusChangeListener { _, _ ->
+            updateSoftkeys()
+        }
+
+        etServer?.nextFocusUpId = R.id.btn_proxy_type_socks5
+        etServer?.nextFocusDownId = R.id.liv_proxy_port
+        etPort?.nextFocusUpId = R.id.liv_proxy_server
+        etPort?.nextFocusDownId = R.id.liv_proxy_username
+        etUsername?.nextFocusUpId = R.id.liv_proxy_port
+        etUsername?.nextFocusDownId = R.id.liv_proxy_password
+        etPassword?.nextFocusUpId = R.id.liv_proxy_username
+        etPassword?.nextFocusDownId = R.id.btn_proxy_save_enable
+        etSecret?.nextFocusUpId = R.id.liv_proxy_port
+        etSecret?.nextFocusDownId = R.id.btn_proxy_save_enable
 
         fun updateTypeSelection(type: ProxyType) {
             selectedType = type
@@ -65,17 +126,34 @@ class ProxySettingsDialog(
                 btnMtproto?.setBackgroundResource(R.drawable.bg_item_selector)
                 layoutSocks5?.visibility = View.VISIBLE
                 layoutMtproto?.visibility = View.GONE
+                livPort?.nextFocusDownId = R.id.liv_proxy_username
+                etPort?.nextFocusDownId = R.id.liv_proxy_username
+                btnSaveEnable?.nextFocusUpId = R.id.liv_proxy_password
             } else {
                 btnSocks5?.setBackgroundResource(R.drawable.bg_item_selector)
                 btnMtproto?.setBackgroundResource(R.drawable.bg_button_selector)
                 layoutSocks5?.visibility = View.GONE
                 layoutMtproto?.visibility = View.VISIBLE
+                livPort?.nextFocusDownId = R.id.liv_proxy_secret
+                etPort?.nextFocusDownId = R.id.liv_proxy_secret
+                btnSaveEnable?.nextFocusUpId = R.id.liv_proxy_secret
             }
         }
 
         btnSocks5?.setOnClickListener { updateTypeSelection(ProxyType.SOCKS5) }
         btnMtproto?.setOnClickListener { updateTypeSelection(ProxyType.MTPROTO) }
-        updateTypeSelection(ProxyType.SOCKS5)
+        updateTypeSelection(initialProxyItem?.type ?: ProxyType.SOCKS5)
+
+        if (initialProxyItem != null) {
+            etServer?.setText(initialProxyItem.server)
+            etPort?.setText(initialProxyItem.port.toString())
+            if (initialProxyItem.type == ProxyType.SOCKS5) {
+                etUsername?.setText(initialProxyItem.username)
+                etPassword?.setText(initialProxyItem.password)
+            } else {
+                etSecret?.setText(initialProxyItem.secret)
+            }
+        }
 
         fun refreshSavedProxiesList() {
             containerSaved?.removeAllViews()
@@ -88,7 +166,15 @@ class ProxySettingsDialog(
                 tvStatus?.text = "Status: Proxy Disabled (Direct Connection)"
             }
 
+            val prevAboveId = btnAutoFailoverToggle?.id ?: R.id.btn_proxy_disable
             if (proxies.isEmpty()) {
+                if (btnAutoFailoverToggle != null) {
+                    btnDisable?.nextFocusDownId = R.id.btn_auto_failover_toggle
+                    btnAutoFailoverToggle.nextFocusDownId = R.id.btn_proxy_close
+                } else {
+                    btnDisable?.nextFocusDownId = R.id.btn_proxy_close
+                }
+                btnClose?.nextFocusUpId = prevAboveId
                 val emptyTv =
                     TextView(context).apply {
                         text = "No proxy servers configured."
@@ -100,7 +186,10 @@ class ProxySettingsDialog(
                 return
             }
 
-            for (proxy in proxies) {
+            var prevToggleBtn: Button? = null
+            var prevDelBtn: Button? = null
+
+            for ((index, proxy) in proxies.withIndex()) {
                 val row =
                     LinearLayout(context).apply {
                         orientation = LinearLayout.VERTICAL
@@ -124,6 +213,12 @@ class ProxySettingsDialog(
                     }
                 row.addView(titleTv)
 
+                telegramManager.pingProxy(proxy) { latencyMs ->
+                    val statusText = if (proxy.isEnabled) " [ACTIVE]" else ""
+                    val pingText = if (latencyMs != null) " • $latencyMs ms" else " • Offline"
+                    titleTv.text = "• [${proxy.type.name}] ${proxy.server}:${proxy.port}$statusText$pingText"
+                }
+
                 val buttonLayout =
                     LinearLayout(context).apply {
                         orientation = LinearLayout.HORIZONTAL
@@ -138,11 +233,14 @@ class ProxySettingsDialog(
 
                 val btnToggle =
                     Button(context).apply {
+                        id = View.generateViewId()
                         text = if (proxy.isEnabled) "Disable" else "Enable"
                         textSize = 11f
                         setTextColor(context.getColor(R.color.text_primary))
                         setBackgroundResource(if (proxy.isEnabled) R.drawable.bg_item_selector else R.drawable.bg_button_selector)
                         isFocusable = true
+                        isFocusableInTouchMode = true
+                        onFocusChangeListener = focusChangeListener
                         val lp = LinearLayout.LayoutParams(0, 36, 1f).apply { marginEnd = 6 }
                         layoutParams = lp
                         setOnClickListener {
@@ -154,24 +252,27 @@ class ProxySettingsDialog(
                             } else {
                                 telegramManager.enableProxy(proxy.id) { success, err ->
                                     if (success) {
+                                        clearDialogError()
                                         refreshSavedProxiesList()
                                         onProxyChanged?.invoke()
                                     } else {
-                                        Toast.makeText(context, err ?: "Error enabling proxy", Toast.LENGTH_SHORT).show()
+                                        showDialogError(err ?: "Error enabling proxy")
                                     }
                                 }
                             }
                         }
                     }
-                buttonLayout.addView(btnToggle)
 
                 val btnDel =
                     Button(context).apply {
+                        id = View.generateViewId()
                         text = "Delete"
                         textSize = 11f
                         setTextColor(context.getColor(R.color.text_error))
                         setBackgroundResource(R.drawable.bg_item_selector)
                         isFocusable = true
+                        isFocusableInTouchMode = true
+                        onFocusChangeListener = focusChangeListener
                         val lp = LinearLayout.LayoutParams(0, 36, 1f)
                         layoutParams = lp
                         setOnClickListener {
@@ -181,14 +282,42 @@ class ProxySettingsDialog(
                             }
                         }
                     }
+
+                btnToggle.nextFocusRightId = btnDel.id
+                btnDel.nextFocusLeftId = btnToggle.id
+
+                if (index == 0) {
+                    if (btnAutoFailoverToggle != null) {
+                        btnDisable?.nextFocusDownId = R.id.btn_auto_failover_toggle
+                        btnAutoFailoverToggle.nextFocusDownId = btnToggle.id
+                    } else {
+                        btnDisable?.nextFocusDownId = btnToggle.id
+                    }
+                    btnToggle.nextFocusUpId = prevAboveId
+                } else {
+                    prevToggleBtn?.nextFocusDownId = btnToggle.id
+                    prevDelBtn?.nextFocusDownId = btnDel.id
+                    btnToggle.nextFocusUpId = prevToggleBtn?.id ?: View.NO_ID
+                    btnDel.nextFocusUpId = prevDelBtn?.id ?: View.NO_ID
+                }
+
+                prevToggleBtn = btnToggle
+                prevDelBtn = btnDel
+
+                buttonLayout.addView(btnToggle)
                 buttonLayout.addView(btnDel)
 
                 row.addView(buttonLayout)
                 containerSaved?.addView(row)
             }
+
+            prevToggleBtn?.nextFocusDownId = R.id.btn_proxy_close
+            prevDelBtn?.nextFocusDownId = R.id.btn_proxy_close
+            btnClose?.nextFocusUpId = prevToggleBtn?.id ?: prevAboveId
         }
 
         refreshSavedProxiesList()
+        updateSoftkeys()
 
         btnSaveEnable?.setOnClickListener {
             engines.values.forEach { it.commitCurrentChar() }
@@ -198,7 +327,7 @@ class ProxySettingsDialog(
             val port = portStr.toIntOrNull() ?: 1080
 
             if (server.isEmpty()) {
-                Toast.makeText(context, "Please enter a valid server address", Toast.LENGTH_SHORT).show()
+                showDialogError("Please enter a valid server address", etServer)
                 return@setOnClickListener
             }
 
@@ -216,7 +345,8 @@ class ProxySettingsDialog(
                 enableNow = true,
             ) { success, errorMsg ->
                 if (success) {
-                    Toast.makeText(context, "Proxy enabled successfully!", Toast.LENGTH_SHORT).show()
+                    clearDialogError()
+                    StatusMessageDispatcher.showStatus(context, "Proxy enabled successfully!", isError = false)
                     etServer?.text?.clear()
                     etPort?.text?.clear()
                     etUsername?.text?.clear()
@@ -225,7 +355,7 @@ class ProxySettingsDialog(
                     refreshSavedProxiesList()
                     onProxyChanged?.invoke()
                 } else {
-                    Toast.makeText(context, errorMsg ?: "Failed to set proxy", Toast.LENGTH_SHORT).show()
+                    showDialogError(errorMsg ?: "Failed to set proxy", etServer)
                 }
             }
         }
@@ -233,24 +363,114 @@ class ProxySettingsDialog(
         btnDisable?.setOnClickListener {
             telegramManager.disableProxy { success, _ ->
                 if (success) {
-                    Toast.makeText(context, "Proxy disabled", Toast.LENGTH_SHORT).show()
+                    clearDialogError()
+                    StatusMessageDispatcher.showStatus(context, "Proxy disabled", isError = false)
                     refreshSavedProxiesList()
                     onProxyChanged?.invoke()
                 }
             }
         }
 
-        btnClose?.setOnClickListener { dismiss() }
-    }
-
-    private fun setupDismissKeys() {
-        setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN && isBackOrRightSoftKey(keyCode)) {
-                dismiss()
-                true
-            } else {
-                false
-            }
+        btnClose?.setOnClickListener {
+            engines.values.forEach { it.commitCurrentChar() }
+            dismiss()
         }
     }
+
+    private fun updateSoftkeys() {
+        val focused = currentFocus
+        if (focused is EditText) {
+            setupSoftkeys(
+                left = "Clear",
+                center = "Save",
+                right = "Close",
+                onLeft = {
+                    engines[focused.id]?.commitCurrentChar()
+                    focused.setText("")
+                },
+                onCenter = {
+                    engines.values.forEach { it.commitCurrentChar() }
+                    findViewById<Button>(R.id.btn_proxy_save_enable)?.performClick()
+                },
+                onRight = {
+                    engines.values.forEach { it.commitCurrentChar() }
+                    dismiss()
+                },
+            )
+        } else {
+            setupSoftkeys(
+                left = "",
+                center = "Select",
+                right = "Close",
+                onLeft = null,
+                onCenter = {
+                    engines.values.forEach { it.commitCurrentChar() }
+                    val current = currentFocus
+                    if (current is Button) {
+                        current.performClick()
+                    } else {
+                        findViewById<Button>(R.id.btn_proxy_save_enable)?.performClick()
+                    }
+                },
+                onRight = {
+                    engines.values.forEach { it.commitCurrentChar() }
+                    dismiss()
+                },
+            )
+        }
+    }
+
+    override fun dismiss() {
+        engines.values.forEach { it.commitCurrentChar() }
+        super.dismiss()
+    }
+
+    override fun onBackPressed() {
+        engines.values.forEach { it.commitCurrentChar() }
+        dismiss()
+    }
+
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
+            return true
+        }
+
+        if (isBackOrRightSoftKey(keyCode)) {
+            engines.values.forEach { it.commitCurrentChar() }
+            dismiss()
+            return true
+        }
+
+        if (isDpadNavigationKey(keyCode)) {
+            engines.values.forEach { it.commitCurrentChar() }
+        }
+
+        val focusedEdit = currentFocus as? EditText
+        if (focusedEdit != null) {
+            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+                engines[focusedEdit.id]?.commitCurrentChar()
+                focusedEdit.setText("")
+                return true
+            }
+            val isInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    keyCode == KeyEvent.KEYCODE_DEL
+            if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
+                return true
+            }
+        }
+
+        return super.onKeyDown(keyCode, event)
+    }
+
+    private fun isDpadNavigationKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_DPAD_UP ||
+            keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
+            keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+            keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
 }

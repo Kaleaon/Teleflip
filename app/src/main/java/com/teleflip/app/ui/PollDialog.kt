@@ -3,35 +3,90 @@ package com.teleflip.app.ui
 import android.content.Context
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.widget.doAfterTextChanged
 import com.teleflip.app.R
 import com.teleflip.app.input.KeypadInputEngine
 
 class PollDialog(
     context: Context,
     private val timeoutMs: Long = 500L,
-    private val onCreatePoll: (question: String, options: List<String>, isAnonymous: Boolean) -> Unit,
+    private val onCreatePoll: (
+        question: String,
+        options: List<String>,
+        isAnonymous: Boolean,
+        isQuiz: Boolean,
+        correctOptionIndex: Int,
+        explanation: String,
+        allowsMultipleAnswers: Boolean,
+    ) -> Unit,
 ) : BaseDialog(context) {
+    constructor(
+        context: Context,
+        timeoutMs: Long = 500L,
+        onCreatePoll: (question: String, options: List<String>, isAnonymous: Boolean) -> Unit,
+    ) : this(
+        context = context,
+        timeoutMs = timeoutMs,
+        onCreatePoll = { question, options, isAnonymous, _, _, _, _ ->
+            onCreatePoll(question, options, isAnonymous)
+        },
+    )
+
     private val engines = mutableMapOf<Int, KeypadInputEngine>()
     private var isAnonymous = true
+    private var isQuiz = false
+    private var correctOptionIndex = 0
+    private var allowsMultipleAnswers = false
+    private var currentStep = 1
+    private var tvError: TextView? = null
+
+    override fun getErrorTextView(): TextView? = tvError
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_create_poll)
         setupDismissKeys()
 
+        tvError = findViewById(R.id.tv_poll_error)
         val tvMode = findViewById<TextView>(R.id.tv_poll_input_mode)
-        val etQuestion = findViewById<EditText>(R.id.et_poll_question)
-        val etOpt1 = findViewById<EditText>(R.id.et_poll_opt1)
-        val etOpt2 = findViewById<EditText>(R.id.et_poll_opt2)
-        val etOpt3 = findViewById<EditText>(R.id.et_poll_opt3)
-        val btnAnon = findViewById<Button>(R.id.btn_poll_anonymous_toggle)
-        val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
+
+        val livQuestion = findViewById<LabeledInputView>(R.id.liv_poll_question)
+        val livOpt1 = findViewById<LabeledInputView>(R.id.liv_poll_opt1)
+        val livOpt2 = findViewById<LabeledInputView>(R.id.liv_poll_opt2)
+        val livOpt3 = findViewById<LabeledInputView>(R.id.liv_poll_opt3)
+        val livOpt4 = findViewById<LabeledInputView>(R.id.liv_poll_opt4)
+        val livExplanation = findViewById<LabeledInputView>(R.id.liv_poll_explanation)
+
+        val etQuestion = livQuestion?.editText
+        val etOpt1 = livOpt1?.editText
+        val etOpt2 = livOpt2?.editText
+        val etOpt3 = livOpt3?.editText
+        val etOpt4 = livOpt4?.editText
+        val etExplanation = livExplanation?.editText
+
+        val btnNext = findViewById<Button>(R.id.btn_poll_next)
         val btnCancel = findViewById<Button>(R.id.btn_poll_cancel)
 
-        listOfNotNull(etQuestion, etOpt1, etOpt2, etOpt3).forEach { field ->
+        val btnAnon = findViewById<Button>(R.id.btn_poll_anonymous_toggle)
+        val btnModeToggle = findViewById<Button>(R.id.btn_poll_mode_toggle)
+        val btnCorrectChoice = findViewById<Button>(R.id.btn_poll_correct_choice)
+        val btnMultipleAnswersToggle = findViewById<Button>(R.id.btn_poll_multiple_answers_toggle)
+        val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
+        val btnBack = findViewById<Button>(R.id.btn_poll_back)
+
+        val editFields = listOfNotNull(etQuestion, etOpt1, etOpt2, etOpt3, etOpt4, etExplanation)
+        editFields.forEach { field ->
+            field.doAfterTextChanged {
+                if (field.error != null) {
+                    field.error = null
+                }
+            }
             engines[field.id] =
                 KeypadInputEngine(
                     editText = field,
@@ -43,25 +98,8 @@ class PollDialog(
                 )
         }
 
-        btnAnon?.setOnClickListener {
-            isAnonymous = !isAnonymous
-            btnAnon.text = if (isAnonymous) "☑ Anonymous Voting: ON" else "☐ Anonymous Voting: OFF"
-        }
-
-        btnSubmit?.setOnClickListener {
-            engines.values.forEach { it.commitCurrentChar() }
-            val question = etQuestion?.text?.toString()?.trim().orEmpty()
-            val opts =
-                listOfNotNull(
-                    etOpt1?.text?.toString()?.trim(),
-                    etOpt2?.text?.toString()?.trim(),
-                    etOpt3?.text?.toString()?.trim(),
-                ).filter { it.isNotBlank() }
-
-            if (question.isNotBlank() && opts.size >= 2) {
-                dismiss()
-                onCreatePoll(question, opts, isAnonymous)
-            }
+        btnNext?.setOnClickListener {
+            handleNextStep()
         }
 
         btnCancel?.setOnClickListener {
@@ -69,41 +107,293 @@ class PollDialog(
             dismiss()
         }
 
+        btnAnon?.setOnClickListener {
+            isAnonymous = !isAnonymous
+            btnAnon.text = if (isAnonymous) "☑ Anonymous Voting: ON" else "☐ Anonymous Voting: OFF"
+        }
+
+        btnModeToggle?.setOnClickListener {
+            isQuiz = !isQuiz
+            btnModeToggle.text = if (isQuiz) "Poll Type: 💡 Trivia Quiz" else "Poll Type: 📊 Regular Survey"
+            updateStepViews()
+        }
+
+        btnCorrectChoice?.setOnClickListener {
+            val opts = getValidOptions()
+            if (opts.isNotEmpty()) {
+                correctOptionIndex = (correctOptionIndex + 1) % opts.size
+                updateCorrectChoiceButtonText()
+            }
+        }
+
+        btnMultipleAnswersToggle?.setOnClickListener {
+            allowsMultipleAnswers = !allowsMultipleAnswers
+            btnMultipleAnswersToggle.text =
+                if (allowsMultipleAnswers) "☑ Multiple Answers: ON" else "☐ Multiple Answers: OFF"
+        }
+
+        btnBack?.setOnClickListener {
+            handleBackOrCancel()
+        }
+
+        btnSubmit?.setOnClickListener {
+            handleSubmit()
+        }
+
+        updateStepViews()
         etQuestion?.requestFocus()
     }
 
-    override fun onBackPressed() {
+    private fun handleNextStep() {
         engines.values.forEach { it.commitCurrentChar() }
+        if (validateStep1Inputs()) {
+            clearDialogError()
+            currentStep = 2
+            updateStepViews()
+            findViewById<Button>(R.id.btn_poll_mode_toggle)?.requestFocus()
+        }
+    }
+
+    private fun handleSubmit() {
+        engines.values.forEach { it.commitCurrentChar() }
+        if (!validateStep1Inputs()) {
+            return
+        }
+        clearDialogError()
+        val question =
+            findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText?.text?.toString()?.trim().orEmpty()
+        val opts = getValidOptions()
+        val explanation =
+            findViewById<LabeledInputView>(R.id.liv_poll_explanation)?.editText?.text?.toString()?.trim().orEmpty()
+
         dismiss()
+        val safeCorrectIndex =
+            if (isQuiz && opts.isNotEmpty()) {
+                correctOptionIndex.coerceIn(0, opts.size - 1)
+            } else {
+                -1
+            }
+        onCreatePoll(
+            question,
+            opts,
+            isAnonymous,
+            isQuiz,
+            safeCorrectIndex,
+            if (isQuiz) explanation else "",
+            if (!isQuiz) allowsMultipleAnswers else false,
+        )
+    }
+
+    private fun validateStep1Inputs(): Boolean {
+        val etQuestion = findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText
+        val etOpt1 = findViewById<LabeledInputView>(R.id.liv_poll_opt1)?.editText
+        val etOpt2 = findViewById<LabeledInputView>(R.id.liv_poll_opt2)?.editText
+        val etOpt3 = findViewById<LabeledInputView>(R.id.liv_poll_opt3)?.editText
+        val etOpt4 = findViewById<LabeledInputView>(R.id.liv_poll_opt4)?.editText
+
+        clearDialogError()
+        etQuestion?.error = null
+        etOpt1?.error = null
+        etOpt2?.error = null
+        etOpt3?.error = null
+        etOpt4?.error = null
+
+        val question = etQuestion?.text?.toString()?.trim().orEmpty()
+        val opt1 = etOpt1?.text?.toString()?.trim().orEmpty()
+        val opt2 = etOpt2?.text?.toString()?.trim().orEmpty()
+        val opts = getValidOptions()
+
+        val isValid =
+            when {
+                question.isBlank() -> {
+                    val errorMsg = "Question cannot be empty"
+                    etQuestion?.error = errorMsg
+                    showDialogError("Please enter a poll question", etQuestion)
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                    false
+                }
+                opts.size < 2 -> {
+                    val errorMsg = "At least 2 options required"
+                    val targetField =
+                        when {
+                            opt1.isBlank() -> etOpt1
+                            opt2.isBlank() -> etOpt2
+                            else -> etOpt1
+                        }
+                    targetField?.error = errorMsg
+                    showDialogError("Please enter at least 2 poll options", targetField ?: etOpt1)
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                    false
+                }
+                else -> {
+                    clearDialogError()
+                    true
+                }
+            }
+
+        return isValid
+    }
+
+    private fun getValidOptions(): List<String> {
+        return listOfNotNull(
+            findViewById<LabeledInputView>(R.id.liv_poll_opt1)?.editText?.text?.toString()?.trim(),
+            findViewById<LabeledInputView>(R.id.liv_poll_opt2)?.editText?.text?.toString()?.trim(),
+            findViewById<LabeledInputView>(R.id.liv_poll_opt3)?.editText?.text?.toString()?.trim(),
+            findViewById<LabeledInputView>(R.id.liv_poll_opt4)?.editText?.text?.toString()?.trim(),
+        ).filter { it.isNotBlank() }
+    }
+
+    private fun updateCorrectChoiceButtonText() {
+        val opts = getValidOptions()
+        if (opts.isEmpty()) return
+        if (correctOptionIndex !in opts.indices) {
+            correctOptionIndex = 0
+        }
+        findViewById<Button>(R.id.btn_poll_correct_choice)?.text =
+            "Correct Answer: ${correctOptionIndex + 1}. ${opts[correctOptionIndex]}"
+    }
+
+    private fun updateStepViews() {
+        val layoutStep1 = findViewById<LinearLayout>(R.id.layout_step1)
+        val layoutStep2 = findViewById<LinearLayout>(R.id.layout_step2)
+        val tvStepTitle = findViewById<TextView>(R.id.tv_poll_step_title)
+        val tvQuestionSummary = findViewById<TextView>(R.id.tv_poll_step2_question_summary)
+        val layoutQuizSettings = findViewById<LinearLayout>(R.id.layout_quiz_settings)
+        val layoutRegularSettings = findViewById<LinearLayout>(R.id.layout_regular_settings)
+        val btnModeToggle = findViewById<Button>(R.id.btn_poll_mode_toggle)
+        val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
+        val etQuestion = findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText
+
+        if (currentStep == 1) {
+            layoutStep1?.visibility = View.VISIBLE
+            layoutStep2?.visibility = View.GONE
+            tvStepTitle?.text = "📊 Create Poll (Step 1/2)"
+        } else {
+            layoutStep1?.visibility = View.GONE
+            layoutStep2?.visibility = View.VISIBLE
+            tvStepTitle?.text = "⚙️ Poll Settings (Step 2/2)"
+
+            val q = etQuestion?.text?.toString()?.trim().orEmpty()
+            tvQuestionSummary?.text = "Q: $q"
+
+            updateCorrectChoiceButtonText()
+
+            if (isQuiz) {
+                layoutQuizSettings?.visibility = View.VISIBLE
+                layoutRegularSettings?.visibility = View.GONE
+                btnModeToggle?.nextFocusDownId = R.id.btn_poll_correct_choice
+                btnSubmit?.nextFocusUpId = R.id.liv_poll_explanation
+            } else {
+                layoutQuizSettings?.visibility = View.GONE
+                layoutRegularSettings?.visibility = View.VISIBLE
+                btnModeToggle?.nextFocusDownId = R.id.btn_poll_multiple_answers_toggle
+                btnSubmit?.nextFocusUpId = R.id.btn_poll_multiple_answers_toggle
+            }
+        }
+        updateSoftkeys()
+    }
+
+    private fun updateSoftkeys() {
+        val isFirstStep = currentStep == 1
+        setupSoftkeys(
+            left = "Clear",
+            center = if (isFirstStep) "Next" else "Submit",
+            right = if (isFirstStep) "Cancel" else "Back",
+            onLeft = {
+                val focusedEdit = currentFocus as? EditText
+                if (focusedEdit != null) {
+                    engines[focusedEdit.id]?.commitCurrentChar()
+                    focusedEdit.setText("")
+                }
+            },
+            onCenter = {
+                engines.values.forEach { it.commitCurrentChar() }
+                val current = currentFocus
+                if (current is Button) {
+                    current.performClick()
+                } else if (isFirstStep) {
+                    findViewById<Button>(R.id.btn_poll_next)?.performClick()
+                } else {
+                    findViewById<Button>(R.id.btn_poll_submit)?.performClick()
+                }
+                Unit
+            },
+            onRight = {
+                handleBackOrCancel()
+            },
+        )
+    }
+
+    override fun onBackPressed() {
+        handleBackOrCancel()
     }
 
     override fun onKeyDown(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (isBackOrRightSoftKey(keyCode)) {
-            engines.values.forEach { it.commitCurrentChar() }
-            dismiss()
+        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
             return true
         }
 
+        if (isBackOrRightSoftKey(keyCode)) {
+            handleBackOrCancel()
+            return true
+        }
+
+        if (isDpadNavigationKey(keyCode)) {
+            engines.values.forEach { it.commitCurrentChar() }
+        }
+
         val focusedEdit = currentFocus as? EditText
-        if (focusedEdit != null) {
-            if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
-                engines[focusedEdit.id]?.commitCurrentChar()
-                focusedEdit.setText("")
-                return true
-            }
-            val isInputKey =
-                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
-                    keyCode == KeyEvent.KEYCODE_STAR ||
-                    keyCode == KeyEvent.KEYCODE_POUND ||
-                    keyCode == KeyEvent.KEYCODE_DEL
-            if (isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true) {
-                return true
-            }
+        if (focusedEdit != null && handleFocusedEditKey(focusedEdit, keyCode, event)) {
+            return true
         }
 
         return super.onKeyDown(keyCode, event)
+    }
+
+    private fun handleBackOrCancel() {
+        engines.values.forEach { it.commitCurrentChar() }
+        if (currentStep == 2) {
+            currentStep = 1
+            updateStepViews()
+            findViewById<LabeledInputView>(R.id.liv_poll_question)?.editText?.requestFocus()
+        } else {
+            dismiss()
+        }
+    }
+
+    private fun isDpadNavigationKey(keyCode: Int): Boolean =
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            -> true
+            else -> false
+        }
+
+    private fun handleFocusedEditKey(
+        focusedEdit: EditText,
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+            engines[focusedEdit.id]?.commitCurrentChar()
+            focusedEdit.setText("")
+            return true
+        }
+        val isInputKey =
+            (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                keyCode == KeyEvent.KEYCODE_STAR ||
+                keyCode == KeyEvent.KEYCODE_POUND ||
+                keyCode == KeyEvent.KEYCODE_DEL ||
+                keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+        val handled = isInputKey && engines[focusedEdit.id]?.handleKeyEvent(keyCode, event) == true
+        if (!handled) {
+            engines[focusedEdit.id]?.commitCurrentChar()
+        }
+        return handled
     }
 }

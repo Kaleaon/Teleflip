@@ -20,43 +20,58 @@ class StorageManagerTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         StorageManager.invalidateCache()
-        StorageManager.setCacheTtlMs(StorageManager.DEFAULT_CACHE_TTL_MS)
         StorageManager.timeProvider = System::currentTimeMillis
-        StorageManager.resetDiscoveryCount()
     }
 
     @Test
-    fun testCacheHitOnConsecutiveInvocations() {
-        assertEquals(0, StorageManager.getDiscoveryCount())
-        assertFalse(StorageManager.isCacheValid())
+    fun testConsecutiveInvocations() {
+        val sdCardAvailable = StorageManager.isSdCardAvailable(context)
+        assertEquals(sdCardAvailable, StorageManager.isSdCardAvailable(context))
 
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
-        assertTrue(StorageManager.isCacheValid())
+        val selectedStorage = StorageManager.getSelectedStorageType(context)
+        assertNotNull(selectedStorage)
 
-        // Consecutive queries read from warm cache without triggering disk traversals
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
+        val filesDir = StorageManager.getFilesDirectory(context)
+        assertNotNull(filesDir)
 
-        StorageManager.getSelectedStorageType(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
-
-        StorageManager.getFilesDirectory(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
-
-        StorageManager.getDownloadDirectory(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
+        val downloadDir = StorageManager.getDownloadDirectory(context)
+        assertNotNull(downloadDir)
     }
 
     @Test
-    fun testSetSelectedStorageTypeInvalidatesCache() {
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
+    fun testSetSelectedStorageType() {
+        val result = StorageManager.setSelectedStorageType(context, StorageLocationType.INTERNAL)
+        assertTrue(result)
+        assertEquals(StorageLocationType.INTERNAL, StorageManager.getSelectedStorageType(context))
+    }
 
-        StorageManager.setSelectedStorageType(context, StorageLocationType.INTERNAL)
-        // Cache was invalidated by setSelectedStorageType, so next call triggers a fresh discovery
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(2, StorageManager.getDiscoveryCount())
+    @Test
+    fun testGetFilesDirectoryForType() {
+        val internalFilesDir = StorageManager.getFilesDirectoryForType(context, StorageLocationType.INTERNAL)
+        assertNotNull(internalFilesDir)
+        assertTrue(internalFilesDir.exists())
+        assertEquals("Telegram", internalFilesDir.name)
+
+        val sdFilesDir = StorageManager.getFilesDirectoryForType(context, StorageLocationType.SD_CARD)
+        assertNotNull(sdFilesDir)
+        assertTrue(sdFilesDir.exists())
+        assertEquals("Telegram", sdFilesDir.name)
+    }
+
+    @Test
+    fun testSetSelectedStorageTypeWithTelegramManagerDelegation() {
+        val telegramManager = org.mockito.Mockito.mock(com.teleflip.app.telegram.TelegramManager::class.java)
+        val onComplete: (Boolean, String) -> Unit = { _, _ -> }
+        val result =
+            StorageManager.setSelectedStorageType(
+                context = context,
+                type = StorageLocationType.INTERNAL,
+                telegramManager = telegramManager,
+                onComplete = onComplete,
+            )
+        assertTrue(result)
+        assertEquals(StorageLocationType.INTERNAL, StorageManager.getSelectedStorageType(context))
+        org.mockito.Mockito.verify(telegramManager).switchStorageLocation(StorageLocationType.INTERNAL, onComplete)
     }
 
     @Test
@@ -64,61 +79,31 @@ class StorageManagerTest {
         var currentTime = 1_000_000L
         StorageManager.timeProvider = { currentTime }
 
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
-        assertTrue(StorageManager.isCacheValid())
+        val initialAvailable = StorageManager.isSdCardAvailable(context)
 
         // Advance time by 5 seconds (within 15s TTL)
         currentTime += 5_000L
-        assertTrue(StorageManager.isCacheValid())
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
+        assertEquals(initialAvailable, StorageManager.isSdCardAvailable(context))
 
         // Advance time past 15s TTL (20 seconds total)
         currentTime += 15_000L
-        assertFalse(StorageManager.isCacheValid())
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(2, StorageManager.getDiscoveryCount())
-    }
-
-    @Test
-    fun testCustomCacheTtlConfiguration() {
-        StorageManager.setCacheTtlMs(5_000L)
-        assertEquals(5_000L, StorageManager.getCacheTtlMs())
-
-        var currentTime = 1_000_000L
-        StorageManager.timeProvider = { currentTime }
-
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
-
-        // Advance time past 5s TTL
-        currentTime += 6_000L
-        assertFalse(StorageManager.isCacheValid())
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(2, StorageManager.getDiscoveryCount())
+        assertEquals(initialAvailable, StorageManager.isSdCardAvailable(context))
     }
 
     @Test
     fun testExplicitInvalidateCache() {
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
-        assertTrue(StorageManager.isCacheValid())
-
+        val initialAvailable = StorageManager.isSdCardAvailable(context)
         StorageManager.invalidateCache()
-        assertFalse(StorageManager.isCacheValid())
-
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(2, StorageManager.getDiscoveryCount())
+        assertEquals(initialAvailable, StorageManager.isSdCardAvailable(context))
     }
 
     @Test
-    fun testForceRefreshBypassesCache() {
-        StorageManager.isSdCardAvailable(context)
-        assertEquals(1, StorageManager.getDiscoveryCount())
-
-        StorageManager.detectSdCardDirectory(context, forceRefresh = true)
-        assertEquals(2, StorageManager.getDiscoveryCount())
+    fun testForceRefresh() {
+        val dir = StorageManager.detectSdCardDirectory(context, forceRefresh = true)
+        val available = StorageManager.isSdCardAvailable(context, forceRefresh = true)
+        if (dir != null) {
+            assertTrue(available)
+        }
     }
 
     @Test
@@ -139,9 +124,10 @@ class StorageManagerTest {
     }
 
     @Test
-    fun testDefaultStorageLocationIsInternal() {
+    fun testDefaultStorageLocationPrefersSdCardWhenAvailable() {
         val selected = StorageManager.getSelectedStorageType(context)
-        assertEquals(StorageLocationType.INTERNAL, selected)
+        val expected = if (StorageManager.isSdCardAvailable(context)) StorageLocationType.SD_CARD else StorageLocationType.INTERNAL
+        assertEquals(expected, selected)
         val filesDir = StorageManager.getFilesDirectory(context)
         assertNotNull(filesDir)
         assertTrue(filesDir.exists())

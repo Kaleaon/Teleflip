@@ -1,6 +1,7 @@
 package com.teleflip.app.storage
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Environment
@@ -47,6 +48,9 @@ object StorageManager {
     private const val PREF_AUTO_DOWNLOAD = "pref_auto_download_media"
     private const val PREF_KEEP_MEDIA = "pref_keep_media_days"
     private const val PREF_SAVE_TO_DOWNLOADS = "pref_save_to_downloads"
+    private const val PREF_SYNC_CONTACTS = "pref_sync_contacts"
+
+    private fun getPrefs(context: Context): SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private const val BYTES_PER_KB = 1024L
     private const val BYTES_PER_MB = 1024L * 1024L
@@ -63,35 +67,11 @@ object StorageManager {
     @Volatile
     private var sdCardCache: SdCardCache? = null
 
-    private var cacheTtlMs: Long = DEFAULT_CACHE_TTL_MS
-
     internal var timeProvider: () -> Long = System::currentTimeMillis
-
-    private val discoveryCount = java.util.concurrent.atomic.AtomicInteger(0)
 
     @Synchronized
     fun invalidateCache() {
         sdCardCache = null
-    }
-
-    fun isCacheValid(): Boolean {
-        val cache = sdCardCache ?: return false
-        val age = timeProvider() - cache.timestamp
-        return age in 0 until cacheTtlMs
-    }
-
-    @Synchronized
-    fun setCacheTtlMs(ttlMs: Long) {
-        require(ttlMs > 0) { "Cache TTL must be positive" }
-        cacheTtlMs = ttlMs
-    }
-
-    fun getCacheTtlMs(): Long = cacheTtlMs
-
-    fun getDiscoveryCount(): Int = discoveryCount.get()
-
-    fun resetDiscoveryCount() {
-        discoveryCount.set(0)
     }
 
     fun formatStorageSize(bytes: Long): String {
@@ -167,7 +147,7 @@ object StorageManager {
             val cache = sdCardCache
             if (cache != null) {
                 val age = timeProvider() - cache.timestamp
-                if (age in 0 until cacheTtlMs) {
+                if (age in 0 until DEFAULT_CACHE_TTL_MS) {
                     return cache.directory
                 }
             }
@@ -184,7 +164,7 @@ object StorageManager {
                 val cache = sdCardCache
                 if (cache != null) {
                     val age = timeProvider() - cache.timestamp
-                    if (age in 0 until cacheTtlMs) {
+                    if (age in 0 until DEFAULT_CACHE_TTL_MS) {
                         return cache
                     }
                 }
@@ -193,7 +173,6 @@ object StorageManager {
             val available = dir != null && dir.exists() && dir.canWrite()
             val newCache = SdCardCache(dir, available, timeProvider())
             sdCardCache = newCache
-            discoveryCount.incrementAndGet()
             return newCache
         }
     }
@@ -241,7 +220,7 @@ object StorageManager {
             val cache = sdCardCache
             if (cache != null) {
                 val age = timeProvider() - cache.timestamp
-                if (age in 0 until cacheTtlMs) {
+                if (age in 0 until DEFAULT_CACHE_TTL_MS) {
                     return cache.isAvailable
                 }
             }
@@ -250,8 +229,8 @@ object StorageManager {
     }
 
     fun getSelectedStorageType(context: Context): StorageLocationType {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val value = prefs.getString(PREF_STORAGE_LOCATION, "internal")
+        val prefs = getPrefs(context)
+        val value = prefs.getString(PREF_STORAGE_LOCATION, "sd_card")
         return if (value == "sd_card" && isSdCardAvailable(context)) {
             StorageLocationType.SD_CARD
         } else {
@@ -262,22 +241,27 @@ object StorageManager {
     fun setSelectedStorageType(
         context: Context,
         type: StorageLocationType,
+        telegramManager: com.teleflip.app.telegram.TelegramManager? = null,
+        onComplete: ((Boolean, String) -> Unit)? = null,
     ): Boolean {
         invalidateCache()
         if (type == StorageLocationType.SD_CARD && !isSdCardAvailable(context)) {
             return false
         }
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         val value = if (type == StorageLocationType.SD_CARD) "sd_card" else "internal"
         prefs.edit().putString(PREF_STORAGE_LOCATION, value).apply()
         invalidateCache()
+        telegramManager?.switchStorageLocation(type, onComplete ?: { _, _ -> })
         return true
     }
 
-    fun getFilesDirectory(context: Context): File {
-        val currentType = getSelectedStorageType(context)
+    fun getFilesDirectoryForType(
+        context: Context,
+        type: StorageLocationType,
+    ): File {
         val baseDir =
-            if (currentType == StorageLocationType.SD_CARD) {
+            if (type == StorageLocationType.SD_CARD) {
                 detectSdCardDirectory(context) ?: context.getExternalFilesDir(null) ?: context.filesDir
             } else {
                 context.getExternalFilesDir(null) ?: context.filesDir
@@ -287,6 +271,10 @@ object StorageManager {
             telegramDir.mkdirs()
         }
         return telegramDir
+    }
+
+    fun getFilesDirectory(context: Context): File {
+        return getFilesDirectoryForType(context, getSelectedStorageType(context))
     }
 
     fun getDownloadDirectory(context: Context): File {
@@ -323,7 +311,7 @@ object StorageManager {
     }
 
     fun getAutoDownloadMode(context: Context): AutoDownloadMode {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         val raw = prefs.getString(PREF_AUTO_DOWNLOAD, AutoDownloadMode.WIFI_ONLY.name)
         return try {
             AutoDownloadMode.valueOf(raw ?: AutoDownloadMode.WIFI_ONLY.name)
@@ -336,7 +324,7 @@ object StorageManager {
         context: Context,
         mode: AutoDownloadMode,
     ) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         prefs.edit().putString(PREF_AUTO_DOWNLOAD, mode.name).apply()
     }
 
@@ -356,7 +344,7 @@ object StorageManager {
     }
 
     fun getKeepMediaDuration(context: Context): KeepMediaDuration {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         val days = prefs.getInt(PREF_KEEP_MEDIA, 0)
         return KeepMediaDuration.values().find { it.days == days } ?: KeepMediaDuration.FOREVER
     }
@@ -365,12 +353,12 @@ object StorageManager {
         context: Context,
         duration: KeepMediaDuration,
     ) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         prefs.edit().putInt(PREF_KEEP_MEDIA, duration.days).apply()
     }
 
     fun isSaveToDownloadsEnabled(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         return prefs.getBoolean(PREF_SAVE_TO_DOWNLOADS, false)
     }
 
@@ -378,8 +366,21 @@ object StorageManager {
         context: Context,
         enabled: Boolean,
     ) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         prefs.edit().putBoolean(PREF_SAVE_TO_DOWNLOADS, enabled).apply()
+    }
+
+    fun isSyncContactsEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(PREF_SYNC_CONTACTS, true)
+    }
+
+    fun setSyncContactsEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(PREF_SYNC_CONTACTS, enabled).apply()
     }
 
     fun copyMediaFiles(

@@ -1,12 +1,20 @@
 package com.teleflip.app.accessibility
 
+import android.content.Context
+import androidx.core.view.ViewCompat
+import androidx.test.core.app.ApplicationProvider
+import com.teleflip.app.ui.SectionHeaderView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
+@RunWith(RobolectricTestRunner::class)
 class LayoutAccessibilityXmlTest {
     private val androidNs = "http://schemas.android.com/apk/res/android"
 
@@ -15,6 +23,42 @@ class LayoutAccessibilityXmlTest {
         val file = File(path)
         if (file.exists()) return file
         return File("app/$path")
+    }
+
+    @Test
+    fun testSectionHeaderViewHeadingSemantics() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val headerView = SectionHeaderView(context)
+        assertTrue(
+            "SectionHeaderView must be marked as an accessibility heading",
+            ViewCompat.isAccessibilityHeading(headerView),
+        )
+    }
+
+    @Test
+    fun testSectionHeaderViewsInLayoutXmlFiles() {
+        val layoutFiles =
+            listOf(
+                "view_settings.xml",
+                "view_profile.xml",
+                "dialog_diagnostics.xml",
+                "dialog_create_poll.xml",
+                "view_login.xml",
+                "view_passcode_lock.xml",
+                "dialog_new_chat.xml",
+                "dialog_search.xml",
+                "dialog_options_menu.xml",
+            )
+
+        for (filename in layoutFiles) {
+            val file = getLayoutFile(filename)
+            val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
+            val sectionHeaders = findNodesByTagName(doc, "com.teleflip.app.ui.SectionHeaderView")
+            assertTrue(
+                "Layout $filename should contain at least one <com.teleflip.app.ui.SectionHeaderView>",
+                sectionHeaders.isNotEmpty(),
+            )
+        }
     }
 
     @Test
@@ -86,6 +130,122 @@ class LayoutAccessibilityXmlTest {
         assertNotNull("tv_viewer_status should exist in dialog_media_viewer.xml", statusNode)
         val statusLiveRegion = statusNode?.attributes?.getNamedItemNS(androidNs, "accessibilityLiveRegion")?.nodeValue
         assertEquals("polite", statusLiveRegion)
+    }
+
+    @Test
+    fun testFormLayoutsUseLabeledInputView() {
+        val formLayoutsWithExpectedIds =
+            mapOf(
+                "view_login.xml" to listOf("@+id/liv_login_input"),
+                "dialog_search.xml" to listOf("@+id/liv_search_input"),
+                "dialog_create_poll.xml" to
+                    listOf(
+                        "@+id/liv_poll_question",
+                        "@+id/liv_poll_opt1",
+                        "@+id/liv_poll_opt2",
+                        "@+id/liv_poll_opt3",
+                        "@+id/liv_poll_opt4",
+                        "@+id/liv_poll_explanation",
+                    ),
+                "dialog_new_chat.xml" to listOf("@+id/liv_new_chat_input"),
+                "dialog_proxy_settings.xml" to
+                    listOf(
+                        "@+id/liv_proxy_server",
+                        "@+id/liv_proxy_port",
+                        "@+id/liv_proxy_username",
+                        "@+id/liv_proxy_password",
+                        "@+id/liv_proxy_secret",
+                    ),
+                "view_settings.xml" to
+                    listOf(
+                        "@+id/liv_api_id",
+                        "@+id/liv_api_hash",
+                    ),
+            )
+
+        for ((layoutName, expectedIds) in formLayoutsWithExpectedIds) {
+            val file = getLayoutFile(layoutName)
+            val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
+            for (id in expectedIds) {
+                val node = findNodeById(doc, id)
+                assertNotNull("Expected node $id in $layoutName", node)
+                assertEquals(
+                    "Node $id in $layoutName must be LabeledInputView",
+                    "com.teleflip.app.ui.LabeledInputView",
+                    node?.nodeName,
+                )
+            }
+
+            val directEditTexts = findNodesByTagName(doc, "EditText")
+            assertEquals("Form layout $layoutName should not contain direct EditText elements", 0, directEditTexts.size)
+        }
+    }
+
+    @Test
+    fun testPinnedBannerFocusableAndSelector() {
+        val file = getLayoutFile("view_chat_conversation.xml")
+        val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
+        val bannerNode = findNodeById(doc, "@+id/layout_pinned_banner")
+        assertNotNull("layout_pinned_banner should exist in view_chat_conversation.xml", bannerNode)
+        assertEquals("true", bannerNode?.attributes?.getNamedItemNS(androidNs, "focusable")?.nodeValue)
+        assertEquals("true", bannerNode?.attributes?.getNamedItemNS(androidNs, "clickable")?.nodeValue)
+        assertEquals("@drawable/bg_item_selector", bannerNode?.attributes?.getNamedItemNS(androidNs, "background")?.nodeValue)
+        assertEquals("@+id/rv_messages", bannerNode?.attributes?.getNamedItemNS(androidNs, "nextFocusDown")?.nodeValue)
+    }
+
+    @Test
+    fun testMessageSubElementsFocusable() {
+        val file = getLayoutFile("view_message_item.xml")
+        val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
+
+        val quoteNode = findNodeById(doc, "@+id/tv_reply_quote")
+        assertNotNull("tv_reply_quote should exist in view_message_item.xml", quoteNode)
+        assertEquals("true", quoteNode?.attributes?.getNamedItemNS(androidNs, "focusable")?.nodeValue)
+        assertEquals("true", quoteNode?.attributes?.getNamedItemNS(androidNs, "clickable")?.nodeValue)
+
+        val rxnNode = findNodeById(doc, "@+id/tv_reactions")
+        assertNotNull("tv_reactions should exist in view_message_item.xml", rxnNode)
+        assertEquals("true", rxnNode?.attributes?.getNamedItemNS(androidNs, "focusable")?.nodeValue)
+        assertEquals("true", rxnNode?.attributes?.getNamedItemNS(androidNs, "clickable")?.nodeValue)
+    }
+
+    @Test
+    fun testMediaViewerButtonsFocusable() {
+        val file = getLayoutFile("dialog_media_viewer.xml")
+        val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(file)
+
+        val buttonIds =
+            listOf(
+                "@+id/btn_viewer_zoom_in",
+                "@+id/btn_viewer_zoom_out",
+                "@+id/btn_viewer_reset",
+                "@+id/btn_viewer_play_pause",
+                "@+id/btn_viewer_rewind",
+                "@+id/btn_viewer_fast_forward",
+                "@+id/btn_viewer_speed",
+                "@+id/btn_viewer_save",
+            )
+
+        for (btnId in buttonIds) {
+            val node = findNodeById(doc, btnId)
+            assertNotNull("$btnId should exist in dialog_media_viewer.xml", node)
+            assertEquals("$btnId should be focusable=true", "true", node?.attributes?.getNamedItemNS(androidNs, "focusable")?.nodeValue)
+        }
+    }
+
+    private fun findNodesByTagName(
+        node: org.w3c.dom.Node,
+        tagName: String,
+        result: MutableList<org.w3c.dom.Node> = mutableListOf(),
+    ): List<org.w3c.dom.Node> {
+        if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE && node.nodeName == tagName) {
+            result.add(node)
+        }
+        val children = node.childNodes
+        for (i in 0 until children.length) {
+            findNodesByTagName(children.item(i), tagName, result)
+        }
+        return result
     }
 
     private fun findNodeById(

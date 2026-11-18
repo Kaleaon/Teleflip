@@ -29,7 +29,9 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
-import android.widget.Toast
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
@@ -40,6 +42,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.teleflip.app.export.ExportFormat
+import com.teleflip.app.input.InputMode
 import com.teleflip.app.input.KeypadInputEngine
 import com.teleflip.app.location.LocationHelper
 import com.teleflip.app.media.VoicePlayer
@@ -47,12 +50,12 @@ import com.teleflip.app.media.VoiceRecorder
 import com.teleflip.app.model.ActiveCall
 import com.teleflip.app.model.CallState
 import com.teleflip.app.model.ChatModel
+import com.teleflip.app.model.ChatProfile
 import com.teleflip.app.model.ChatType
 import com.teleflip.app.model.MediaType
 import com.teleflip.app.model.MessageModel
 import com.teleflip.app.model.MessageStatus
-import com.teleflip.app.model.SavedGifItem
-import com.teleflip.app.model.StickerSetModel
+import com.teleflip.app.model.ProxyItem
 import com.teleflip.app.notifications.NotificationHelper
 import com.teleflip.app.notifications.TeleFlipNotificationService
 import com.teleflip.app.security.PasscodeManager
@@ -65,20 +68,30 @@ import com.teleflip.app.telegram.TelegramManager
 import com.teleflip.app.ui.ChatExportDialog
 import com.teleflip.app.ui.ChatExportProgressDialog
 import com.teleflip.app.ui.ChatListAdapter
+import com.teleflip.app.ui.ChatNotificationSettingsDialog
+import com.teleflip.app.ui.GifStickerPickerDialog
+import com.teleflip.app.ui.LabeledInputView
+import com.teleflip.app.ui.MediaPickerBottomSheetDialog
 import com.teleflip.app.ui.MediaViewerDialog
 import com.teleflip.app.ui.MenuOption
 import com.teleflip.app.ui.MessageAdapter
 import com.teleflip.app.ui.NewChatDialog
 import com.teleflip.app.ui.OptionsMenuDialog
 import com.teleflip.app.ui.PollDialog
+import com.teleflip.app.ui.ProxySettingsDialog
 import com.teleflip.app.ui.SoftkeyManager
 import com.teleflip.app.ui.SoftkeyUtils
 import com.teleflip.app.ui.SymbolsDialog
+import com.teleflip.app.ui.TelegramFeatureMenus
 import com.teleflip.app.ui.loadCircularAvatarOrFallback
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.Locale
 
@@ -99,13 +112,82 @@ class MainActivity : AppCompatActivity() {
     private lateinit var voiceRecorder: VoiceRecorder
     private lateinit var voicePlayer: VoicePlayer
     private lateinit var locationHelper: LocationHelper
+    private val featureMenus by lazy {
+        TelegramFeatureMenus(this, telegramManager, { text, error ->
+            showToast(
+                text,
+                error,
+            )
+        }, { chat -> openConversation(chat) }, { chat, messageId -> openConversation(chat, messageId) }, { chatId ->
+            activeChat?.takeIf {
+                it.id == chatId
+            }?.let { sendLocationFlow(it) }
+        })
+    }
+
+    private val photoPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "jpg", "Sending photo…") { id, path, caption ->
+                telegramManager.sendPhoto(id, path, caption)
+            }
+        }
+
+    private val videoPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "mp4", "Sending video…") { id, path, caption ->
+                telegramManager.sendVideo(id, path, 0, caption)
+            }
+        }
+
+    private val documentPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "bin", "Sending file…") { id, path, caption ->
+                telegramManager.sendDocument(id, path, caption)
+            }
+        }
+
+    private val stickerPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handlePickerResult(result, "webp", "") { id, path, _ ->
+                telegramManager.sendLocalSticker(id, path)
+            }
+        }
+
+    private val albumPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            receivePhotoAlbum(result.resultCode, result.data)
+        }
 
     internal var currentScreen: Screen = Screen.CHAT_LIST
     internal var activeChat: ChatModel? = null
     internal var pendingTargetChatId: Long = 0L
+    internal var pendingProxyItem: ProxyItem? = null
+
+    private fun handleDeepLinkIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        val proxyItem = telegramManager.parseProxyUri(data) ?: return
+        if (PasscodeManager.isLocked(this)) {
+            pendingProxyItem = proxyItem
+        } else {
+            ProxySettingsDialog(
+                context = this,
+                telegramManager = telegramManager,
+                initialProxyItem = proxyItem,
+                onProxyChanged = {
+                    if (currentScreen == Screen.LOGIN) {
+                        updateLoginConnectionState(telegramManager.connectionState.value)
+                    }
+                },
+            ).show()
+        }
+    }
+
     private var pendingTargetMessageId: Long? = null
     private var callTimerJob: Job? = null
     private var callDurationSec: Int = 0
+    private var pendingAlbumChatId: Long? = null
+    private var pendingAlbumReplyId: Long = 0
+    private var pendingAlbumCaption: String = ""
     private var pendingNavigationAction: (() -> Unit)? = null
     private var lastHandledCallId: Int? = null
 
@@ -135,6 +217,7 @@ class MainActivity : AppCompatActivity() {
     private var chatListAdapter: ChatListAdapter? = null
     private var rvChats: RecyclerView? = null
     private var tabDebounceJob: kotlinx.coroutines.Job? = null
+    private var focusedChatId: Long? = null
 
     // Conversation State
     private var messageAdapter: MessageAdapter? = null
@@ -145,9 +228,16 @@ class MainActivity : AppCompatActivity() {
     private var activeReplyMessage: MessageModel? = null
     private var activeEditMessage: MessageModel? = null
     private var layoutReplyEditBar: View? = null
+    private var focusedMessageId: Long? = null
+    private var initialConversationScrollDone: Boolean = false
+    private var lastAutoLoadedOldestMsgId: Long = 0L
     private var tvReplyEditPreview: TextView? = null
     private var layoutPinnedBanner: View? = null
     private var tvPinnedBannerText: TextView? = null
+    private val activePinnedIndexMap: MutableMap<Long, Int> = mutableMapOf()
+    private var layoutSlowModeBanner: View? = null
+    private var tvSlowModeBannerText: TextView? = null
+    private var slowModeTickerJob: Job? = null
 
     // Voice Recording State
     private var layoutVoiceRecording: LinearLayout? = null
@@ -157,6 +247,10 @@ class MainActivity : AppCompatActivity() {
     // Login State
     private var etLoginInput: EditText? = null
     private var loginInputEngine: KeypadInputEngine? = null
+    private var qrGenerationJob: Job? = null
+
+    // Settings State
+    private val settingsInputEngines = mutableMapOf<Int, KeypadInputEngine>()
 
     // Passcode Lock State
     internal var passcodeEntry: String = ""
@@ -164,18 +258,17 @@ class MainActivity : AppCompatActivity() {
     private var tvPasscodeError: TextView? = null
 
     companion object {
+        private const val REQ_CALL_AUDIO_PERM = 1015
         private const val REQ_AUDIO_PERM = 1001
         private const val REQ_LOC_PERM = 1002
         private const val REQ_PHONE_PERM = 1003
-        private const val REQ_PICK_PHOTO = 1004
-        private const val REQ_PICK_DOCUMENT = 1005
-        private const val REQ_PICK_VIDEO = 1006
         private const val BYTES_PER_MB = 1024 * 1024L
         private const val MUTE_1_HOUR_SEC = 3600
         private const val MUTE_8_HOURS_SEC = 28800
         private const val MUTE_2_DAYS_SEC = 172800
-        private const val MUTE_FOREVER_SEC = 31536000
+        private const val MUTE_FOREVER_SEC = Int.MAX_VALUE
         private const val PASSCODE_PIN_LENGTH = 4
+        private const val PINNED_MESSAGE_LOAD_TIMEOUT_MS = 5000L
 
         internal fun cleanAndFormatPhoneNumber(raw: String?): String? {
             if (raw.isNullOrBlank()) return null
@@ -195,10 +288,11 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             phonePerms.add(Manifest.permission.READ_PHONE_STATE)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED) {
             phonePerms.add(Manifest.permission.READ_PHONE_NUMBERS)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            phonePerms.add(Manifest.permission.READ_CONTACTS)
         }
         if (phonePerms.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, phonePerms.toTypedArray(), REQ_PHONE_PERM)
@@ -264,7 +358,15 @@ class MainActivity : AppCompatActivity() {
 
         telegramManager.start()
 
+        handleDeepLinkIntent(intent)
+
         pendingTargetChatId = intent?.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L) ?: 0L
+
+        intent?.data?.let { uri ->
+            if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
+                telegramManager.handleDeepLinkProxy(uri)
+            }
+        }
 
         if (PasscodeManager.isLocked(this)) {
             showPasscodeUnlockScreen()
@@ -283,6 +385,36 @@ class MainActivity : AppCompatActivity() {
                         avatarLetters = "TG",
                     )
             openConversation(targetChat)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLinkIntent(intent)
+        intent?.data?.let { uri ->
+            if (uri.scheme == "tg" || uri.host == "t.me" || uri.host == "telegram.me") {
+                telegramManager.handleDeepLinkProxy(uri)
+            }
+        }
+        val targetOpenChatId = intent?.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L) ?: 0L
+        if (targetOpenChatId != 0L) {
+            pendingTargetChatId = targetOpenChatId
+            if (!PasscodeManager.isLocked(this) && telegramManager.authState.value is AuthState.Ready) {
+                val targetChat =
+                    telegramManager.chats.value.find { it.id == targetOpenChatId }
+                        ?: ChatModel(
+                            id = targetOpenChatId,
+                            title = "Chat #$targetOpenChatId",
+                            lastMessage = "",
+                            time = "",
+                            unreadCount = 0,
+                            chatType = ChatType.DIRECT,
+                            avatarLetters = "TG",
+                        )
+                pendingTargetChatId = 0L
+                openConversation(targetChat)
+            }
         }
     }
 
@@ -315,26 +447,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        val targetOpenChatId = intent.getLongExtra(NotificationHelper.EXTRA_OPEN_CHAT_ID, 0L)
-        if (targetOpenChatId != 0L) {
-            pendingTargetChatId = targetOpenChatId
-            if (!PasscodeManager.isLocked(this) && telegramManager.authState.value is AuthState.Ready) {
-                val targetChat =
-                    telegramManager.chats.value.find { it.id == targetOpenChatId }
-                        ?: ChatModel(
-                            id = targetOpenChatId,
-                            title = "Chat #$targetOpenChatId",
-                            lastMessage = "",
-                            time = "",
-                            unreadCount = 0,
-                            chatType = ChatType.DIRECT,
-                            avatarLetters = "TG",
-                        )
-                pendingTargetChatId = 0L
-                openConversation(targetChat)
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) return
+        if (currentScreen == Screen.CHAT_LIST && !isTabViewFocused()) {
+            val rv = rvChats ?: return
+            val hasItemFocus = currentFocus?.let { rv.findContainingViewHolder(it) } != null
+            if (!hasItemFocus) {
+                val count = chatListAdapter?.itemCount ?: 0
+                if (count > 0) {
+                    val targetPos =
+                        focusedChatId?.let { id ->
+                            chatListAdapter?.getPositionForChatId(id)?.takeIf { it in 0 until count }
+                        } ?: 0
+                    focusChatAt(targetPos)
+                }
+            }
+        } else if (currentScreen == Screen.CONVERSATION) {
+            val rv = rvMessages
+            val hasMsgFocus = currentFocus?.let { rv?.findContainingViewHolder(it) } != null
+            if (!hasMsgFocus && etComposeInput?.hasFocus() != true) {
+                val msgId = focusedMessageId
+                val pos = msgId?.let { messageAdapter?.getPositionForMessageId(it) } ?: -1
+                if (pos >= 0) {
+                    focusMessageAt(pos)
+                } else {
+                    etComposeInput?.requestFocus()
+                }
             }
         }
     }
@@ -351,7 +490,7 @@ class MainActivity : AppCompatActivity() {
         voiceRecorder.cancelRecording()
         voicePlayer.stop()
         cleanupInCallAudio()
-        if (!telegramManager.backgroundPushEnabled) {
+        if (!telegramManager.backgroundPushEnabled && !telegramManager.hasOngoingCall) {
             telegramManager.stop()
         }
     }
@@ -401,6 +540,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
+            telegramManager.operationError.collectLatest { error ->
+                if (error != null) {
+                    showToast(error, isError = true)
+                    telegramManager.clearOperationError()
+                }
+            }
+        }
+        lifecycleScope.launch {
             telegramManager.connectionState.collectLatest { status ->
                 val tvConnectionStatus = findViewById<TextView>(R.id.tv_connection_status)
                 tvConnectionStatus?.text = status
@@ -420,12 +567,35 @@ class MainActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
+            telegramManager.failoverStatus.collectLatest { failoverMsg ->
+                if (!failoverMsg.isNullOrBlank() && currentScreen == Screen.LOGIN) {
+                    val tvStatus = findViewById<TextView>(R.id.tv_login_status)
+                    tvStatus?.text = failoverMsg
+                    if (failoverMsg.startsWith("🟢")) {
+                        tvStatus?.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.focus_highlight_gold))
+                    } else if (failoverMsg.startsWith("🔴") || failoverMsg.startsWith("⚠️")) {
+                        tvStatus?.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_error))
+                    }
+                    tvStatus?.announceForAccessibility(failoverMsg)
+                }
+            }
+        }
+
+        lifecycleScope.launch {
             telegramManager.chatFolders.collectLatest { folders ->
                 if (currentScreen == Screen.CHAT_LIST) {
                     val view = mainContainer.getChildAt(0)
                     if (view != null) {
                         renderChatFolderTabs(view, folders)
                     }
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            telegramManager.slowModeStates.collectLatest {
+                if (currentScreen == Screen.CONVERSATION && activeChat != null) {
+                    startSlowModeTicker(activeChat!!.id)
                 }
             }
         }
@@ -442,7 +612,45 @@ class MainActivity : AppCompatActivity() {
                 if (currentScreen == Screen.CHAT_LIST) {
                     val filtered = filterChatsForCurrentTab(chats)
                     val wasEmpty = (chatListAdapter?.itemCount ?: 0) == 0
-                    chatListAdapter?.submitList(filtered)
+                    val rv = rvChats
+                    val currentFocusedVh = currentFocus?.let { rv?.findContainingViewHolder(it) }
+                    val isListFocused = wasEmpty || currentFocusedVh != null || !isTabViewFocused()
+                    val anchorChatId = focusedChatId
+                    val anchorTop = currentFocusedVh?.itemView?.top
+                    // If the user is sitting at the top of the list, stay at the top so
+                    // chats bumped by new messages are immediately visible.
+                    val wasAtTop =
+                        wasEmpty ||
+                            currentFocusedVh?.bindingAdapterPosition == 0 ||
+                            (anchorChatId != null && chatListAdapter?.getPositionForChatId(anchorChatId) == 0)
+                    chatListAdapter?.submitList(filtered) {
+                        if (currentScreen == Screen.CHAT_LIST && filtered.isNotEmpty() && isListFocused && !isTabViewFocused()) {
+                            val targetPos =
+                                if (wasAtTop) {
+                                    0
+                                } else {
+                                    anchorChatId?.let { id ->
+                                        chatListAdapter?.getPositionForChatId(id)?.takeIf { it >= 0 }
+                                    } ?: 0
+                                }
+                            val lm = rv?.layoutManager as? LinearLayoutManager
+                            if (wasAtTop) {
+                                lm?.scrollToPositionWithOffset(0, 0)
+                                focusedChatId = filtered.firstOrNull()?.id
+                            } else if (anchorTop != null && targetPos > 0) {
+                                lm?.scrollToPositionWithOffset(targetPos, anchorTop)
+                            }
+                            rv?.post {
+                                if (currentScreen == Screen.CHAT_LIST && !isTabViewFocused()) {
+                                    rv.findViewHolderForAdapterPosition(targetPos)?.itemView?.let { itemView ->
+                                        if (!itemView.hasFocus()) {
+                                            itemView.requestFocus()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     val emptyView = findViewById<View>(R.id.layout_empty_state)
                     val progressView = findViewById<View>(R.id.progress_chats)
 
@@ -452,7 +660,11 @@ class MainActivity : AppCompatActivity() {
                         emptyView?.visibility = View.GONE
                         if (wasEmpty && !isTabViewFocused()) {
                             rvChats?.post {
-                                rvChats?.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                                val targetPos =
+                                    focusedChatId?.let { id ->
+                                        chatListAdapter?.getPositionForChatId(id)?.takeIf { it >= 0 }
+                                    } ?: 0
+                                rvChats?.findViewHolderForAdapterPosition(targetPos)?.itemView?.requestFocus()
                             }
                         }
                     } else {
@@ -481,26 +693,77 @@ class MainActivity : AppCompatActivity() {
                             } else {
                                 rawList
                             }
-                        messageAdapter?.submitList(list)
+                        val rv = rvMessages
+                        val lm = rv?.layoutManager as? LinearLayoutManager
+                        val previousCount = messageAdapter?.itemCount ?: 0
+                        val previousLastId = if (previousCount > 0) messageAdapter?.getItemAt(previousCount - 1)?.id else null
+                        val currentFocusedVh = currentFocus?.let { rv?.findContainingViewHolder(it) }
+                        val isBrowsingMessages = currentFocusedVh != null || (etComposeInput?.hasFocus() != true && focusedMessageId != null)
+                        val anchorMsgId =
+                            focusedMessageId ?: currentFocusedVh?.adapterPosition?.takeIf { it != RecyclerView.NO_POSITION }?.let {
+                                messageAdapter?.getItemAt(it)?.id
+                            }
+                        val anchorOldPos = anchorMsgId?.let { messageAdapter?.getPositionForMessageId(it) } ?: -1
+                        val anchorTopOffset = currentFocusedVh?.itemView?.top
+
+                        messageAdapter?.submitList(list) {
+                            if (currentScreen != Screen.CONVERSATION || activeChat?.id != chat.id) return@submitList
+                            val liveFocusedVh = currentFocus?.let { rv?.findContainingViewHolder(it) }
+                            val liveBrowsing =
+                                isBrowsingMessages ||
+                                    liveFocusedVh != null ||
+                                    (etComposeInput?.hasFocus() != true && focusedMessageId != null)
+                            val liveAnchorId = focusedMessageId ?: anchorMsgId
+                            val targetId = pendingTargetMessageId
+                            if (targetId != null) {
+                                val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                                if (pos != -1) {
+                                    rv?.scrollToPosition(pos)
+                                    rv?.post {
+                                        rv.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+                                    }
+                                    pendingTargetMessageId = null
+                                    initialConversationScrollDone = true
+                                } else if (!initialConversationScrollDone && list.isNotEmpty()) {
+                                    rv?.scrollToPosition(list.size - 1)
+                                    initialConversationScrollDone = true
+                                }
+                            } else if (liveBrowsing && liveAnchorId != null) {
+                                val newPos = messageAdapter?.getPositionForMessageId(liveAnchorId) ?: -1
+                                if (newPos != -1) {
+                                    val targetTop = liveFocusedVh?.itemView?.top ?: anchorTopOffset
+                                    if (targetTop != null && newPos != anchorOldPos) {
+                                        lm?.scrollToPositionWithOffset(newPos, targetTop)
+                                    }
+                                    rv?.post {
+                                        val vh = rv.findViewHolderForAdapterPosition(newPos)
+                                        if (vh != null && !vh.itemView.hasFocus() && etComposeInput?.hasFocus() != true) {
+                                            vh.itemView.requestFocus()
+                                        }
+                                    }
+                                }
+                            } else if (!initialConversationScrollDone && list.isNotEmpty()) {
+                                rv?.scrollToPosition(list.size - 1)
+                                initialConversationScrollDone = true
+                            } else if (!liveBrowsing && list.size > previousCount && list.isNotEmpty()) {
+                                val newLastId = list.last().id
+                                val lastVisible = lm?.findLastVisibleItemPosition() ?: -1
+                                if (previousCount <= 1 || (newLastId != previousLastId && lastVisible >= previousCount - 3)) {
+                                    rv?.scrollToPosition(list.size - 1)
+                                }
+                            }
+                        }
                         updatePinnedMessageBanner(chat, list)
                         val unread = list.filter { !it.isOutbound }.map { it.id }.toLongArray()
                         if (unread.isNotEmpty()) {
                             telegramManager.markMessagesAsRead(chat.id, unread)
                         }
-                        val targetId = pendingTargetMessageId
-                        if (targetId != null) {
-                            val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
-                            if (pos != -1) {
-                                rvMessages?.scrollToPosition(pos)
-                                rvMessages?.post {
-                                    rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
-                                }
-                                pendingTargetMessageId = null
-                            } else if (list.isNotEmpty()) {
-                                rvMessages?.scrollToPosition(list.size - 1)
+                        if (list.size in 1..9) {
+                            val oldestId = list.first().id
+                            if (oldestId != 0L && oldestId != lastAutoLoadedOldestMsgId) {
+                                lastAutoLoadedOldestMsgId = oldestId
+                                telegramManager.loadMessages(chat.id, fromMessageId = oldestId)
                             }
-                        } else if (list.isNotEmpty()) {
-                            rvMessages?.scrollToPosition(list.size - 1)
                         }
                     }
                 }
@@ -539,6 +802,7 @@ class MainActivity : AppCompatActivity() {
     private fun commitActiveInputEngines() {
         composeInputEngine?.commitCurrentChar()
         loginInputEngine?.commitCurrentChar()
+        settingsInputEngines.values.forEach { it.commitCurrentChar() }
     }
 
     // =========================================================================
@@ -573,10 +837,20 @@ class MainActivity : AppCompatActivity() {
 
         rvChats = view.findViewById(R.id.rv_chats)
         rvChats?.layoutManager = LinearLayoutManager(this)
+        rvChats?.itemAnimator = null
         chatListAdapter =
-            ChatListAdapter { chat ->
-                openConversation(chat)
-            }
+            ChatListAdapter(
+                onChatFocused = { chat ->
+                    focusedChatId = chat.id
+                },
+                onChatSelected = { chat ->
+                    focusedChatId = chat.id
+                    openConversation(chat)
+                },
+                onChatAction = { actionId, chat ->
+                    handleChatAccessibilityAction(actionId, chat)
+                },
+            )
         rvChats?.adapter = chatListAdapter
 
         // Lazy loading / pagination on scroll
@@ -628,15 +902,24 @@ class MainActivity : AppCompatActivity() {
             onRight = { finish() },
         )
 
+        applyChatFilterAndDebounce(
+            currentChatTypeFilter,
+            archivedMode = isArchivedTabSelected,
+            foldersMode = isFoldersTabSelected,
+        )
+
         rvChats?.post {
-            if ((chatListAdapter?.itemCount ?: 0) > 0) {
-                rvChats?.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+            val count = chatListAdapter?.itemCount ?: 0
+            if (count > 0) {
+                val targetPos =
+                    focusedChatId?.let { id ->
+                        chatListAdapter?.getPositionForChatId(id)?.takeIf { it in 0 until count }
+                    } ?: 0
+                focusChatAt(targetPos)
             } else {
                 view.findViewById<View>(R.id.tab_all)?.requestFocus()
             }
         }
-
-        applyChatFilterAndDebounce(currentChatTypeFilter)
         updateActiveCallOverlay()
     }
 
@@ -715,6 +998,30 @@ class MainActivity : AppCompatActivity() {
         }
 
         tabFolders?.text = if (!activeFolderFilter.isNullOrBlank()) "📁 $activeFolderFilter" else "📁 Folders"
+
+        val activeTabView: View? =
+            when {
+                archivedMode -> tabArchived
+                foldersMode && !activeFolderFilter.isNullOrBlank() ->
+                    layoutTabs?.let { layout ->
+                        (0 until layout.childCount)
+                            .map { layout.getChildAt(it) }
+                            .firstOrNull { it.isSelected }
+                    } ?: tabFolders
+                foldersMode -> tabFolders
+                filter == ChatType.BOT -> tabBots
+                filter == ChatType.CHANNEL -> tabChannels
+                filter == ChatType.GROUP -> tabGroups
+                filter == ChatType.DIRECT -> tabDirect
+                else -> tabAll
+            }
+        val scrollTabs = findViewById<android.widget.HorizontalScrollView>(R.id.scroll_tabs)
+        if (scrollTabs != null && activeTabView != null) {
+            scrollTabs.post {
+                val targetScrollX = (activeTabView.left + activeTabView.right - scrollTabs.width) / 2
+                scrollTabs.smoothScrollTo(targetScrollX.coerceAtLeast(0), 0)
+            }
+        }
 
         val allChats = telegramManager.chats.value
         val filtered = filterChatsForCurrentTab(allChats)
@@ -964,14 +1271,24 @@ class MainActivity : AppCompatActivity() {
         isError: Boolean = false,
     ) {
         com.teleflip.app.report.AdbReporter.reportPopup("UI_Popup", msg, isError)
-        Toast.makeText(this, msg, if (isError) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(this, msg, if (isError) android.widget.Toast.LENGTH_LONG else android.widget.Toast.LENGTH_SHORT).show()
+        com.teleflip.app.ui.StatusMessageDispatcher.showStatus(this, msg, isError)
     }
 
-    private var activeDialogCount = 0
-    private var savedFocusView: View? = null
+    @VisibleForTesting
+    internal var activeDialogCount = 0
+
+    @VisibleForTesting
+    internal var savedFocusView: View? = null
+
+    fun captureFocusForDialog() {
+        if (activeDialogCount == 0 && savedFocusView == null) {
+            savedFocusView = currentFocus ?: window?.decorView?.findFocus()
+        }
+    }
 
     fun onDialogShown() {
-        if (activeDialogCount == 0) {
+        if (activeDialogCount == 0 && savedFocusView == null) {
             savedFocusView = currentFocus ?: window?.decorView?.findFocus()
         }
         activeDialogCount++
@@ -986,10 +1303,19 @@ class MainActivity : AppCompatActivity() {
             softkeyManager.setSoftkeyBarVisible(true)
             val targetView = savedFocusView
             savedFocusView = null
-            targetView?.post {
-                if (targetView.isAttachedToWindow) {
+            val postContainer = targetView?.takeIf { it.isAttachedToWindow } ?: mainContainer
+            postContainer.post {
+                if (targetView != null && targetView.isAttachedToWindow) {
                     targetView.requestFocus()
                     targetView.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED)
+                } else {
+                    val fallbackView =
+                        rvChats?.takeIf { it.isAttachedToWindow && it.visibility == View.VISIBLE }
+                            ?: mainContainer.takeIf { it.isAttachedToWindow }
+                    fallbackView?.isFocusable = true
+                    fallbackView?.isFocusableInTouchMode = true
+                    fallbackView?.requestFocus()
+                    fallbackView?.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED)
                 }
             }
         }
@@ -1026,8 +1352,8 @@ class MainActivity : AppCompatActivity() {
                 }
             },
             onOpenSavedMessages = {
-                telegramManager.openSavedMessages { savedChat ->
-                    openConversation(savedChat)
+                telegramManager.openSavedMessages { savedChat, error ->
+                    if (savedChat != null) openConversation(savedChat) else showToast(error ?: "Could not open Saved Messages", isError = true)
                 }
             },
             onCreateGroup = { title ->
@@ -1069,6 +1395,11 @@ class MainActivity : AppCompatActivity() {
         val options = mutableListOf<MenuOption>()
 
         options.add(
+            MenuOption(options.size + 1, "⚙️ Settings (shortcut: 0)") {
+                showSettingsScreen()
+            },
+        )
+        options.add(
             MenuOption(options.size + 1, "🔍 Search (Chats, Contacts, Messages)") {
                 showSearchDialog()
             },
@@ -1080,8 +1411,8 @@ class MainActivity : AppCompatActivity() {
         )
         options.add(
             MenuOption(options.size + 1, "⭐ Saved Messages") {
-                telegramManager.openSavedMessages { savedChat ->
-                    openConversation(savedChat)
+                telegramManager.openSavedMessages { savedChat, error ->
+                    if (savedChat != null) openConversation(savedChat) else showToast(error ?: "Could not open Saved Messages", isError = true)
                 }
             },
         )
@@ -1134,6 +1465,8 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
+        options.add(MenuOption(options.size + 1, "Open Telegram link / Join chat") { featureMenus.invite() })
+        if (focusedChat != null) options.add(MenuOption(options.size + 1, if (focusedChat.isMarkedUnread) "Clear unread mark" else "Mark as unread") { featureMenus.unread(focusedChat) })
         options.add(
             MenuOption(options.size + 1, "🔄 Refresh Chats") {
                 telegramManager.loadChats()
@@ -1143,11 +1476,6 @@ class MainActivity : AppCompatActivity() {
         options.add(
             MenuOption(options.size + 1, "🩺 Diagnostics & Error Log") {
                 com.teleflip.app.ui.DiagnosticsDialog(this).show()
-            },
-        )
-        options.add(
-            MenuOption(options.size + 1, "⚙️ Settings & API") {
-                showSettingsScreen()
             },
         )
         options.add(
@@ -1233,7 +1561,9 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
     // SCREEN 2: CONVERSATION / CHAT
     // =========================================================================
-    private fun openConversation(
+    @androidx.annotation.VisibleForTesting
+    @JvmName("openConversation")
+    internal fun openConversation(
         chat: ChatModel,
         targetMessageId: Long? = null,
     ) {
@@ -1283,25 +1613,72 @@ class MainActivity : AppCompatActivity() {
 
         val openProfileListener = View.OnClickListener { showProfileScreen(chat) }
         tvConvTitle.setOnClickListener(openProfileListener)
+        tvConvTitle.isFocusable = false
         ivConvAvatar?.setOnClickListener(openProfileListener)
+        ivConvAvatar?.isFocusable = false
         tvConvAvatar?.setOnClickListener(openProfileListener)
+        tvConvAvatar?.isFocusable = false
+
+        focusedMessageId = null
+        initialConversationScrollDone = false
+        lastAutoLoadedOldestMsgId = 0L
 
         rvMessages = view.findViewById(R.id.rv_messages)
         val layoutManager =
-            LinearLayoutManager(this).apply {
-                stackFromEnd = true
+            object : LinearLayoutManager(this) {
+                init {
+                    stackFromEnd = true
+                }
+
+                override fun onRequestChildFocus(
+                    parent: RecyclerView,
+                    state: RecyclerView.State,
+                    child: View,
+                    focused: View?,
+                ): Boolean {
+                    // Prevent RecyclerView from performing unexpected jump-scrolls on tall messages
+                    // when focus is managed deterministically via D-Pad in dispatchKeyEvent.
+                    return true
+                }
             }
         rvMessages?.layoutManager = layoutManager
+        rvMessages?.itemAnimator = null
 
         layoutVoiceRecording = view.findViewById(R.id.layout_voice_recording)
         layoutCompose = view.findViewById(R.id.layout_compose)
         tvRecordTimer = view.findViewById(R.id.tv_record_timer)
         layoutReplyEditBar = view.findViewById(R.id.layout_reply_edit_bar)
+        layoutReplyEditBar?.isFocusable = true
+        layoutReplyEditBar?.isClickable = true
+        layoutReplyEditBar?.setOnClickListener {
+            val targetId = activeReplyMessage?.id ?: activeEditMessage?.id
+            if (targetId != null) {
+                val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                if (pos >= 0) {
+                    focusMessageAt(pos)
+                } else {
+                    showToast("Quoted message not found")
+                }
+            }
+        }
         tvReplyEditPreview = view.findViewById(R.id.tv_reply_edit_preview)
         layoutPinnedBanner = view.findViewById(R.id.layout_pinned_banner)
+        layoutPinnedBanner?.isFocusable = true
+        layoutPinnedBanner?.isClickable = true
         tvPinnedBannerText = view.findViewById(R.id.tv_pinned_banner_text)
+        layoutSlowModeBanner = view.findViewById(R.id.layout_slow_mode_banner)
+        tvSlowModeBannerText = view.findViewById(R.id.tv_slow_mode_banner_text)
+        startSlowModeTicker(chat.id)
         view.findViewById<View>(R.id.btn_cancel_reply_edit)?.setOnClickListener {
             clearReplyOrEditMode()
+        }
+        val btnJumpToBottom = view.findViewById<Button>(R.id.btn_jump_to_bottom)
+        btnJumpToBottom?.setOnClickListener {
+            val count = messageAdapter?.itemCount ?: 0
+            if (count > 0) {
+                rvMessages?.smoothScrollToPosition(count - 1)
+                focusMessageAt(count - 1)
+            }
         }
         activeReplyMessage = null
         activeEditMessage = null
@@ -1309,6 +1686,7 @@ class MainActivity : AppCompatActivity() {
         messageAdapter =
             MessageAdapter(
                 onMessageFocused = { focusedMsg ->
+                    focusedMessageId = focusedMsg.id
                     updateSoftkeysForFocusedMessage(chat, focusedMsg)
                 },
                 onMessageAction = { clickedMsg ->
@@ -1319,6 +1697,33 @@ class MainActivity : AppCompatActivity() {
                 },
                 customEmojiResolver = { key ->
                     telegramManager.getCustomEmojiFilePath(key)
+                },
+                onMessageAccessibilityAction = { actionId, msg ->
+                    handleMessageAccessibilityAction(actionId, msg)
+                },
+                onQuoteClick = { quotedMessageId ->
+                    val pos = messageAdapter?.getPositionForMessageId(quotedMessageId) ?: -1
+                    if (pos >= 0) {
+                        rvMessages?.smoothScrollToPosition(pos)
+                        focusMessageAt(pos)
+                    } else {
+                        showToast("Quoted message not found")
+                    }
+                },
+                onReplyQuoteClick = { quoteMsg ->
+                    val targetId = quoteMsg.replyToMessageId
+                    if (targetId != 0L) {
+                        val pos = messageAdapter?.getPositionForMessageId(targetId) ?: -1
+                        if (pos >= 0) {
+                            rvMessages?.smoothScrollToPosition(pos)
+                            focusMessageAt(pos)
+                        } else {
+                            showToast("Quoted message not found")
+                        }
+                    }
+                },
+                onReactionsClick = { rxnMsg ->
+                    showReactionPickerDialog(rxnMsg)
                 },
             )
         rvMessages?.adapter = messageAdapter
@@ -1338,11 +1743,14 @@ class MainActivity : AppCompatActivity() {
                     rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
                 }
                 pendingTargetMessageId = null
+                initialConversationScrollDone = true
             } else if (currentMsgs.isNotEmpty()) {
                 rvMessages?.scrollToPosition(currentMsgs.size - 1)
+                initialConversationScrollDone = true
             }
         } else if (currentMsgs.isNotEmpty()) {
             rvMessages?.scrollToPosition(currentMsgs.size - 1)
+            initialConversationScrollDone = true
         }
 
         // Fetch live chat history from TDLib
@@ -1356,8 +1764,16 @@ class MainActivity : AppCompatActivity() {
                     dx: Int,
                     dy: Int,
                 ) {
+                    val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                    val lastVisible = lm.findLastVisibleItemPosition()
+                    val totalCount = lm.itemCount
+                    if (totalCount > 0 && lastVisible < totalCount - 2) {
+                        btnJumpToBottom?.visibility = View.VISIBLE
+                    } else {
+                        btnJumpToBottom?.visibility = View.GONE
+                    }
+
                     if (dy < 0) {
-                        val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
                         val firstVisible = lm.findFirstVisibleItemPosition()
                         if (firstVisible <= 1) {
                             val msgs = telegramManager.messages.value[chat.id] ?: emptyList()
@@ -1389,34 +1805,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val doSend = {
-            commitActiveInputEngines()
-            draftSyncJob?.cancel()
-            draftSyncJob = null
-            val text = etComposeInput?.text?.toString()?.trim() ?: ""
-            if (text.isNotEmpty()) {
-                val editing = activeEditMessage
-                val replying = activeReplyMessage
-                if (editing != null) {
-                    telegramManager.editMessageText(chat.id, editing.id, text) {
-                        showToast("Message edited")
-                    }
-                    clearReplyOrEditMode()
-                    etComposeInput?.setText("")
-                } else if (replying != null) {
-                    val preview = "${replying.senderName}: ${replying.text.take(35)}"
-                    telegramManager.sendMessage(
-                        chatId = chat.id,
-                        text = text,
-                        replyToMessageId = replying.id,
-                        replyToPreview = preview,
-                    )
-                    clearReplyOrEditMode()
-                    etComposeInput?.setText("")
-                } else {
-                    telegramManager.sendMessage(chat.id, text)
-                    etComposeInput?.setText("")
-                }
-            }
+            dispatchOutboundMessageWithOptions(chat)
         }
 
         btnSend.setOnClickListener { doSend() }
@@ -1458,6 +1847,9 @@ class MainActivity : AppCompatActivity() {
         )
 
         etComposeInput?.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                focusedMessageId = null
+            }
             if (hasFocus && !voiceRecorder.isRecording()) {
                 softkeyManager.update(
                     left = "Attach",
@@ -1465,6 +1857,7 @@ class MainActivity : AppCompatActivity() {
                     right = "Back",
                     onLeft = { showAttachMenu(chat) },
                     onCenter = { doSend() },
+                    onCenterLongClick = { showSendOptionsMenu(chat) },
                     onRight = { showChatListScreen() },
                 )
             } else if (!hasFocus) {
@@ -1485,11 +1878,49 @@ class MainActivity : AppCompatActivity() {
                     etComposeInput?.requestFocus()
                 }
             },
+            onCenterLongClick = { showSendOptionsMenu(chat) },
             onRight = { showChatListScreen() },
         )
 
         etComposeInput?.requestFocus()
         updateActiveCallOverlay()
+    }
+
+    private fun startSlowModeTicker(chatId: Long) {
+        slowModeTickerJob?.cancel()
+        slowModeTickerJob =
+            lifecycleScope.launch {
+                var wasVisible = false
+                var keepRunning = true
+                while (isActive && keepRunning) {
+                    if (currentScreen != Screen.CONVERSATION || activeChat?.id != chatId) {
+                        layoutSlowModeBanner?.visibility = View.GONE
+                        keepRunning = false
+                    } else {
+                        val remainingSec = telegramManager.getSlowModeRemainingSeconds(chatId)
+                        if (remainingSec > 0) {
+                            val minutes = remainingSec / 60
+                            val secs = remainingSec % 60
+                            val formattedTime = String.format(java.util.Locale.US, "%02d:%02d", minutes, secs)
+                            val bannerText = "Slow mode active: wait $formattedTime to send next message"
+
+                            tvSlowModeBannerText?.text = bannerText
+                            if (layoutSlowModeBanner?.visibility != View.VISIBLE) {
+                                layoutSlowModeBanner?.visibility = View.VISIBLE
+                                tvSlowModeBannerText?.contentDescription = bannerText
+                                layoutSlowModeBanner?.announceForAccessibility(bannerText)
+                            }
+                            wasVisible = true
+                            delay(1000L)
+                        } else {
+                            if (wasVisible || layoutSlowModeBanner?.visibility == View.VISIBLE) {
+                                layoutSlowModeBanner?.visibility = View.GONE
+                            }
+                            keepRunning = false
+                        }
+                    }
+                }
+            }
     }
 
     private var lastResendTimestamp = 0L
@@ -1531,7 +1962,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         when (msg.mediaType) {
-            MediaType.VOICE -> {
+            MediaType.CONTACT -> {
+                softkeyManager.update(
+                    left = "Options",
+                    center = "Contact",
+                    right = "Back",
+                    onLeft = { showMessageOptionsMenu(msg) },
+                    onCenter = { featureMenus.contact(msg) },
+                    onRight = { showChatListScreen() },
+                )
+            }
+            MediaType.VOICE, MediaType.AUDIO -> {
                 val isPlaying = msg.mediaFilePath != null && voicePlayer.isPlayingPath(msg.mediaFilePath)
                 if (isPlaying) {
                     val speedText = String.format(Locale.US, "Speed %.1fx", voicePlayer.currentSpeed)
@@ -1588,6 +2029,16 @@ class MainActivity : AppCompatActivity() {
                     onRight = { showChatListScreen() },
                 )
             }
+            MediaType.DOCUMENT -> {
+                softkeyManager.update(
+                    left = "Options",
+                    center = "Open",
+                    right = "Back",
+                    onLeft = { showMessageOptionsMenu(msg) },
+                    onCenter = { openDocument(msg) },
+                    onRight = { showChatListScreen() },
+                )
+            }
             MediaType.POLL -> {
                 softkeyManager.update(
                     left = "Options",
@@ -1602,7 +2053,7 @@ class MainActivity : AppCompatActivity() {
                 if (msg.isPaidMediaLocked) {
                     softkeyManager.update(
                         left = "Options",
-                        center = "Unlock",
+                        center = "Refresh",
                         right = "Back",
                         onLeft = { showMessageOptionsMenu(msg) },
                         onCenter = { handlePaidMediaAction(msg) },
@@ -1635,7 +2086,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleMessageActionClick(msg: MessageModel) {
         when (msg.mediaType) {
-            MediaType.VOICE -> handlePlayVoiceMessage(msg)
+            MediaType.VOICE, MediaType.AUDIO -> handlePlayVoiceMessage(msg)
+            MediaType.DOCUMENT -> openDocument(msg)
+            MediaType.CONTACT -> featureMenus.contact(msg)
             MediaType.LOCATION -> LocationHelper.openInOrganicMaps(this, msg.latitude, msg.longitude)
             MediaType.PHOTO, MediaType.VIDEO, MediaType.ANIMATION, MediaType.STICKER -> openMediaViewer(msg)
             MediaType.POLL -> showPollVoteMenu(msg)
@@ -1654,23 +2107,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun showPaidMediaUnlockConfirmation(msg: MessageModel) {
         commitActiveInputEngines()
-        AlertDialog.Builder(this)
-            .setTitle("Unlock Content")
-            .setMessage("Unlock this media for ⭐ ${msg.starCount} Stars?")
-            .setPositiveButton("Unlock") { _, _ ->
-                showToast("Requesting unlock for ⭐ ${msg.starCount} Stars...")
-                telegramManager.unlockPaidMedia(msg.chatId, msg.id) { success ->
-                    runOnUiThread {
-                        if (success) {
-                            showToast("Content unlocked!")
-                        } else {
-                            showToast("Failed to unlock content", isError = true)
+        showToast("Checking Stars price…")
+        telegramManager.quotePaidMedia(msg.chatId, msg.id) { quote, error ->
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (quote == null) {
+                    showToast(error ?: "Unable to load payment", isError = true)
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle("Unlock paid media")
+                        .setMessage("Pay ${quote.stars} Telegram Stars to unlock this media?")
+                        .setPositiveButton("Pay ${quote.stars} Stars") { _, _ ->
+                            showToast("Processing payment…")
+                            telegramManager.purchasePaidMedia(quote) { paid, paymentError ->
+                                runOnUiThread {
+                                    showToast(if (paid) "Payment completed. Refreshing media…" else paymentError ?: "Payment failed", isError = !paid)
+                                }
+                            }
                         }
-                    }
+                        .setNegativeButton("Cancel", null)
+                        .show()
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
     }
 
     private fun openMediaViewer(msg: MessageModel) {
@@ -1678,7 +2137,24 @@ class MainActivity : AppCompatActivity() {
         MediaViewerDialog(
             context = this,
             message = msg,
-            onSaveMedia = { targetMsg -> saveMessageToDevice(targetMsg) },
+            messageUpdates = telegramManager.messages,
+            onSaveMedia = { targetMsg ->
+                if (targetMsg.mediaType == MediaType.STICKER) {
+                    telegramManager.saveSticker(
+                        fileId = targetMsg.mediaFileId,
+                        emoji = targetMsg.stickerEmoji,
+                        filePath = targetMsg.mediaFilePath,
+                    )
+                } else if (targetMsg.mediaType == MediaType.ANIMATION) {
+                    telegramManager.saveGif(
+                        fileId = targetMsg.mediaFileId,
+                        duration = targetMsg.durationSeconds,
+                        caption = targetMsg.mediaCaption.ifBlank { targetMsg.text },
+                        filePath = targetMsg.mediaFilePath,
+                    )
+                }
+                saveMessageToDevice(targetMsg)
+            },
             onRequestDownload = { fileId ->
                 telegramManager.downloadFilePriority(fileId)
                 showToast("Prioritizing media download...")
@@ -1722,10 +2198,60 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val pendingMediaActions = mutableSetOf<Pair<Long, Long>>()
+
+    private fun withDownloadedMedia(
+        msg: MessageModel,
+        onReady: (MessageModel) -> Unit,
+    ) {
+        val existing = msg.mediaFilePath
+        if (!existing.isNullOrBlank() && File(existing).isFile) {
+            onReady(msg)
+            return
+        }
+        if (msg.mediaFileId <= 0) {
+            showToast("This attachment has no downloadable file", isError = true)
+            return
+        }
+        val key = msg.chatId to msg.id
+        if (!pendingMediaActions.add(key)) return
+        showToast("Downloading attachment…")
+        lifecycleScope.launch {
+            try {
+                val path = telegramManager.downloadFileSuspending(msg.mediaFileId)
+                if (path != null) onReady(msg.copy(mediaFilePath = path)) else showToast("Download did not complete. Try again.", isError = true)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                showToast(e.message ?: "Media download failed", isError = true)
+            } finally {
+                pendingMediaActions.remove(key)
+            }
+        }
+    }
+
+    private fun openDocument(msg: MessageModel) {
+        withDownloadedMedia(msg) { ready ->
+            try {
+                val file = File(requireNotNull(ready.mediaFilePath))
+                val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", file)
+                val mimeType =
+                    ready.mediaMimeType.ifBlank {
+                        android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase()) ?: "application/octet-stream"
+                    }
+                startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mimeType).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+            } catch (e: Exception) {
+                showToast("No app can open this attachment. Use Save to Device.", isError = true)
+            }
+        }
+    }
+
     private fun handlePlayVoiceMessage(msg: MessageModel) {
         val path = msg.mediaFilePath
-        if (path.isNullOrBlank()) {
-            showToast("Voice note audio file not available offline", true)
+        if (path.isNullOrBlank() || !File(path).isFile) {
+            withDownloadedMedia(msg) { ready ->
+                if (activeChat?.id == ready.chatId) handlePlayVoiceMessage(ready)
+            }
             return
         }
 
@@ -1804,7 +2330,7 @@ class MainActivity : AppCompatActivity() {
 
         if (recording != null && recording.file.exists()) {
             telegramManager.sendVoiceNote(chat.id, recording.file.absolutePath, recording.durationSeconds)
-            showToast("Voice note sent (${recording.durationSeconds}s)!")
+            showToast("Sending voice note (${recording.durationSeconds}s)…")
         } else {
             showToast("Recording was too short or empty", true)
         }
@@ -1833,15 +2359,8 @@ class MainActivity : AppCompatActivity() {
             center = "Send",
             right = "Back",
             onLeft = { showAttachMenu(chat) },
-            onCenter = {
-                val text = etComposeInput?.text?.toString()?.trim() ?: ""
-                if (text.isNotEmpty()) {
-                    telegramManager.sendMessage(chat.id, text)
-                    etComposeInput?.setText("")
-                } else {
-                    etComposeInput?.requestFocus()
-                }
-            },
+            onCenter = { dispatchOutboundMessageWithOptions(chat) },
+            onCenterLongClick = { showSendOptionsMenu(chat) },
             onRight = { showChatListScreen() },
         )
         etComposeInput?.requestFocus()
@@ -1865,7 +2384,7 @@ class MainActivity : AppCompatActivity() {
         locationHelper.fetchCurrentLocation(
             onSuccess = { locInfo ->
                 telegramManager.sendLocation(chat.id, locInfo.latitude, locInfo.longitude, locInfo.accuracyMeters)
-                showToast("GPS Location sent! Available on Google Maps and Organic Maps")
+                showToast("Sending GPS location…")
             },
             onError = { errMsg ->
                 showToast(errMsg, true)
@@ -1882,13 +2401,29 @@ class MainActivity : AppCompatActivity() {
         etComposeInput?.requestFocus()
     }
 
-    private fun startEditingMessage(msg: MessageModel) {
+    private fun isCaptionableMedia(msg: MessageModel?): Boolean {
+        if (msg == null) return false
+        return msg.mediaType == MediaType.PHOTO ||
+            msg.mediaType == MediaType.VIDEO ||
+            msg.mediaType == MediaType.DOCUMENT ||
+            msg.mediaType == MediaType.ANIMATION ||
+            msg.mediaType == MediaType.AUDIO
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun startEditingMessage(msg: MessageModel) {
         activeEditMessage = msg
         activeReplyMessage = null
         layoutReplyEditBar?.visibility = View.VISIBLE
-        tvReplyEditPreview?.text = "✏️ Editing: ${msg.text.take(35)}"
-        etComposeInput?.setText(msg.text)
-        etComposeInput?.setSelection(msg.text.length)
+        if (isCaptionableMedia(msg)) {
+            tvReplyEditPreview?.text = "✏️ Editing Caption: ${msg.mediaCaption.take(35)}"
+            etComposeInput?.setText(msg.mediaCaption)
+            etComposeInput?.setSelection(msg.mediaCaption.length)
+        } else {
+            tvReplyEditPreview?.text = "✏️ Editing: ${msg.text.take(35)}"
+            etComposeInput?.setText(msg.text)
+            etComposeInput?.setSelection(msg.text.length)
+        }
         etComposeInput?.requestFocus()
     }
 
@@ -1907,25 +2442,61 @@ class MainActivity : AppCompatActivity() {
         chat: ChatModel,
         messagesList: List<MessageModel>,
     ) {
-        val pinnedMsg =
-            messagesList.find { it.isPinned }
-                ?: if (chat.pinnedMessageId != 0L) messagesList.find { it.id == chat.pinnedMessageId } else null
+        val pinnedIds = chat.getEffectivePinnedMessageIds()
+        if (pinnedIds.isEmpty()) {
+            layoutPinnedBanner?.visibility = View.GONE
+            return
+        }
 
-        if (pinnedMsg != null) {
-            layoutPinnedBanner?.visibility = View.VISIBLE
-            val snippet = pinnedMsg.text.ifBlank { pinnedMsg.mediaCaption }.ifBlank { "Attachment" }
-            tvPinnedBannerText?.text = "📌 Pinned: $snippet"
-            layoutPinnedBanner?.setOnClickListener {
-                val pos = messageAdapter?.getPositionForMessageId(pinnedMsg.id) ?: -1
-                if (pos >= 0) {
-                    rvMessages?.scrollToPosition(pos)
-                    rvMessages?.post {
-                        rvMessages?.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+        layoutPinnedBanner?.visibility = View.VISIBLE
+        layoutPinnedBanner?.isFocusable = true
+        layoutPinnedBanner?.isClickable = true
+        val currentIndex = activePinnedIndexMap.getOrDefault(chat.id, 0)
+        val idx = if (currentIndex in pinnedIds.indices) currentIndex else 0
+        activePinnedIndexMap[chat.id] = idx
+
+        val targetId = pinnedIds[idx]
+        val pinnedMsg = messagesList.find { it.id == targetId }
+        val snippet =
+            if (pinnedMsg != null) {
+                pinnedMsg.text.ifBlank { pinnedMsg.mediaCaption }.ifBlank { "Attachment" }
+            } else {
+                "Message #$targetId"
+            }
+        tvPinnedBannerText?.text = "📌 Pinned: $snippet"
+
+        layoutPinnedBanner?.setOnClickListener {
+            val currentPinnedIds = chat.getEffectivePinnedMessageIds()
+            if (currentPinnedIds.isEmpty()) return@setOnClickListener
+
+            val activeIdx = activePinnedIndexMap.getOrDefault(chat.id, 0) % currentPinnedIds.size
+            val currentTargetId = currentPinnedIds[activeIdx]
+
+            val pos = messageAdapter?.getPositionForMessageId(currentTargetId) ?: -1
+            if (pos >= 0) {
+                focusMessageAt(pos)
+            } else {
+                pendingTargetMessageId = currentTargetId
+                lifecycleScope.launch(Dispatchers.IO) {
+                    kotlin.runCatching {
+                        withTimeoutOrNull(PINNED_MESSAGE_LOAD_TIMEOUT_MS) {
+                            telegramManager.loadMessages(chat.id, fromMessageId = currentTargetId, limit = 50)
+                        }
                     }
                 }
             }
-        } else {
-            layoutPinnedBanner?.visibility = View.GONE
+
+            val nextIdx = (activeIdx + 1) % currentPinnedIds.size
+            activePinnedIndexMap[chat.id] = nextIdx
+            val nextTargetId = currentPinnedIds[nextIdx]
+            val nextMsg = messagesList.find { it.id == nextTargetId }
+            val nextSnippet =
+                if (nextMsg != null) {
+                    nextMsg.text.ifBlank { nextMsg.mediaCaption }.ifBlank { "Attachment" }
+                } else {
+                    "Message #$nextTargetId"
+                }
+            tvPinnedBannerText?.text = "📌 Pinned: $nextSnippet"
         }
     }
 
@@ -1970,18 +2541,23 @@ class MainActivity : AppCompatActivity() {
             },
         )
         options.add(
+            MenuOption(options.size + 1, "🎞️ Open GIFs") {
+                showGifStickerPickerDialog(chat, initialIsGif = true)
+            },
+        )
+        options.add(
             MenuOption(options.size + 1, "🎨 Send Sticker") {
-                showStickerPickerMenu(chat)
+                showGifStickerPickerDialog(chat, initialIsGif = false)
             },
         )
         options.add(
             MenuOption(options.size + 1, "🎞️ Send GIF / Animation") {
-                showGifPickerMenu(chat)
+                showGifStickerPickerDialog(chat, initialIsGif = true)
             },
         )
         if (chat.chatType == ChatType.BOT || chat.chatType == ChatType.GROUP) {
             options.add(
-                MenuOption(options.size + 1, "🤖 Bot Commands (/start, /help)") {
+                MenuOption(options.size + 1, "🤖 Bot Commands") {
                     showBotCommandsMenu(chat)
                 },
             )
@@ -2008,13 +2584,11 @@ class MainActivity : AppCompatActivity() {
                 },
             )
         }
-        if (chat.chatType == ChatType.DIRECT) {
-            options.add(
-                MenuOption(options.size + 1, "⏱️ Self-Destruct Timer") {
-                    showSelfDestructTimerMenu(chat)
-                },
-            )
-        }
+        options.add(
+            MenuOption(options.size + 1, "⏱️ Auto-Delete Timer") {
+                showSelfDestructTimerMenu(chat)
+            },
+        )
         val isMuted = telegramManager.isChatMuted(chat.id)
         val muteLabel = if (isMuted) "🔔 Unmute Notifications" else "🔇 Mute Notifications..."
         options.add(
@@ -2057,6 +2631,29 @@ class MainActivity : AppCompatActivity() {
                 showChatExportFormatDialog(chat.id, chat.title)
             },
         )
+        options.add(MenuOption(options.size + 1, "Send photo album (2–10 photos)") { pickPhotoAlbum(chat) })
+        options.add(MenuOption(options.size + 1, "Share a contact") { featureMenus.contactPicker(chat.id) })
+        options.add(MenuOption(options.size + 1, "Select / forward / delete messages") { featureMenus.selectMessages(chat) })
+        options.add(MenuOption(options.size + 1, "Scheduled messages") { featureMenus.scheduled(chat) })
+        options.add(
+            MenuOption(options.size + 1, "Send formatted draft") {
+                commitActiveInputEngines()
+                if (activeEditMessage != null) {
+                    showToast("Finish editing before sending a formatted message", true)
+                } else {
+                    val draft = etComposeInput?.text?.toString().orEmpty()
+                    val reply = activeReplyMessage?.id ?: 0
+                    featureMenus.formatting(chat.id, draft, reply) {
+                        if (activeChat?.id == chat.id && etComposeInput?.text?.toString() == draft && (activeReplyMessage?.id ?: 0) == reply) {
+                            etComposeInput?.setText("")
+                            clearReplyOrEditMode()
+                            telegramManager.saveChatDraft(chat.id, "")
+                        }
+                    }
+                }
+            },
+        )
+        if (chat.chatType == ChatType.GROUP || chat.chatType == ChatType.CHANNEL) options.add(MenuOption(options.size + 1, "Leave group / channel") { featureMenus.leave(chat) })
         OptionsMenuDialog(this, "Attach & Actions", options).show()
     }
 
@@ -2066,16 +2663,35 @@ class MainActivity : AppCompatActivity() {
         schedulingState: org.drinkless.tdlib.TdApi.MessageSchedulingState? = null,
     ) {
         commitActiveInputEngines()
+        draftSyncJob?.cancel()
+        draftSyncJob = null
         val text = etComposeInput?.text?.toString()?.trim() ?: ""
-        if (text.isEmpty()) {
-            showToast("Please enter a message first")
-            return
-        }
         val editing = activeEditMessage
         val replying = activeReplyMessage
+        if (text.isEmpty() && (editing == null || !isCaptionableMedia(editing))) {
+            showToast("Please enter a message first")
+            etComposeInput?.requestFocus()
+            return
+        }
+        val remainingSlowModeSec = telegramManager.getSlowModeRemainingSeconds(chat.id)
+        if (remainingSlowModeSec > 0) {
+            val minutes = remainingSlowModeSec / 60
+            val secs = remainingSlowModeSec % 60
+            val formatted = String.format(java.util.Locale.US, "%02d:%02d", minutes, secs)
+            val warningText = "Slow mode is active. Wait $formatted to send next message."
+            showToast(warningText, isError = true)
+            layoutSlowModeBanner?.announceForAccessibility(warningText)
+            return
+        }
         if (editing != null) {
-            telegramManager.editMessageText(chat.id, editing.id, text) {
-                showToast("Message edited")
+            if (isCaptionableMedia(editing)) {
+                telegramManager.editMessageCaption(chat.id, editing.id, text) {
+                    showToast("Caption edited")
+                }
+            } else {
+                telegramManager.editMessageText(chat.id, editing.id, text) {
+                    showToast("Message edited")
+                }
             }
             clearReplyOrEditMode()
             etComposeInput?.setText("")
@@ -2104,7 +2720,7 @@ class MainActivity : AppCompatActivity() {
         if (disableNotification && schedulingState != null) {
             showToast("Message scheduled silently")
         } else if (disableNotification) {
-            showToast("Message sent silently")
+            showToast("Sending message silently…")
         } else if (schedulingState != null) {
             showToast("Message scheduled")
         }
@@ -2176,27 +2792,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCustomScheduleDelayDialog(chat: ChatModel) {
-        val input =
-            android.widget.EditText(this).apply {
-                inputType = android.text.InputType.TYPE_CLASS_NUMBER
-                hint = "Minutes (e.g. 15)"
+        com.teleflip.app.ui.KeypadTextDialog(this, "Schedule delay in minutes", numeric = true) { value ->
+            val minutes = value.trim().toLongOrNull()
+            val now = System.currentTimeMillis() / 1000
+            if (minutes == null || minutes !in 1..525600 || now + minutes * 60 > Int.MAX_VALUE) {
+                showToast("Choose 1–525600 minutes")
+            } else {
+                dispatchOutboundMessageWithOptions(chat, schedulingState = org.drinkless.tdlib.TdApi.MessageSchedulingStateSendAtDate((now + minutes * 60).toInt(), 0))
             }
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Schedule Delay (Minutes)")
-            .setView(input)
-            .setPositiveButton("Schedule") { _, _ ->
-                val minutes = input.text.toString().trim().toIntOrNull() ?: 0
-                if (minutes > 0) {
-                    val nowSec = (System.currentTimeMillis() / 1000).toInt()
-                    val sendAtDate = nowSec + minutes * 60
-                    val schedulingState = org.drinkless.tdlib.TdApi.MessageSchedulingStateSendAtDate(sendAtDate, 0)
-                    dispatchOutboundMessageWithOptions(chat, schedulingState = schedulingState)
-                } else {
-                    showToast("Invalid minute duration")
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }.show()
     }
 
     private fun showCreatePollDialog(chat: ChatModel) {
@@ -2204,9 +2808,18 @@ class MainActivity : AppCompatActivity() {
         PollDialog(
             context = this,
             timeoutMs = telegramManager.keypadTimeoutMs,
-            onCreatePoll = { question, pollOptions, isAnonymous ->
-                telegramManager.sendPoll(chat.id, question, pollOptions, isAnonymous)
-                showToast("Poll published!")
+            onCreatePoll = { question, pollOptions, isAnonymous, isQuiz, correctIndex, explanation, allowsMultipleAnswers ->
+                telegramManager.sendPoll(
+                    chatId = chat.id,
+                    question = question,
+                    options = pollOptions,
+                    isAnonymous = isAnonymous,
+                    isQuiz = isQuiz,
+                    correctOptionIndex = correctIndex,
+                    explanation = explanation,
+                    allowsMultipleAnswers = allowsMultipleAnswers,
+                )
+                showToast(if (isQuiz) "Quiz published!" else "Poll published!")
             },
         ).show()
     }
@@ -2240,7 +2853,7 @@ class MainActivity : AppCompatActivity() {
                             type = "video/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }
-                    startActivityForResult(intent, REQ_PICK_VIDEO)
+                    videoPickerLauncher.launch(intent)
                 } catch (e: Exception) {
                     showToast("System video picker unavailable", isError = true)
                 }
@@ -2254,10 +2867,10 @@ class MainActivity : AppCompatActivity() {
                 MenuOption(options.size + 1, "$icon ${file.name}") {
                     if (isGif) {
                         telegramManager.sendAnimation(chat.id, file.absolutePath, caption)
-                        showToast("GIF sent: ${file.name}")
+                        showToast("Sending GIF: ${file.name}")
                     } else {
                         telegramManager.sendVideo(chat.id, file.absolutePath, 0, caption)
-                        showToast("Video sent: ${file.name}")
+                        showToast("Sending video: ${file.name}")
                     }
                     if (caption.isNotEmpty()) {
                         etComposeInput?.setText("")
@@ -2306,7 +2919,11 @@ class MainActivity : AppCompatActivity() {
             options.add(
                 MenuOption(options.size + 1, "➕ Create New Topic Thread") {
                     val draftTitle = etComposeInput?.text?.toString()?.trim().orEmpty().ifBlank { "Discussion #${topics.size}" }
-                    telegramManager.createForumTopic(chat.id, draftTitle) { created ->
+                    telegramManager.createForumTopic(chat.id, draftTitle) { created, error ->
+                        if (created == null) {
+                            showToast(error ?: "Could not create topic", isError = true)
+                            return@createForumTopic
+                        }
                         showToast("Created topic: ${created.name}")
                         val updatedChat = chat.copy(isForum = true, activeTopicId = created.topicId, activeTopicName = created.name)
                         openConversation(updatedChat)
@@ -2319,27 +2936,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun showGroupMembersMenu(chat: ChatModel) {
         commitActiveInputEngines()
-        val members = telegramManager.getGroupMembers(chat.id)
-        val options = mutableListOf<MenuOption>()
-        options.add(
-            MenuOption(1, "➕ Add Member to Group") {
-                showAddMemberToGroupMenu(chat)
-            },
-        )
-        members.forEachIndexed { idx, member ->
-            val badge =
-                when {
-                    member.isCreator -> "👑 Owner"
-                    member.isAdmin -> "🛡️ Admin"
-                    else -> "👤 Member"
-                }
+        telegramManager.loadGroupMembers(chat.id) { members, error ->
+            if (error != null) showToast(error, isError = true)
+            val options = mutableListOf<MenuOption>()
             options.add(
-                MenuOption(idx + 2, "${member.name} ($badge • ${member.status})") {
-                    showMemberAdminActionsMenu(chat, member)
+                MenuOption(1, "➕ Add Member to Group") {
+                    showAddMemberToGroupMenu(chat)
                 },
             )
+            members.forEachIndexed { idx, member ->
+                val badge =
+                    when {
+                        member.isCreator -> "👑 Owner"
+                        member.isAdmin -> "🛡️ Admin"
+                        else -> "👤 Member"
+                    }
+                options.add(
+                    MenuOption(idx + 2, "${member.name} ($badge • ${member.status})") {
+                        showMemberAdminActionsMenu(chat, member)
+                    },
+                )
+            }
+            OptionsMenuDialog(this, "👥 Members (${members.size})", options).show()
         }
-        OptionsMenuDialog(this, "👥 Members (${members.size})", options).show()
     }
 
     private fun showMemberAdminActionsMenu(
@@ -2358,15 +2977,15 @@ class MainActivity : AppCompatActivity() {
             val adminActionLabel = if (member.isAdmin) "🛡️ Demote from Admin" else "🛡️ Promote to Admin"
             options.add(
                 MenuOption(options.size + 1, adminActionLabel) {
-                    telegramManager.setChatMemberAdminRole(chat.id, member.userId, !member.isAdmin) {
-                        showToast(if (!member.isAdmin) "${member.name} promoted to Admin" else "${member.name} demoted")
+                    telegramManager.setChatMemberAdminRole(chat.id, member.userId, !member.isAdmin) { success ->
+                        showToast(if (success) "Member role updated" else "Could not change member role", isError = !success)
                     }
                 },
             )
             options.add(
                 MenuOption(options.size + 1, "🚫 Remove from ${chat.title}") {
-                    telegramManager.removeChatMember(chat.id, member.userId) {
-                        showToast("Removed ${member.name}")
+                    telegramManager.removeChatMember(chat.id, member.userId) { success ->
+                        showToast(if (success) "Removed ${member.name}" else "Could not remove member", isError = !success)
                     }
                 },
             )
@@ -2477,39 +3096,46 @@ class MainActivity : AppCompatActivity() {
             .setMessage("Fetch all previous messages and media for \"${chat.title}\" directly from Telegram cloud servers?")
             .setPositiveButton("Import All") { dialog, _ ->
                 dialog.dismiss()
-                val progressDialog = ChatExportProgressDialog(this) {}
-                progressDialog.show()
-                lifecycleScope.launch {
-                    try {
-                        val result =
-                            telegramManager.importChatHistoryFromCloud(
-                                chatId = chat.id,
-                                autoDownloadMedia = true,
-                                onProgress = { loadedMsgs, queuedMedia ->
-                                    progressDialog.updateProgress(
-                                        ChatExportProgress(
-                                            stage = ExportStage.FETCHING_CLOUD_HISTORY,
-                                            messagesProcessed = loadedMsgs,
-                                            totalMessages = loadedMsgs,
-                                            mediaDownloaded = queuedMedia,
-                                            totalMedia = queuedMedia,
-                                            statusText = "Imported $loadedMsgs messages ($queuedMedia media queued)...",
-                                        ),
-                                    )
-                                },
-                            )
-                        progressDialog.dismiss()
-                        showToast("✅ Imported ${result.first} messages from cloud (${result.second} media syncing)")
-                        val updated = telegramManager.messages.value[chat.id] ?: emptyList()
-                        messageAdapter?.submitList(updated)
-                        if (updated.isNotEmpty()) {
-                            rvMessages?.scrollToPosition(updated.size - 1)
-                        }
-                    } catch (e: Exception) {
-                        progressDialog.dismiss()
-                        showToast("Failed to import history: ${e.message}")
+                var importJob: Job? = null
+                val progressDialog =
+                    ChatExportProgressDialog(this) {
+                        importJob?.cancel()
                     }
-                }
+                progressDialog.show()
+                importJob =
+                    lifecycleScope.launch {
+                        try {
+                            val result =
+                                telegramManager.importChatHistoryFromCloud(
+                                    chatId = chat.id,
+                                    autoDownloadMedia = true,
+                                    onProgress = { loadedMsgs, queuedMedia ->
+                                        progressDialog.updateProgress(
+                                            ChatExportProgress(
+                                                stage = ExportStage.FETCHING_CLOUD_HISTORY,
+                                                messagesProcessed = loadedMsgs,
+                                                totalMessages = loadedMsgs,
+                                                mediaDownloaded = queuedMedia,
+                                                totalMedia = queuedMedia,
+                                                statusText = "Imported $loadedMsgs messages ($queuedMedia media queued)...",
+                                            ),
+                                        )
+                                    },
+                                )
+                            progressDialog.dismiss()
+                            showToast("✅ Imported ${result.first} messages from cloud (${result.second} media syncing)")
+                            val updated = telegramManager.messages.value[chat.id] ?: emptyList()
+                            messageAdapter?.submitList(updated)
+                            if (updated.isNotEmpty()) {
+                                rvMessages?.scrollToPosition(updated.size - 1)
+                            }
+                        } catch (e: Exception) {
+                            progressDialog.dismiss()
+                            if (e !is kotlinx.coroutines.CancellationException) {
+                                showToast("Failed to import history: ${e.message}")
+                            }
+                        }
+                    }
             }
             .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
             .show()
@@ -2740,6 +3366,7 @@ class MainActivity : AppCompatActivity() {
                     telegramManager.terminateAllOtherSessions { ok, err ->
                         if (ok) {
                             showToast("All other sessions terminated")
+                            showActiveSessionsMenu()
                         } else {
                             showToast("Error: ${err ?: "Failed"}", isError = true)
                         }
@@ -2751,7 +3378,30 @@ class MainActivity : AppCompatActivity() {
                 val info = "${session.deviceModel} • ${session.platform} • ${session.ip}$currentBadge"
                 options.add(
                     MenuOption(idx + 2, "📱 $info") {
-                        showToast("Session: ${session.appName} ${session.appVersion} (${session.activeDate})")
+                        if (session.isCurrent) {
+                            showToast("Current device session cannot be removed")
+                        } else {
+                            AlertDialog.Builder(this)
+                                .setTitle("Stop Session?")
+                                .setMessage(
+                                    "${session.deviceModel} (${session.platform})\n" +
+                                        "${session.appName} ${session.appVersion}\n" +
+                                        "IP: ${session.ip}\n" +
+                                        "Last active: ${session.activeDate}",
+                                )
+                                .setPositiveButton("Stop Session") { _, _ ->
+                                    telegramManager.terminateSession(session.id) { ok, err ->
+                                        if (ok) {
+                                            showToast("Session terminated")
+                                            showActiveSessionsMenu()
+                                        } else {
+                                            showToast("Error: ${err ?: "Failed"}", isError = true)
+                                        }
+                                    }
+                                }
+                                .setNegativeButton("Cancel", null)
+                                .show()
+                        }
                     },
                 )
             }
@@ -2834,6 +3484,7 @@ class MainActivity : AppCompatActivity() {
         updatePasscodeDotsDisplay()
 
         val btnForgot = view.findViewById<Button>(R.id.btn_passcode_forgot)
+        btnForgot.isFocusable = false
         btnForgot.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Forgot Passcode?")
@@ -2849,7 +3500,7 @@ class MainActivity : AppCompatActivity() {
 
         softkeyManager.update(
             left = "",
-            center = "Unlock",
+            center = "Refresh",
             right = "Clear",
             onLeft = {},
             onCenter = {
@@ -2909,6 +3560,20 @@ class MainActivity : AppCompatActivity() {
         passcodeEntry = ""
         if (unlocked) {
             tvPasscodeError?.text = ""
+            if (pendingProxyItem != null) {
+                val proxyItem = pendingProxyItem
+                pendingProxyItem = null
+                ProxySettingsDialog(
+                    context = this,
+                    telegramManager = telegramManager,
+                    initialProxyItem = proxyItem,
+                    onProxyChanged = {
+                        if (currentScreen == Screen.LOGIN) {
+                            updateLoginConnectionState(telegramManager.connectionState.value)
+                        }
+                    },
+                ).show()
+            }
             if (pendingTargetChatId != 0L) {
                 val targetId = pendingTargetChatId
                 pendingTargetChatId = 0L
@@ -3104,51 +3769,15 @@ class MainActivity : AppCompatActivity() {
         onMuteStateChanged: ((Boolean) -> Unit)? = null,
     ) {
         commitActiveInputEngines()
-        val options = mutableListOf<MenuOption>()
-        if (isCurrentlyMuted) {
-            options.add(
-                MenuOption(1, "🔔 Unmute Notifications") {
-                    telegramManager.setChatNotificationMute(chatId, 0) { isMuted ->
-                        showToast("Unmuted $chatTitle")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-        } else {
-            options.add(
-                MenuOption(1, "🔇 Mute for 1 Hour") {
-                    telegramManager.setChatNotificationMute(chatId, MUTE_1_HOUR_SEC) { isMuted ->
-                        showToast("Muted $chatTitle for 1 hour")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-            options.add(
-                MenuOption(2, "🔇 Mute for 8 Hours") {
-                    telegramManager.setChatNotificationMute(chatId, MUTE_8_HOURS_SEC) { isMuted ->
-                        showToast("Muted $chatTitle for 8 hours")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-            options.add(
-                MenuOption(3, "🔇 Mute for 2 Days") {
-                    telegramManager.setChatNotificationMute(chatId, MUTE_2_DAYS_SEC) { isMuted ->
-                        showToast("Muted $chatTitle for 2 days")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-            options.add(
-                MenuOption(4, "🔇 Mute Forever") {
-                    telegramManager.setChatNotificationMute(chatId, MUTE_FOREVER_SEC) { isMuted ->
-                        showToast("Muted $chatTitle forever")
-                        onMuteStateChanged?.invoke(isMuted)
-                    }
-                },
-            )
-        }
-        OptionsMenuDialog(this, "Notifications: $chatTitle", options).show()
+        ChatNotificationSettingsDialog(
+            context = this,
+            telegramManager = telegramManager,
+            chatId = chatId,
+            chatTitle = chatTitle,
+            onSettingsChanged = { isMuted ->
+                onMuteStateChanged?.invoke(isMuted)
+            },
+        ).show()
     }
 
     // =========================================================================
@@ -3241,38 +3870,77 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun formatAutoDeleteTimer(sec: Int): String {
+        return when {
+            sec <= 0 -> "Off"
+            sec == 5 -> "5s"
+            sec == 15 -> "15s"
+            sec == 30 -> "30s"
+            sec == 60 -> "1m"
+            sec == 3600 -> "1h"
+            sec == 86400 -> "24 Hours"
+            sec == 604800 -> "7 Days"
+            sec == 2592000 -> "30 Days"
+            sec % 86400 == 0 -> "${sec / 86400} Days"
+            sec % 3600 == 0 -> "${sec / 3600} Hours"
+            sec % 60 == 0 -> "${sec / 60}m"
+            else -> "${sec}s"
+        }
+    }
+
     private fun showSelfDestructTimerMenu(chat: ChatModel) {
         val presets =
-            listOf(
-                0 to "Off (Keep Messages)",
-                5 to "5 Seconds",
-                15 to "15 Seconds",
-                30 to "30 Seconds",
-                60 to "1 Minute",
-                3600 to "1 Hour",
-            )
+            if (chat.isSecretChat) {
+                listOf(
+                    0 to "Off (Keep Messages)",
+                    5 to "5 Seconds",
+                    15 to "15 Seconds",
+                    30 to "30 Seconds",
+                    60 to "1 Minute",
+                    3600 to "1 Hour",
+                )
+            } else {
+                listOf(
+                    0 to "Off (Keep Messages)",
+                    86400 to "24 Hours",
+                    604800 to "7 Days",
+                    2592000 to "30 Days",
+                )
+            }
         val options =
             presets.mapIndexed { idx, (sec, label) ->
                 val prefix = if (chat.selfDestructTimerSec == sec) "✓ " else ""
                 MenuOption(idx + 1, "$prefix⏱️ $label") {
-                    telegramManager.setSelfDestructTimer(chat.id, sec) { appliedSec ->
-                        val updated = chat.copy(selfDestructTimerSec = appliedSec)
-                        activeChat = updated
-                        showToast(if (appliedSec == 0) "Self-destruct timer turned OFF" else "Self-destruct timer set to $label")
-                        if (currentScreen == Screen.CONVERSATION) {
-                            openConversation(updated)
-                        } else if (currentScreen == Screen.PROFILE) {
-                            showProfileScreen(updated)
+                    telegramManager.setSelfDestructTimer(chat.id, sec) { success, err, appliedSec ->
+                        if (success) {
+                            val updated = chat.copy(selfDestructTimerSec = appliedSec)
+                            activeChat = updated
+                            val timerLabel = formatAutoDeleteTimer(appliedSec)
+                            showToast(
+                                if (appliedSec == 0) {
+                                    "Auto-delete timer turned OFF"
+                                } else {
+                                    "Auto-delete timer set to $timerLabel"
+                                },
+                            )
+                            if (currentScreen == Screen.CONVERSATION) {
+                                openConversation(updated)
+                            } else if (currentScreen == Screen.PROFILE) {
+                                showProfileScreen(updated)
+                            }
+                        } else if (err != null) {
+                            showToast(err, isError = true)
                         }
                     }
                 }
             }
-        OptionsMenuDialog(this, "⏱️ Self-Destruct Timer", options).show()
+        OptionsMenuDialog(this, "⏱️ Auto-Delete Timer", options).show()
     }
 
     private fun showSendMediaPicker(
         chat: ChatModel,
         isPhoto: Boolean,
+        isSticker: Boolean = false,
     ) {
         val searchDirs =
             if (isPhoto) {
@@ -3315,7 +3983,11 @@ class MainActivity : AppCompatActivity() {
                             type = if (isPhoto) "image/*" else "*/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }
-                    startActivityForResult(intent, if (isPhoto) REQ_PICK_PHOTO else REQ_PICK_DOCUMENT)
+                    when {
+                        isSticker -> stickerPickerLauncher.launch(intent)
+                        isPhoto -> photoPickerLauncher.launch(intent)
+                        else -> documentPickerLauncher.launch(intent)
+                    }
                 } catch (e: Exception) {
                     showToast("System file picker unavailable on this device", isError = true)
                 }
@@ -3327,12 +3999,14 @@ class MainActivity : AppCompatActivity() {
             val label = if (isPhoto) "📷 ${file.name}" else "📄 ${file.name}"
             options.add(
                 MenuOption(options.size + 1, label) {
-                    if (isPhoto) {
+                    if (isSticker) {
+                        telegramManager.sendLocalSticker(chat.id, file.absolutePath)
+                    } else if (isPhoto) {
                         telegramManager.sendPhoto(chat.id, file.absolutePath, caption)
-                        showToast("Photo sent: ${file.name}")
+                        showToast("Sending photo: ${file.name}")
                     } else {
                         telegramManager.sendDocument(chat.id, file.absolutePath, caption)
-                        showToast("Document sent: ${file.name}")
+                        showToast("Sending document: ${file.name}")
                     }
                     if (caption.isNotEmpty()) {
                         etComposeInput?.setText("")
@@ -3345,175 +4019,31 @@ class MainActivity : AppCompatActivity() {
         OptionsMenuDialog(this, title, options).show()
     }
 
-    private fun showStickerPickerMenu(chat: ChatModel) {
-        val rootOptions = mutableListOf<MenuOption>()
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "📦 My Telegram Sticker Packs") {
-                telegramManager.loadInstalledStickers { sets ->
-                    if (sets.isEmpty()) {
-                        showToast("No installed sticker sets found")
-                    } else {
-                        showInstalledStickerPacksMenu(chat, sets)
-                    }
-                }
-                showToast("Loading sticker packs...")
-            },
-        )
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "⭐ Popular Emoji Stickers") {
-                showPopularStickersMenu(chat)
-            },
-        )
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "📁 Pick Sticker from Device (.webp/.png)") {
-                showSendMediaPicker(chat, isPhoto = true)
-            },
-        )
-
-        OptionsMenuDialog(this, "Send Sticker", rootOptions).show()
-    }
-
-    private fun showInstalledStickerPacksMenu(
+    private fun showGifStickerPickerDialog(
         chat: ChatModel,
-        sets: List<StickerSetModel>,
+        initialIsGif: Boolean = true,
     ) {
-        val packOptions =
-            sets.mapIndexed { idx, set ->
-                MenuOption(idx + 1, "📦 ${set.title} (${set.stickers.size})") {
-                    showStickerPackItemsMenu(chat, set)
-                }
-            }
-        OptionsMenuDialog(this, "Sticker Packs", packOptions).show()
+        commitActiveInputEngines()
+        GifStickerPickerDialog(
+            context = this,
+            chat = chat,
+            telegramManager = telegramManager,
+            initialIsGif = initialIsGif,
+        ).show()
     }
 
-    private fun showStickerPackItemsMenu(
-        chat: ChatModel,
-        set: StickerSetModel,
-    ) {
-        val stickerOptions =
-            set.stickers.take(30).mapIndexed { idx, st ->
-                val label = if (st.emoji.isNotBlank()) "${st.emoji} Sticker ${idx + 1}" else "Sticker ${idx + 1}"
-                MenuOption(idx + 1, label) {
-                    telegramManager.sendSticker(chat.id, st.fileId, st.emoji)
-                    showToast("Sticker sent")
-                }
-            }
-        OptionsMenuDialog(this, set.title.take(20), stickerOptions).show()
+    internal fun showStickerPickerMenu(chat: ChatModel) {
+        val picker = MediaPickerBottomSheetDialog.newInstance(chat.id)
+        picker.show(supportFragmentManager, "media_picker")
     }
 
-    private fun showPopularStickersMenu(chat: ChatModel) {
-        val popular =
-            listOf(
-                "👍" to "👍 Thumbs Up",
-                "❤️" to "❤️ Red Heart",
-                "😂" to "😂 Laughing",
-                "🔥" to "🔥 Fire",
-                "🎉" to "🎉 Party / Celebrate",
-                "🙏" to "🙏 Thank You",
-                "😎" to "😎 Cool",
-                "🚀" to "🚀 Rocket",
-                "👏" to "👏 Applause",
-                "💯" to "💯 100",
-                "🤔" to "🤔 Thinking",
-                "😢" to "😢 Crying",
-            )
-        val options =
-            popular.mapIndexed { idx, (emoji, label) ->
-                MenuOption(idx + 1, label) {
-                    telegramManager.sendStickerEmoji(chat.id, emoji)
-                    showToast("Sticker $emoji sent")
-                }
-            }
-        OptionsMenuDialog(this, "Popular Stickers", options).show()
-    }
-
-    private fun showGifPickerMenu(chat: ChatModel) {
-        val rootOptions = mutableListOf<MenuOption>()
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "💾 Saved Telegram GIFs") {
-                telegramManager.loadSavedGifs { gifs ->
-                    if (gifs.isEmpty()) {
-                        showToast("No saved GIFs found")
-                    } else {
-                        showSavedGifsMenu(chat, gifs)
-                    }
-                }
-                showToast("Loading saved GIFs...")
-            },
-        )
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "⚡ Popular Reaction Loops") {
-                showReactionGifsMenu(chat)
-            },
-        )
-
-        rootOptions.add(
-            MenuOption(rootOptions.size + 1, "📁 Pick GIF from Device (.gif/.mp4)") {
-                showSendMediaPicker(chat, isPhoto = false)
-            },
-        )
-
-        OptionsMenuDialog(this, "Send GIF / Animation", rootOptions).show()
-    }
-
-    private fun showSavedGifsMenu(
-        chat: ChatModel,
-        gifs: List<SavedGifItem>,
-    ) {
-        val gifOptions =
-            gifs.take(25).mapIndexed { idx, gif ->
-                val name = gif.caption.ifBlank { "GIF #${idx + 1}" }
-                MenuOption(idx + 1, "🎞️ $name (${gif.durationSeconds}s)") {
-                    telegramManager.sendSavedAnimation(chat.id, gif.fileId, gif.durationSeconds, gif.caption)
-                    showToast("GIF sent")
-                }
-            }
-        OptionsMenuDialog(this, "Saved GIFs", gifOptions).show()
-    }
-
-    private fun showReactionGifsMenu(chat: ChatModel) {
-        val reactions =
-            listOf(
-                "🎉 Celebration / Party",
-                "👋 Hello / Wave",
-                "👏 Applause / Bravo",
-                "🤣 Rolling with Laughter",
-                "👍 Thumbs Up",
-                "🔥 Fire / Awesome",
-                "💃 Dance / Groove",
-                "🤝 Deal / Handshake",
-            )
-        val options =
-            reactions.mapIndexed { idx, title ->
-                MenuOption(idx + 1, title) {
-                    telegramManager.sendMessage(chat.id, "🎞️ [$title]")
-                    showToast("Reaction sent")
-                }
-            }
-        OptionsMenuDialog(this, "Reaction GIFs", options).show()
+    internal fun showGifPickerMenu(chat: ChatModel) {
+        val picker = MediaPickerBottomSheetDialog.newInstance(chat.id)
+        picker.show(supportFragmentManager, "media_picker")
     }
 
     private fun showBotCommandsMenu(chat: ChatModel) {
-        val commands =
-            listOf(
-                "/start" to "/start — Start or restart bot",
-                "/help" to "/help — Show bot help & commands",
-                "/settings" to "/settings — Configure bot preferences",
-                "/status" to "/status — Check current status",
-                "/cancel" to "/cancel — Cancel active operation",
-            )
-        val options =
-            commands.mapIndexed { idx, (cmd, label) ->
-                MenuOption(idx + 1, label) {
-                    telegramManager.sendMessage(chat.id, cmd)
-                }
-            }
-        OptionsMenuDialog(this, "Bot Commands", options).show()
+        featureMenus.commands(chat)
     }
 
     private fun showReactionPickerDialog(msg: MessageModel) {
@@ -3606,7 +4136,7 @@ class MainActivity : AppCompatActivity() {
         options.add(
             MenuOption(options.size + 1, "📱 Telegram Voice Call") {
                 showToast("Connecting Telegram Voice Call to ${chat.title}...")
-                telegramManager.initiateTelegramCall(userId) { success, msg ->
+                initiateAudioCall(userId) { success, msg ->
                     if (success) {
                         showToast("Calling ${chat.title}...")
                     } else {
@@ -3630,17 +4160,67 @@ class MainActivity : AppCompatActivity() {
         val options =
             targetChats.take(20).mapIndexed { idx, chat ->
                 MenuOption(idx + 1, "↪ ${chat.title} (${chat.chatType})") {
-                    telegramManager.forwardMessage(msg.chatId, chat.id, msg.id) { success ->
-                        if (success) {
-                            showToast("Forwarded to ${chat.title}")
-                        } else {
-                            showToast("Failed to forward message", true)
-                        }
-                    }
+                    showForwardCustomizationDialog(msg, chat)
                 }
             }
 
         OptionsMenuDialog(this, "Forward Message To...", options).show()
+    }
+
+    private fun showForwardCustomizationDialog(
+        msg: MessageModel,
+        targetChat: ChatModel,
+        sendCopy: Boolean = false,
+        removeCaption: Boolean = false,
+    ) {
+        val options = mutableListOf<MenuOption>()
+        val hasCaption = msg.mediaType != MediaType.NONE && msg.mediaCaption.isNotBlank()
+
+        val senderLabel = if (sendCopy) "✓ Hide Sender Name" else "Hide Sender Name"
+        options.add(
+            MenuOption(options.size + 1, senderLabel) {
+                showForwardCustomizationDialog(
+                    msg = msg,
+                    targetChat = targetChat,
+                    sendCopy = !sendCopy,
+                    removeCaption = removeCaption,
+                )
+            },
+        )
+
+        if (hasCaption) {
+            val captionLabel = if (removeCaption) "✓ Remove Caption" else "Remove Caption"
+            options.add(
+                MenuOption(options.size + 1, captionLabel) {
+                    showForwardCustomizationDialog(
+                        msg = msg,
+                        targetChat = targetChat,
+                        sendCopy = sendCopy,
+                        removeCaption = !removeCaption,
+                    )
+                },
+            )
+        }
+
+        options.add(
+            MenuOption(options.size + 1, "Send Message") {
+                telegramManager.forwardMessage(
+                    fromChatId = msg.chatId,
+                    toChatId = targetChat.id,
+                    messageId = msg.id,
+                    sendCopy = sendCopy,
+                    removeCaption = removeCaption,
+                ) { success ->
+                    if (success) {
+                        showToast("Forwarded to ${targetChat.title}")
+                    } else {
+                        showToast("Failed to forward message", true)
+                    }
+                }
+            },
+        )
+
+        OptionsMenuDialog(this, "Forward Options (${targetChat.title})", options).show()
     }
 
     private fun saveMessageToDevice(msg: MessageModel) {
@@ -3651,7 +4231,7 @@ class MainActivity : AppCompatActivity() {
                 val targetDirType =
                     when (msg.mediaType) {
                         MediaType.PHOTO, MediaType.STICKER, MediaType.ANIMATION -> Environment.DIRECTORY_PICTURES
-                        MediaType.VOICE -> Environment.DIRECTORY_MUSIC
+                        MediaType.VOICE, MediaType.AUDIO -> Environment.DIRECTORY_MUSIC
                         MediaType.VIDEO -> Environment.DIRECTORY_MOVIES
                         else -> Environment.DIRECTORY_DOWNLOADS
                     }
@@ -3672,7 +4252,7 @@ class MainActivity : AppCompatActivity() {
                             MediaType.PHOTO -> "jpg"
                             MediaType.STICKER -> "webp"
                             MediaType.ANIMATION -> "gif"
-                            MediaType.VOICE -> "m4a"
+                            MediaType.VOICE, MediaType.AUDIO -> "m4a"
                             MediaType.VIDEO -> "mp4"
                             else -> "bin"
                         }
@@ -3702,9 +4282,8 @@ class MainActivity : AppCompatActivity() {
                 showToast("Failed to save file: ${e.message}", true)
             }
         } else if (msg.mediaFileId != 0) {
-            telegramManager.downloadFilePriority(msg.mediaFileId)
-            showToast("Downloading media to device... Please retry once complete.")
-        } else if (msg.text.isNotBlank()) {
+            withDownloadedMedia(msg) { saveMessageToDevice(it) }
+        } else if (msg.mediaType == MediaType.NONE && msg.text.isNotBlank()) {
             try {
                 val publicDir = com.teleflip.app.storage.StorageManager.getDownloadDirectory(this)
                 if (!publicDir.exists()) {
@@ -3751,17 +4330,29 @@ class MainActivity : AppCompatActivity() {
                 startReplyToMessage(msg)
             },
         )
-        if (msg.isOutbound && msg.mediaType == MediaType.NONE && msg.text.isNotBlank()) {
-            options.add(
-                MenuOption(options.size + 1, "✏️ Edit Message") {
-                    startEditingMessage(msg)
-                },
-            )
+        if (msg.isOutbound) {
+            if (msg.mediaType == MediaType.NONE && msg.text.isNotBlank()) {
+                options.add(
+                    MenuOption(options.size + 1, "✏️ Edit Message") {
+                        startEditingMessage(msg)
+                    },
+                )
+            } else if (isCaptionableMedia(msg)) {
+                options.add(
+                    MenuOption(options.size + 1, "✏️ Edit Caption") {
+                        startEditingMessage(msg)
+                    },
+                )
+            }
         }
         options.add(
             MenuOption(options.size + 1, if (msg.isPinned) "📌 Unpin Message" else "📌 Pin Message") {
-                telegramManager.togglePinMessage(msg.chatId, msg.id, msg.isPinned) { isNowPinned ->
-                    showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                if (msg.isPinned) {
+                    telegramManager.togglePinMessage(msg.chatId, msg.id, msg.isPinned) { isNowPinned ->
+                        showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                    }
+                } else {
+                    showPinMessageOptionsDialog(msg)
                 }
             },
         )
@@ -3807,7 +4398,39 @@ class MainActivity : AppCompatActivity() {
                 },
             )
         }
-        if (msg.mediaType != MediaType.NONE) {
+        if (msg.mediaType == MediaType.STICKER) {
+            options.add(
+                MenuOption(options.size + 1, "⭐ Save Sticker") {
+                    telegramManager.saveSticker(
+                        fileId = msg.mediaFileId,
+                        emoji = msg.stickerEmoji,
+                        setName = "",
+                        filePath = msg.mediaFilePath,
+                    ) { success ->
+                        runOnUiThread {
+                            showToast(if (success) "Sticker saved" else "Could not save sticker")
+                        }
+                    }
+                },
+            )
+        }
+        if (msg.mediaType == MediaType.ANIMATION) {
+            options.add(
+                MenuOption(options.size + 1, "💾 Save GIF") {
+                    telegramManager.saveGif(
+                        fileId = msg.mediaFileId,
+                        duration = msg.durationSeconds,
+                        caption = msg.mediaCaption.ifBlank { msg.text },
+                        filePath = msg.mediaFilePath,
+                    ) { success ->
+                        runOnUiThread {
+                            showToast(if (success) "GIF saved" else "Could not save GIF")
+                        }
+                    }
+                },
+            )
+        }
+        if (msg.mediaType != MediaType.NONE && msg.mediaType != MediaType.CONTACT) {
             options.add(
                 MenuOption(options.size + 1, "💾 Save Media to Device") {
                     saveMessageToDevice(msg)
@@ -3834,7 +4457,7 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        if (msg.mediaType == MediaType.VOICE) {
+        if (msg.mediaType in setOf(MediaType.VOICE, MediaType.AUDIO)) {
             val isPlaying = msg.mediaFilePath != null && voicePlayer.isPlayingPath(msg.mediaFilePath)
             options.add(
                 MenuOption(options.size + 1, if (isPlaying) "Pause Voice Note" else "Play Voice Note") {
@@ -3869,14 +4492,131 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        options.add(
-            MenuOption(options.size + 1, "Delete Message") {
-                telegramManager.deleteMessage(msg.chatId, msg.id)
-                showToast("Message deleted")
-            },
-        )
+        if (msg.formatting.orEmpty().any { it.kind == "url" }) options.add(MenuOption(options.size + 1, "Open a link in this message") { featureMenus.links(msg) })
+        if (msg.formatting.orEmpty().any { it.kind == "spoiler" }) options.add(MenuOption(options.size + 1, "Reveal spoilers") { featureMenus.reveal(msg) })
+        options.add(MenuOption(options.size + 1, "Save to Saved Messages") { featureMenus.save(msg) })
+        if (activeChat?.chatType in setOf(ChatType.GROUP, ChatType.CHANNEL)) options.add(MenuOption(options.size + 1, "Replies / comments") { featureMenus.replies(msg) })
+        options.add(MenuOption(options.size + 1, "Copy message link") { featureMenus.link(msg) })
+        if (msg.text.isNotBlank() || msg.mediaCaption.isNotBlank()) options.add(MenuOption(options.size + 1, "Translate message") { featureMenus.translate(msg) })
+        if (msg.hasBotButtons) options.add(MenuOption(options.size + 1, "Bot buttons") { featureMenus.buttons(msg) })
+        if (msg.mediaType == MediaType.CONTACT) options.add(MenuOption(options.size + 1, "Open contact") { featureMenus.contact(msg) })
+        if (msg.isOutbound && msg.mediaType in setOf(MediaType.PHOTO, MediaType.VIDEO, MediaType.ANIMATION, MediaType.AUDIO, MediaType.VOICE, MediaType.DOCUMENT)) {
+            options.add(
+                MenuOption(
+                    options.size + 1,
+                    "Edit caption",
+                ) {
+                    featureMenus.caption(msg)
+                },
+            )
+        }
+        options.add(MenuOption(options.size + 1, "Delete Message") { featureMenus.delete(msg) })
 
         OptionsMenuDialog(this, "Message Actions", options).show()
+    }
+
+    private fun showPinMessageOptionsDialog(msg: MessageModel) {
+        val options =
+            listOf(
+                MenuOption(1, "🔔 Pin and Notify Members") {
+                    telegramManager.togglePinMessage(
+                        chatId = msg.chatId,
+                        messageId = msg.id,
+                        currentPinned = false,
+                        disableNotification = false,
+                    ) { isNowPinned ->
+                        showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                    }
+                },
+                MenuOption(2, "🔕 Pin Silently") {
+                    telegramManager.togglePinMessage(
+                        chatId = msg.chatId,
+                        messageId = msg.id,
+                        currentPinned = false,
+                        disableNotification = true,
+                    ) { isNowPinned ->
+                        showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                    }
+                },
+            )
+        OptionsMenuDialog(this, "Pin Message", options).show()
+    }
+
+    private fun handleChatAccessibilityAction(
+        actionId: Int,
+        chat: ChatModel,
+    ): Boolean {
+        return when (actionId) {
+            R.id.action_chat_open -> {
+                openConversation(chat)
+                true
+            }
+            R.id.action_chat_pin, R.id.action_chat_unpin -> {
+                telegramManager.toggleChatPin(chat.id, chat.isPinned) { isPinned ->
+                    showToast(if (isPinned) "Chat pinned" else "Chat unpinned")
+                }
+                true
+            }
+            R.id.action_chat_mute, R.id.action_chat_unmute -> {
+                telegramManager.toggleChatMute(chat.id, chat.isMuted) { isMuted ->
+                    showToast(if (isMuted) "Chat muted" else "Chat unmuted")
+                }
+                true
+            }
+            R.id.action_chat_archive, R.id.action_chat_unarchive -> {
+                telegramManager.toggleChatArchived(chat.id, chat.isArchived) { isArchived ->
+                    showToast(if (isArchived) "Chat archived" else "Chat unarchived")
+                }
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun handleMessageAccessibilityAction(
+        actionId: Int,
+        msg: MessageModel,
+    ): Boolean {
+        return when (actionId) {
+            R.id.action_message_reply -> {
+                startReplyToMessage(msg)
+                true
+            }
+            R.id.action_message_react -> {
+                showReactionPickerDialog(msg)
+                true
+            }
+            R.id.action_message_copy -> {
+                if (msg.text.isNotBlank()) {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Telegram Message", msg.text))
+                    showToast("Copied to clipboard")
+                    true
+                } else {
+                    false
+                }
+            }
+            R.id.action_message_delete -> {
+                telegramManager.deleteMessage(msg.chatId, msg.id)
+                showToast("Message deleted")
+                true
+            }
+            R.id.action_message_transcribe -> {
+                handleTranscribeVoiceMessage(msg)
+                true
+            }
+            R.id.action_message_play_voice -> {
+                handlePlayVoiceMessage(msg)
+                true
+            }
+            R.id.action_message_pin, R.id.action_message_unpin -> {
+                telegramManager.togglePinMessage(msg.chatId, msg.id, msg.isPinned) { isNowPinned ->
+                    showToast(if (isNowPinned) "Message pinned" else "Message unpinned")
+                }
+                true
+            }
+            else -> false
+        }
     }
 
     private fun showQuickRepliesMenu(chat: ChatModel) {
@@ -3920,13 +4660,12 @@ class MainActivity : AppCompatActivity() {
 
         val view = LayoutInflater.from(this).inflate(R.layout.view_login, mainContainer, true)
 
+        val livLoginInput = view.findViewById<LabeledInputView>(R.id.liv_login_input)
         val tvStatus = view.findViewById<TextView>(R.id.tv_login_status)
-        val tvLabel = view.findViewById<TextView>(R.id.tv_input_label)
-        val tvMode = view.findViewById<TextView>(R.id.tv_login_input_mode)
-        etLoginInput = view.findViewById(R.id.et_login_input)
+        val tvMode = livLoginInput?.modeView
+        etLoginInput = livLoginInput?.editText
         val btnSubmit = view.findViewById<Button>(R.id.btn_login_submit)
 
-        val layoutInputContainer = view.findViewById<View>(R.id.layout_login_input_container)
         val layoutQrContainer = view.findViewById<View>(R.id.layout_qr_container)
         val ivQrCode = view.findViewById<ImageView>(R.id.iv_login_qr)
         val btnPhoneLogin = view.findViewById<Button>(R.id.btn_phone_login)
@@ -3936,7 +4675,14 @@ class MainActivity : AppCompatActivity() {
         val btnForgotPassword = view.findViewById<Button>(R.id.btn_forgot_password)
         val btnResetAccount = view.findViewById<Button>(R.id.btn_reset_account)
         val btnUseSim = view.findViewById<Button>(R.id.btn_use_sim_number)
+        val btnLoginProxy = view.findViewById<Button>(R.id.btn_login_proxy)
         val btnConfig = view.findViewById<Button>(R.id.btn_config_credentials)
+
+        btnLoginProxy?.setOnClickListener {
+            ProxySettingsDialog(this, telegramManager) {
+                updateLoginConnectionState(telegramManager.connectionState.value)
+            }.show()
+        }
 
         btnQrLogin?.setOnClickListener {
             telegramManager.requestQrCodeLogin()
@@ -3960,20 +4706,24 @@ class MainActivity : AppCompatActivity() {
         btnForgotPassword?.visibility = View.GONE
         btnResetAccount?.visibility = View.GONE
 
+        qrGenerationJob?.cancel()
+
         when (state) {
             is AuthState.WaitPhoneNumber -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.let { liv ->
+                    liv.visibility = View.VISIBLE
+                    liv.labelText = "Phone Number (with +country code):"
+                    liv.modeView.visibility = View.VISIBLE
+                }
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.VISIBLE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_PHONE
                 etLoginInput?.typeface = tf
-                tvMode?.visibility = View.VISIBLE
                 loginInputEngine?.isModeSwitchingEnabled = true
                 loginInputEngine?.isSymbolPickerEnabled = true
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
-                tvLabel.text = "Phone Number (with +country code):"
                 etLoginInput?.hint = "+1 555 123 4567"
                 btnSubmit.text = "Send Code"
 
@@ -4009,16 +4759,19 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitOtherDeviceConfirmation -> {
-                layoutInputContainer?.visibility = View.GONE
+                livLoginInput?.visibility = View.GONE
                 layoutQrContainer?.visibility = View.VISIBLE
                 btnSubmit.visibility = View.GONE
                 btnUseSim?.visibility = View.GONE
                 btnQrLogin?.visibility = View.GONE
 
-                val qrBitmap = com.teleflip.app.ui.QrCodeGenerator.generateQrCodeBitmap(state.link)
-                if (qrBitmap != null) {
-                    ivQrCode?.setImageBitmap(qrBitmap)
-                }
+                qrGenerationJob =
+                    lifecycleScope.launch {
+                        val qrBitmap = com.teleflip.app.ui.QrCodeGenerator.generateQrCodeBitmapAsync(state.link)
+                        if (qrBitmap != null) {
+                            ivQrCode?.setImageBitmap(qrBitmap)
+                        }
+                    }
 
                 if (state.errorMessage != null) {
                     val errorMessage = "⚠️ Error: ${state.errorMessage}"
@@ -4031,19 +4784,21 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitCode -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.let { liv ->
+                    liv.visibility = View.VISIBLE
+                    liv.labelText = "Verification Code (numbers only):"
+                    liv.modeView.visibility = View.GONE
+                }
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_NUMBER
                 etLoginInput?.typeface = tf
-                tvMode?.visibility = View.GONE
                 loginInputEngine?.isModeSwitchingEnabled = false
                 loginInputEngine?.isSymbolPickerEnabled = false
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
                 btnUseSim?.visibility = View.GONE
-                tvLabel.text = "Verification Code (numbers only):"
                 etLoginInput?.hint = "12345"
                 btnSubmit.text = "Verify Code"
                 if (state.errorMessage != null) {
@@ -4057,14 +4812,17 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitPassword -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.let { liv ->
+                    liv.visibility = View.VISIBLE
+                    liv.labelText = "2-Step Verification Password:"
+                    liv.modeView.visibility = View.VISIBLE
+                }
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
                 etLoginInput?.typeface = tf
-                tvMode?.visibility = View.VISIBLE
                 loginInputEngine?.isModeSwitchingEnabled = true
                 loginInputEngine?.isSymbolPickerEnabled = true
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.LOWER)
@@ -4076,8 +4834,10 @@ class MainActivity : AppCompatActivity() {
                 btnForgotPassword?.nextFocusUpId = R.id.btn_login_submit
                 btnForgotPassword?.nextFocusDownId = R.id.btn_reset_account
                 btnResetAccount?.nextFocusUpId = R.id.btn_forgot_password
-                btnResetAccount?.nextFocusDownId = R.id.btn_config_credentials
-                btnConfig.nextFocusUpId = R.id.btn_reset_account
+                btnResetAccount?.nextFocusDownId = R.id.btn_login_proxy
+                btnLoginProxy?.nextFocusUpId = R.id.btn_reset_account
+                btnLoginProxy?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_proxy
 
                 btnForgotPassword?.setOnClickListener {
                     telegramManager.requestPasswordRecovery()
@@ -4085,7 +4845,6 @@ class MainActivity : AppCompatActivity() {
                 btnResetAccount?.setOnClickListener {
                     showAccountResetConfirmationDialog()
                 }
-                tvLabel.text = "2-Step Verification Password:"
                 etLoginInput?.hint = "Cloud Password (letters, numbers, symbols)"
                 btnSubmit.text = "Submit Password"
                 if (state.errorMessage != null) {
@@ -4106,14 +4865,17 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.WaitPasswordRecoveryCode -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.let { liv ->
+                    liv.visibility = View.VISIBLE
+                    liv.labelText = "Email Recovery Code (numbers only):"
+                    liv.modeView.visibility = View.GONE
+                }
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
                 val tf = etLoginInput?.typeface
                 etLoginInput?.inputType = InputType.TYPE_CLASS_NUMBER
                 etLoginInput?.typeface = tf
-                tvMode?.visibility = View.GONE
                 loginInputEngine?.isModeSwitchingEnabled = false
                 loginInputEngine?.isSymbolPickerEnabled = false
                 loginInputEngine?.setMode(com.teleflip.app.input.InputMode.NUMERIC)
@@ -4121,10 +4883,11 @@ class MainActivity : AppCompatActivity() {
                 btnForgotPassword?.visibility = View.GONE
                 btnResetAccount?.visibility = View.GONE
 
-                btnSubmit.nextFocusDownId = R.id.btn_config_credentials
-                btnConfig.nextFocusUpId = R.id.btn_login_submit
+                btnSubmit.nextFocusDownId = R.id.btn_login_proxy
+                btnLoginProxy?.nextFocusUpId = R.id.btn_login_submit
+                btnLoginProxy?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_proxy
 
-                tvLabel.text = "Email Recovery Code (numbers only):"
                 etLoginInput?.hint = "123456"
                 etLoginInput?.setText("")
                 btnSubmit.text = "Submit Recovery Code"
@@ -4143,13 +4906,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AuthState.Error -> {
-                layoutInputContainer?.visibility = View.VISIBLE
+                livLoginInput?.visibility = View.VISIBLE
                 layoutQrContainer?.visibility = View.GONE
                 btnSubmit.visibility = View.VISIBLE
                 btnQrLogin?.visibility = View.GONE
                 btnUseSim?.visibility = View.GONE
-                btnSubmit.nextFocusDownId = R.id.btn_config_credentials
-                btnConfig.nextFocusUpId = R.id.btn_login_submit
+                btnSubmit.nextFocusDownId = R.id.btn_login_proxy
+                btnLoginProxy?.nextFocusUpId = R.id.btn_login_submit
+                btnLoginProxy?.nextFocusDownId = R.id.btn_config_credentials
+                btnConfig.nextFocusUpId = R.id.btn_login_proxy
                 val errorMessage = "⚠️ Error: ${state.message}"
                 tvStatus.text = errorMessage
                 tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_error))
@@ -4232,7 +4997,11 @@ class MainActivity : AppCompatActivity() {
             onRight = { finish() },
         )
 
-        etLoginInput?.requestFocus()
+        if (livLoginInput?.visibility == View.VISIBLE) {
+            etLoginInput?.requestFocus()
+        } else if (state is AuthState.WaitOtherDeviceConfirmation) {
+            btnPhoneLogin?.requestFocus()
+        }
     }
 
     private fun updateLoginConnectionState(status: String) {
@@ -4290,7 +5059,7 @@ class MainActivity : AppCompatActivity() {
         val btnConfig = findViewById<Button>(R.id.btn_config_credentials) ?: return
 
         etInput.nextFocusDownId = R.id.btn_login_submit
-        btnSubmit.nextFocusUpId = R.id.et_login_input
+        btnSubmit.nextFocusUpId = R.id.liv_login_input
 
         var prevId = R.id.btn_login_submit
 
@@ -4328,12 +5097,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hasTelephonyPermission(): Boolean {
         val hasPhoneState = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
-        val hasPhoneNumbers =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                false
-            }
+        val hasPhoneNumbers = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED
         return hasPhoneState || hasPhoneNumbers
     }
 
@@ -4494,11 +5258,16 @@ class MainActivity : AppCompatActivity() {
 
         val view = LayoutInflater.from(this).inflate(R.layout.view_settings, mainContainer, true)
 
-        val etId = view.findViewById<EditText>(R.id.et_api_id)
-        val etHash = view.findViewById<EditText>(R.id.et_api_hash)
+        val livId = view.findViewById<LabeledInputView>(R.id.liv_api_id)
+        val livHash = view.findViewById<LabeledInputView>(R.id.liv_api_hash)
+        val etId = livId?.editText
+        val etHash = livHash?.editText
         val spTimeout = view.findViewById<Spinner>(R.id.sp_keypad_timeout)
         val btnBgPush = view.findViewById<Button>(R.id.btn_toggle_bg_notifications)
+        val btnSyncContacts = view.findViewById<Button>(R.id.btn_sync_contacts)
         val btnEditProfile = view.findViewById<Button>(R.id.btn_edit_profile)
+        view.findViewById<Button>(R.id.btn_telegram_privacy)?.setOnClickListener { featureMenus.privacy() }
+        view.findViewById<Button>(R.id.btn_two_step)?.setOnClickListener { featureMenus.twoStep() }
         val btnActiveSessions = view.findViewById<Button>(R.id.btn_active_sessions)
         val btnBlockedUsers = view.findViewById<Button>(R.id.btn_blocked_users)
         val btnPasscodeLock = view.findViewById<Button>(R.id.btn_passcode_lock)
@@ -4614,8 +5383,60 @@ class MainActivity : AppCompatActivity() {
             showToast(if (newState) "Closed-flip background notifications enabled" else "Background notifications disabled")
         }
 
-        etId.setText(telegramManager.apiId.toString())
-        etHash.setText(telegramManager.apiHash)
+        fun updateSyncContactsLabel(enabled: Boolean) {
+            btnSyncContacts?.text = if (enabled) "👥 Sync Contacts: ON" else "👥 Sync Contacts: OFF"
+        }
+        updateSyncContactsLabel(telegramManager.syncContactsEnabled)
+        btnSyncContacts?.setOnClickListener {
+            val newState = !telegramManager.syncContactsEnabled
+            telegramManager.syncContactsEnabled = newState
+            updateSyncContactsLabel(newState)
+            if (newState) {
+                val hasPerm =
+                    ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.READ_CONTACTS,
+                    ) == PackageManager.PERMISSION_GRANTED
+                if (hasPerm) {
+                    telegramManager.syncContacts()
+                    showToast("Contact sync enabled")
+                } else {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.READ_CONTACTS),
+                        REQ_PHONE_PERM,
+                    )
+                }
+            } else {
+                showToast("Contact sync disabled")
+            }
+        }
+
+        val tvSettingsInputMode = view.findViewById<TextView>(R.id.tv_settings_input_mode)
+        settingsInputEngines.clear()
+        listOfNotNull(etId, etHash).forEach { field ->
+            val modeIndicator = tvSettingsInputMode ?: if (field === etId) livId?.modeView else livHash?.modeView
+            val engine =
+                KeypadInputEngine(
+                    editText = field,
+                    modeIndicator = modeIndicator,
+                    timeoutMs = telegramManager.keypadTimeoutMs,
+                    onSymbolRequested = {
+                        com.teleflip.app.ui.SymbolsDialog(this) { sym ->
+                            settingsInputEngines[field.id]?.insertSymbol(sym)
+                        }.show()
+                    },
+                )
+            if (field === etId) {
+                engine.setMode(InputMode.NUMERIC)
+            } else if (field === etHash) {
+                engine.setMode(InputMode.LOWER)
+            }
+            settingsInputEngines[field.id] = engine
+        }
+
+        etId?.setText(telegramManager.apiId.toString())
+        etHash?.setText(telegramManager.apiHash)
 
         val timeoutValues = listOf(300L, 500L, 900L)
         val timeoutLabels = listOf("300 ms (Fast)", "500 ms (Normal)", "900 ms (Slow)")
@@ -4633,12 +5454,14 @@ class MainActivity : AppCompatActivity() {
         spTimeout.setSelection(initialIndex)
 
         val doSave = {
+            commitActiveInputEngines()
             val selIndex = spTimeout.selectedItemPosition
             if (selIndex in timeoutValues.indices) {
                 telegramManager.keypadTimeoutMs = timeoutValues[selIndex]
+                settingsInputEngines.values.forEach { it.timeoutMs = timeoutValues[selIndex] }
             }
-            val idStr = etId.text.toString().trim()
-            val hashStr = etHash.text.toString().trim()
+            val idStr = etId?.text?.toString()?.trim().orEmpty()
+            val hashStr = etHash?.text?.toString()?.trim().orEmpty()
             if (idStr.isNotEmpty() && hashStr.isNotEmpty()) {
                 telegramManager.apiId = idStr.toIntOrNull() ?: telegramManager.apiId
                 telegramManager.apiHash = hashStr
@@ -4678,7 +5501,9 @@ class MainActivity : AppCompatActivity() {
             },
         )
 
-        etId.requestFocus()
+        if (livId?.requestFocus() != true) {
+            btnEditProfile?.requestFocus() ?: view.requestFocus()
+        }
         updateActiveCallOverlay()
     }
 
@@ -4699,7 +5524,6 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.layout_active_call_overlay)?.visibility = View.GONE
 
         val view = LayoutInflater.from(this).inflate(R.layout.view_in_call, mainContainer, true)
-        setupInCallAudio()
 
         val ivAvatar = view.findViewById<ImageView>(R.id.iv_call_avatar)
         val tvAvatar = view.findViewById<TextView>(R.id.tv_call_avatar)
@@ -4715,7 +5539,7 @@ class MainActivity : AppCompatActivity() {
         ivAvatar.loadCircularAvatarOrFallback(chat?.avatarPath, chat?.avatarLetters ?: avatarLetters, tvAvatar)
 
         btnAccept.setOnClickListener {
-            telegramManager.acceptCall(call.callId)
+            acceptAudioCall(call.callId)
         }
         btnMute.setOnClickListener {
             toggleInCallMute()
@@ -4727,10 +5551,18 @@ class MainActivity : AppCompatActivity() {
             telegramManager.discardCall(call.callId, callDurationSec)
         }
 
+        listOf(btnAccept, btnMute, btnSpeaker, btnEnd).forEach { button ->
+            button.setOnFocusChangeListener { _, focused ->
+                if (focused) telegramManager.activeCall.value?.let { updateInCallUI(it) }
+            }
+        }
         updateInCallUI(call)
+        if (!call.isOutgoing && call.state == CallState.PENDING) btnAccept.requestFocus() else btnMute.requestFocus()
     }
 
     private fun updateInCallUI(call: ActiveCall) {
+        callDurationSec = call.durationSec
+        findViewById<TextView>(R.id.tv_call_encryption_badge)?.text = if (call.verificationEmojis.isEmpty()) "🔒 End-to-End Encrypted Telegram Call" else "🔒 ${call.verificationEmojis.joinToString(" ")}\nCompare these emoji with your contact"
         findViewById<View>(R.id.layout_active_call_overlay)?.visibility = View.GONE
         val tvStatus = findViewById<TextView>(R.id.tv_call_status) ?: return
         val tvMuteInd = findViewById<TextView>(R.id.tv_call_mute_indicator)
@@ -4738,9 +5570,21 @@ class MainActivity : AppCompatActivity() {
         val btnAccept = findViewById<Button>(R.id.btn_call_accept)
         val btnMute = findViewById<Button>(R.id.btn_call_mute)
         val btnSpeaker = findViewById<Button>(R.id.btn_call_speaker)
+        val btnEnd = findViewById<Button>(R.id.btn_call_end)
 
+        val wasAcceptVisible = btnAccept?.visibility == View.VISIBLE
         val isIncomingPending = !call.isOutgoing && call.state == CallState.PENDING
         btnAccept?.visibility = if (isIncomingPending) View.VISIBLE else View.GONE
+
+        if (isIncomingPending) {
+            btnAccept?.post { btnAccept.requestFocus() }
+        } else {
+            val focused = currentFocus
+            val isCallButtonFocused = focused == btnMute || focused == btnSpeaker || focused == btnEnd
+            if (wasAcceptVisible || !isCallButtonFocused) {
+                btnMute?.post { btnMute.requestFocus() }
+            }
+        }
 
         tvMuteInd?.text = if (call.isMuted) "🎤 Mic: Muted" else "🎤 Mic: On"
         tvSpeakerInd?.text = if (call.isSpeakerOn) "🔊 Speaker: On" else "🔈 Earpiece"
@@ -4756,8 +5600,11 @@ class MainActivity : AppCompatActivity() {
             CallState.EXCHANGING_KEYS -> {
                 tvStatus.text = "Exchanging encryption keys..."
             }
+            CallState.CONNECTING -> {
+                tvStatus.text = "Connecting audio..."
+            }
             CallState.READY -> {
-                startCallTimer()
+                tvStatus.text = "In Call • ${formatCallDuration(call.durationSec)}"
             }
             CallState.HANGING_UP -> {
                 tvStatus.text = "Hanging up..."
@@ -4773,23 +5620,33 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val focusedButton = currentFocus as? Button
+        val centerLabel =
+            focusedButton?.text?.toString() ?: if (isIncomingPending) {
+                "Speaker"
+            } else if (call.isMuted) {
+                "Unmute"
+            } else {
+                "Mute"
+            }
+        if (!isIncomingPending && btnAccept?.hasFocus() == true) btnMute?.requestFocus()
         if (isIncomingPending) {
             softkeyManager.update(
                 left = "Accept",
-                center = if (call.isSpeakerOn) "Earpiece" else "Speaker",
+                center = centerLabel,
                 right = "Decline",
-                onLeft = { telegramManager.acceptCall(call.callId) },
-                onCenter = { toggleInCallSpeaker() },
+                onLeft = { acceptAudioCall(call.callId) },
+                onCenter = { if (focusedButton != null) focusedButton.performClick() else toggleInCallSpeaker() },
                 onRight = { telegramManager.discardCall(call.callId, 0) },
             )
         } else {
             softkeyManager.update(
                 left = "Minimize",
-                center = if (call.isMuted) "Unmute" else "Mute",
+                center = centerLabel,
                 right = "End Call",
                 onLeft = { minimizeCall() },
-                onCenter = { toggleInCallMute() },
-                onRight = { telegramManager.discardCall(call.callId, callDurationSec) },
+                onCenter = { if (focusedButton != null) focusedButton.performClick() else toggleInCallMute() },
+                onRight = { telegramManager.discardCall(call.callId, call.durationSec) },
             )
         }
     }
@@ -4827,65 +5684,55 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupInCallAudio() {
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        try {
-            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-            audioManager.isMicrophoneMute = false
-            setSpeakerphoneEnabled(audioManager, false)
-            telegramManager.updateCallAudioState(isMuted = false, isSpeakerOn = false)
-        } catch (e: Exception) {
-            Log.e("MainActivity", "setupInCallAudio error: ${e.message}")
+    private var pendingCallPermission: (() -> Unit)? = null
+
+    private fun withCallMicrophone(action: () -> Unit) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            action()
+        } else {
+            pendingCallPermission = action
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), REQ_CALL_AUDIO_PERM)
+        }
+    }
+
+    private fun initiateAudioCall(
+        userId: Long,
+        onResult: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        withCallMicrophone {
+            cancelActiveVoiceOperations()
+            telegramManager.initiateTelegramCall(userId) { success, message ->
+                if (!success) showToast(message ?: "Unable to start call", isError = true)
+                onResult?.invoke(success, message)
+            }
+        }
+    }
+
+    private fun acceptAudioCall(callId: Int) {
+        withCallMicrophone {
+            cancelActiveVoiceOperations()
+            telegramManager.acceptCall(callId) { success, message ->
+                if (!success) showToast(message ?: "Unable to accept call", isError = true)
+            }
         }
     }
 
     private fun toggleInCallMute() {
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        val newMute = !audioManager.isMicrophoneMute
-        audioManager.isMicrophoneMute = newMute
-        telegramManager.updateCallAudioState(isMuted = newMute)
-        showToast(if (newMute) "Microphone Muted" else "Microphone Unmuted")
-        if (currentScreen == Screen.IN_CALL) {
-            telegramManager.activeCall.value?.let { updateInCallUI(it) }
-        } else {
-            updateActiveCallOverlay()
-        }
+        val current = telegramManager.activeCall.value ?: return
+        telegramManager.updateCallAudioState(isMuted = !current.isMuted)
     }
 
     private fun toggleInCallSpeaker() {
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        val newSpeaker = !isSpeakerphoneEnabled(audioManager)
-        setSpeakerphoneEnabled(audioManager, newSpeaker)
-        telegramManager.updateCallAudioState(isSpeakerOn = newSpeaker)
-        showToast(if (newSpeaker) "Speakerphone On" else "Earpiece Active")
+        val current = telegramManager.activeCall.value ?: return
+        telegramManager.updateCallAudioState(isSpeakerOn = !current.isSpeakerOn)
     }
 
     private fun cleanupInCallAudio() {
+        if (::telegramManager.isInitialized) {
+            telegramManager.stopDialTone()
+        }
         stopCallTimer()
         callDurationSec = 0
-        val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        try {
-            audioManager.isMicrophoneMute = false
-            setSpeakerphoneEnabled(audioManager, false)
-            audioManager.mode = AudioManager.MODE_NORMAL
-        } catch (e: Exception) {
-            Log.e("MainActivity", "cleanupInCallAudio error: ${e.message}")
-        }
-    }
-
-    private fun startCallTimer() {
-        if (callTimerJob != null && callTimerJob?.isActive == true) return
-        callTimerJob =
-            lifecycleScope.launch {
-                while (true) {
-                    delay(1000L)
-                    callDurationSec++
-                    telegramManager.updateCallDuration(callDurationSec)
-                    val tvStatus = findViewById<TextView>(R.id.tv_call_status)
-                    tvStatus?.text = "In Call • ${formatCallDuration(callDurationSec)}"
-                    updateActiveCallOverlay()
-                }
-            }
     }
 
     private fun stopCallTimer() {
@@ -4937,7 +5784,8 @@ class MainActivity : AppCompatActivity() {
                 when (call.state) {
                     CallState.PENDING -> if (call.isOutgoing) "Calling..." else "Incoming Telegram Call..."
                     CallState.EXCHANGING_KEYS -> "Exchanging encryption keys..."
-                    CallState.READY -> "In Call • ${formatCallDuration(callDurationSec)}"
+                    CallState.CONNECTING -> "Connecting audio..."
+                    CallState.READY -> "In Call • ${formatCallDuration(call.durationSec)}"
                     CallState.HANGING_UP -> "Hanging up..."
                     CallState.DISCARDED -> "Call Ended"
                     CallState.ERROR -> "Call Failed"
@@ -4989,6 +5837,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun rebuildProfileFocusChain(allViews: List<View>) {
+        val visibleViews = allViews.filter { it.visibility == View.VISIBLE }
+        for (i in visibleViews.indices) {
+            val curr = visibleViews[i]
+            val prev = visibleViews.getOrNull(i - 1)
+            val next = visibleViews.getOrNull(i + 1)
+            curr.nextFocusUpId = prev?.id ?: curr.id
+            curr.nextFocusDownId = next?.id ?: curr.id
+        }
+    }
+
+    private data class ProfileSoftkeyAction(
+        val left: String,
+        val center: String,
+        val onLeft: () -> Unit,
+        val onCenter: () -> Unit = onLeft,
+    )
+
     private fun renderProfileScreen(chat: ChatModel) {
         commitActiveInputEngines()
         currentScreen = Screen.PROFILE
@@ -5018,8 +5884,142 @@ class MainActivity : AppCompatActivity() {
         val btnForumTopics = view.findViewById<Button>(R.id.btn_profile_forum_topics)
         val btnSendMsg = view.findViewById<Button>(R.id.btn_profile_send_msg)
         val btnToggleMute = view.findViewById<Button>(R.id.btn_profile_toggle_mute)
+        val btnBlock = view.findViewById<Button>(R.id.btn_profile_block_user)
         val btnSearch = view.findViewById<Button>(R.id.btn_profile_search)
         val btnExportHistory = view.findViewById<Button>(R.id.btn_profile_export_history)
+
+        var currentProfile: ChatProfile? = null
+
+        val dialAction =
+            View.OnClickListener {
+                val phone = tvPhone.text.toString().trim()
+                if (phone.isNotEmpty()) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+                    } catch (e: Exception) {
+                        showToast("Could not open dialer: ${e.message}", true)
+                    }
+                }
+            }
+        rowPhone?.setOnClickListener(dialAction)
+        btnCellCall?.setOnClickListener(dialAction)
+
+        rowUsername?.setOnClickListener {
+            val uname = tvUsername.text.toString().trim()
+            if (uname.isNotEmpty()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("Username", uname))
+                showToast("Copied $uname to clipboard")
+            }
+        }
+
+        rowBio?.setOnClickListener {
+            val bio = tvBio.text.toString().trim()
+            if (bio.isNotEmpty()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("Bio", bio))
+                showToast("Copied bio to clipboard")
+            }
+        }
+
+        val focusableControls =
+            listOfNotNull(
+                rowPhone,
+                rowUsername,
+                rowBio,
+                btnTgCall,
+                btnCellCall,
+                btnSecretChat,
+                btnSelfDestruct,
+                btnMembers,
+                btnForumTopics,
+                btnSendMsg,
+                btnToggleMute,
+                btnBlock,
+                btnSearch,
+                btnExportHistory,
+            )
+
+        fun updateProfileFocusChaining() {
+            rebuildProfileFocusChain(focusableControls)
+        }
+
+        val onBack: () -> Unit = {
+            if (activeChat != null && activeChat?.id == chat.id) {
+                openConversation(chat)
+            } else {
+                showChatListScreen()
+            }
+        }
+
+        fun updateProfileSoftkeysForView(focusedView: View?) {
+            val copyUsername = {
+                val uname = tvUsername.text.toString().trim()
+                if (uname.isNotEmpty()) {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("Username", uname))
+                    showToast("Copied $uname to clipboard")
+                }
+            }
+            val copyBio = {
+                val bio = tvBio.text.toString().trim()
+                if (bio.isNotEmpty()) {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("Bio", bio))
+                    showToast("Copied bio to clipboard")
+                }
+            }
+
+            val config =
+                when (focusedView?.id) {
+                    R.id.layout_profile_phone_row -> ProfileSoftkeyAction("Dial", "Dial", { dialAction.onClick(rowPhone) })
+                    R.id.btn_profile_cell_call -> ProfileSoftkeyAction("Dial", "Dial", { dialAction.onClick(btnCellCall) })
+                    R.id.layout_profile_username_row -> ProfileSoftkeyAction("Copy", "Copy", copyUsername)
+                    R.id.layout_profile_bio_row -> ProfileSoftkeyAction("Copy", "Copy", copyBio)
+                    R.id.btn_profile_tg_call -> {
+                        val callAction: () -> Unit = {
+                            val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+                            initiateAudioCall(userId)
+                        }
+                        ProfileSoftkeyAction("Call", "Call", callAction)
+                    }
+                    R.id.btn_profile_secret_chat -> ProfileSoftkeyAction("Start", "Start", { btnSecretChat.performClick() })
+                    R.id.btn_profile_self_destruct -> ProfileSoftkeyAction("Timer", "Timer", { btnSelfDestruct.performClick() })
+                    R.id.btn_profile_members -> ProfileSoftkeyAction("Members", "Members", { btnMembers.performClick() })
+                    R.id.btn_profile_forum_topics -> ProfileSoftkeyAction("Topics", "Topics", { btnForumTopics.performClick() })
+                    R.id.btn_profile_send_msg -> ProfileSoftkeyAction("Open", "Open", { btnSendMsg.performClick() })
+                    R.id.btn_profile_toggle_mute -> {
+                        val isMuted = currentProfile?.isMuted ?: chat.isMuted
+                        val label = if (isMuted) "Unmute" else "Mute"
+                        ProfileSoftkeyAction(label, label, { btnToggleMute.performClick() })
+                    }
+                    R.id.btn_profile_block_user -> ProfileSoftkeyAction("Block", "Block", { btnBlock.performClick() })
+                    R.id.btn_profile_search -> ProfileSoftkeyAction("Search", "Search", { btnSearch.performClick() })
+                    R.id.btn_profile_export_history -> ProfileSoftkeyAction("Export", "Export", { btnExportHistory.performClick() })
+                    else -> {
+                        val defaultLabel = if (chat.chatType == ChatType.DIRECT) "Call" else "Select"
+                        val defaultLeftAction: () -> Unit = {
+                            if (chat.chatType == ChatType.DIRECT) {
+                                val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+                                initiateAudioCall(userId)
+                            } else {
+                                currentFocus?.performClick()
+                            }
+                        }
+                        ProfileSoftkeyAction(defaultLabel, "Select", defaultLeftAction, { currentFocus?.performClick() })
+                    }
+                }
+
+            softkeyManager.update(
+                left = config.left,
+                center = config.center,
+                right = "Back",
+                onLeft = config.onLeft,
+                onCenter = config.onCenter,
+                onRight = onBack,
+            )
+            updateActiveCallOverlay()
+        }
 
         btnExportHistory?.setOnClickListener {
             showChatExportFormatDialog(chat.id, chat.title)
@@ -5027,17 +6027,50 @@ class MainActivity : AppCompatActivity() {
 
         if (chat.chatType == ChatType.DIRECT) {
             btnSecretChat?.visibility = if (chat.isSecretChat) View.GONE else View.VISIBLE
-            btnSelfDestruct?.visibility = View.VISIBLE
-            val ttlLabel = if (chat.selfDestructTimerSec > 0) "${chat.selfDestructTimerSec}s" else "Off"
-            btnSelfDestruct?.text = "⏱️ Self-Destruct Timer: $ttlLabel"
             btnMembers?.visibility = View.GONE
             btnForumTopics?.visibility = View.GONE
+            btnBlock?.visibility = View.VISIBLE
         } else {
             btnSecretChat?.visibility = View.GONE
-            btnSelfDestruct?.visibility = View.GONE
             btnMembers?.visibility = View.VISIBLE
             btnForumTopics?.visibility = View.VISIBLE
+            btnBlock?.visibility = View.GONE
+            btnTgCall?.visibility = View.GONE
+            btnCellCall?.visibility = View.GONE
+            tvBioLabel.text = "Group / Channel Info"
         }
+
+        btnTgCall?.setOnClickListener {
+            val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+            initiateAudioCall(userId)
+        }
+
+        btnSendMsg?.setOnClickListener {
+            openConversation(chat)
+        }
+
+        btnSearch?.setOnClickListener {
+            showSearchDialog()
+        }
+
+        btnToggleMute?.setOnClickListener {
+            showChatMuteDialog(chat.id, chat.isMuted, chat.title) { newMuted ->
+                val updatedProfile = currentProfile?.copy(isMuted = newMuted)
+                currentProfile = updatedProfile
+                btnToggleMute.text = if (newMuted) "🔔 Notifications: Muted" else "🔔 Notifications: Sound"
+                updateProfileSoftkeysForView(btnToggleMute)
+            }
+        }
+
+        if (chat.chatType == ChatType.DIRECT) {
+            btnBlock?.setOnClickListener {
+                val targetUserId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
+                confirmBlockUser(targetUserId, chat.title)
+            }
+        }
+        btnSelfDestruct?.visibility = View.VISIBLE
+        val ttlLabel = formatAutoDeleteTimer(chat.selfDestructTimerSec)
+        btnSelfDestruct?.text = "⏱️ Auto-Delete Timer: $ttlLabel"
 
         btnSecretChat?.setOnClickListener {
             val targetUserId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
@@ -5064,36 +6097,32 @@ class MainActivity : AppCompatActivity() {
         tvPremium.visibility = if (chat.isPremium) View.VISIBLE else View.GONE
         ivAvatar.loadCircularAvatarOrFallback(chat.avatarPath, chat.avatarLetters, tvAvatar)
 
-        if (chat.chatType != ChatType.DIRECT) {
-            btnTgCall.visibility = View.GONE
-            btnCellCall.visibility = View.GONE
-            tvBioLabel.text = "Group / Channel Info"
+        focusableControls.forEach { control ->
+            control.setOnFocusChangeListener { v, hasFocus ->
+                if (hasFocus) {
+                    updateProfileSoftkeysForView(v)
+                }
+            }
         }
 
-        softkeyManager.update(
-            left = if (chat.chatType == ChatType.DIRECT) "Call" else "Select",
-            center = "Select",
-            right = "Back",
-            onLeft = {
-                if (chat.chatType == ChatType.DIRECT) {
-                    val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
-                    telegramManager.initiateTelegramCall(userId)
-                }
-            },
-            onCenter = {
-                currentFocus?.performClick()
-            },
-            onRight = {
-                if (activeChat != null && activeChat?.id == chat.id) {
-                    openConversation(chat)
-                } else {
-                    showChatListScreen()
-                }
-            },
-        )
+        updateProfileFocusChaining()
         updateActiveCallOverlay()
 
+        val initialFocus =
+            if (btnSendMsg?.visibility == View.VISIBLE) {
+                btnSendMsg
+            } else {
+                focusableControls.firstOrNull { it.visibility == View.VISIBLE }
+            }
+        initialFocus?.let {
+            updateProfileSoftkeysForView(it)
+            it.post {
+                it.requestFocus()
+            }
+        }
+
         telegramManager.loadChatProfile(chat.id) { profile ->
+            currentProfile = profile
             tvTitle.text = profile.title
             tvStatus.text = profile.statusText
             tvPremium.visibility = if (profile.isPremium) View.VISIBLE else View.GONE
@@ -5102,16 +6131,6 @@ class MainActivity : AppCompatActivity() {
                 rowPhone.visibility = View.VISIBLE
                 btnCellCall.visibility = View.VISIBLE
                 tvPhone.text = profile.phoneNumber
-                val dialAction =
-                    View.OnClickListener {
-                        try {
-                            startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${profile.phoneNumber}")))
-                        } catch (e: Exception) {
-                            showToast("Could not open dialer: ${e.message}", true)
-                        }
-                    }
-                rowPhone.setOnClickListener(dialAction)
-                btnCellCall.setOnClickListener(dialAction)
             } else {
                 rowPhone.visibility = View.GONE
                 btnCellCall.visibility = View.GONE
@@ -5134,11 +6153,13 @@ class MainActivity : AppCompatActivity() {
             btnToggleMute.text = if (profile.isMuted) "🔔 Notifications: Muted" else "🔔 Notifications: Sound"
             btnToggleMute.setOnClickListener {
                 showChatMuteDialog(profile.chatId, profile.isMuted, profile.title) { newMuted ->
+                    val updatedProfile = currentProfile?.copy(isMuted = newMuted) ?: profile
+                    currentProfile = updatedProfile
                     btnToggleMute.text = if (newMuted) "🔔 Notifications: Muted" else "🔔 Notifications: Sound"
+                    updateProfileSoftkeysForView(btnToggleMute)
                 }
             }
 
-            val btnBlock = view.findViewById<Button>(R.id.btn_profile_block_user)
             if (chat.chatType == ChatType.DIRECT) {
                 btnBlock?.visibility = View.VISIBLE
                 btnBlock?.setOnClickListener {
@@ -5151,7 +6172,7 @@ class MainActivity : AppCompatActivity() {
 
             btnTgCall.setOnClickListener {
                 val userId = telegramManager.getDirectChatUserId(profile.chatId) ?: profile.chatId
-                telegramManager.initiateTelegramCall(userId)
+                initiateAudioCall(userId)
             }
 
             btnSendMsg.setOnClickListener {
@@ -5161,6 +6182,24 @@ class MainActivity : AppCompatActivity() {
             btnSearch.setOnClickListener {
                 showSearchDialog()
             }
+
+            updateProfileFocusChaining()
+
+            val focused = currentFocus
+            if (focused != null && focused.visibility == View.VISIBLE && focusableControls.contains(focused)) {
+                updateProfileSoftkeysForView(focused)
+            } else if (currentFocus == null || currentFocus?.visibility != View.VISIBLE) {
+                val fallbackFocus =
+                    if (btnSendMsg?.visibility == View.VISIBLE) {
+                        btnSendMsg
+                    } else {
+                        focusableControls.firstOrNull { it.visibility == View.VISIBLE }
+                    }
+                fallbackFocus?.let {
+                    updateProfileSoftkeysForView(it)
+                    it.requestFocus()
+                }
+            }
         }
     }
 
@@ -5169,6 +6208,19 @@ class MainActivity : AppCompatActivity() {
     // =========================================================================
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
+        if (keyCode == KeyEvent.KEYCODE_CALL && event.action == KeyEvent.ACTION_UP) return true
+        if (keyCode == KeyEvent.KEYCODE_CALL && event.repeatCount > 0) return true
+        if (keyCode == KeyEvent.KEYCODE_HEADSETHOOK && telegramManager.hasOngoingCall) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                val call = telegramManager.activeCall.value
+                if (call != null && !call.isOutgoing && call.state == CallState.PENDING) {
+                    acceptAudioCall(call.callId)
+                } else {
+                    telegramManager.endCurrentCall()
+                }
+            }
+            return true
+        }
 
         // Top Left hardware softkey always triggers softkey action
         if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
@@ -5203,8 +6255,10 @@ class MainActivity : AppCompatActivity() {
             if (SoftkeyUtils.isCenterKey(keyCode)) {
                 if (passcodeEntry.length == PASSCODE_PIN_LENGTH) {
                     attemptPasscodeUnlock()
-                    return true
+                } else {
+                    softkeyManager.handleKeyEvent(keyCode, event)
                 }
+                return true
             }
         }
 
@@ -5213,18 +6267,19 @@ class MainActivity : AppCompatActivity() {
             val call = telegramManager.activeCall.value
             if (call != null && call.state != CallState.DISCARDED && call.state != CallState.ERROR) {
                 if (!call.isOutgoing && call.state == CallState.PENDING) {
-                    telegramManager.acceptCall(call.callId)
+                    acceptAudioCall(call.callId)
                     return true
                 } else if (currentScreen != Screen.IN_CALL) {
                     returnToCall()
                     return true
                 }
+                return true
             }
             if (currentScreen == Screen.PROFILE) {
                 activeChat?.let { chat ->
                     if (chat.chatType == ChatType.DIRECT) {
                         val userId = telegramManager.getDirectChatUserId(chat.id) ?: chat.id
-                        telegramManager.initiateTelegramCall(userId)
+                        initiateAudioCall(userId)
                         return true
                     }
                 }
@@ -5244,8 +6299,8 @@ class MainActivity : AppCompatActivity() {
 
         // Dedicated End Call button
         if (keyCode == KeyEvent.KEYCODE_ENDCALL && event.action == KeyEvent.ACTION_DOWN) {
-            telegramManager.activeCall.value?.let { call ->
-                telegramManager.discardCall(call.callId, callDurationSec)
+            if (telegramManager.hasOngoingCall) {
+                telegramManager.endCurrentCall()
                 return true
             }
         }
@@ -5256,7 +6311,7 @@ class MainActivity : AppCompatActivity() {
                 activeChat?.let { stopAndSendVoiceRecording(it) }
                 return true
             }
-            val focused = currentFocus
+            val focused = currentFocus ?: window.decorView.findFocus()
             if (focused is Button) {
                 focused.performClick()
                 return true
@@ -5266,10 +6321,91 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // In Conversation: Route *, # to compose box engine
-        if (currentScreen == Screen.CONVERSATION && etComposeInput?.hasFocus() == true) {
-            if (composeInputEngine?.handleKeyEvent(keyCode, event) == true) {
-                return true
+        // In Conversation: D-Pad navigation between message list and compose input
+        if (currentScreen == Screen.CONVERSATION && event.action == KeyEvent.ACTION_DOWN) {
+            val count = messageAdapter?.itemCount ?: 0
+            val focused = currentFocus
+            val vh = focused?.let { rvMessages?.findContainingViewHolder(it) }
+
+            if (etComposeInput?.hasFocus() == true) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    val cursor = etComposeInput?.selectionStart ?: 0
+                    val isAtTopLine = (etComposeInput?.layout?.getLineForOffset(cursor) ?: 0) == 0
+                    if (isAtTopLine && count > 0) {
+                        focusMessageAt(count - 1, fromDirection = -1)
+                        return true
+                    }
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    // Keep focus in compose input instead of falling out
+                    return true
+                }
+            } else if (vh != null) {
+                val rv = rvMessages!!
+                val pos = vh.adapterPosition
+                val portTop = rv.paddingTop
+                val portBottom = rv.height - rv.paddingBottom
+                val portHeight = (portBottom - portTop).coerceAtLeast(1)
+
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    if (vh.itemView.top < portTop) {
+                        val delta = maxOf(vh.itemView.top - portTop, -(portHeight * 2 / 3))
+                        rv.scrollBy(0, delta)
+                        return true
+                    }
+                    if (pos > 0) {
+                        if (pos - 1 <= 3) {
+                            activeChat?.let { c ->
+                                val msgs = telegramManager.messages.value[c.id] ?: emptyList()
+                                if (msgs.isNotEmpty()) {
+                                    telegramManager.loadMessages(c.id, fromMessageId = msgs.first().id)
+                                }
+                            }
+                        }
+                        focusMessageAt(pos - 1, fromDirection = -1)
+                        return true
+                    } else {
+                        // Already at top-most loaded message; trigger history load and keep focus inside list
+                        activeChat?.let { c ->
+                            val msgs = telegramManager.messages.value[c.id] ?: emptyList()
+                            if (msgs.isNotEmpty()) {
+                                telegramManager.loadMessages(c.id, fromMessageId = msgs.first().id)
+                            }
+                        }
+                        vh.itemView.requestFocus()
+                        return true
+                    }
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    if (vh.itemView.bottom > portBottom) {
+                        val delta = minOf(vh.itemView.bottom - portBottom, portHeight * 2 / 3)
+                        rv.scrollBy(0, delta)
+                        return true
+                    }
+                    if (pos in 0 until (count - 1)) {
+                        focusMessageAt(pos + 1, fromDirection = 1)
+                        return true
+                    } else {
+                        focusedMessageId = null
+                        etComposeInput?.requestFocus()
+                        return true
+                    }
+                }
+            }
+        }
+
+        // In Conversation: Route keypad keys (digits, *, #) to compose box engine even if scrolling messages
+        if (currentScreen == Screen.CONVERSATION) {
+            val isComposeInputKey =
+                (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
+                    keyCode == KeyEvent.KEYCODE_STAR ||
+                    keyCode == KeyEvent.KEYCODE_POUND ||
+                    (etComposeInput?.hasFocus() == true && (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT))
+            if (isComposeInputKey) {
+                if (etComposeInput?.hasFocus() != true) {
+                    etComposeInput?.requestFocus()
+                }
+                if (composeInputEngine?.handleKeyEvent(keyCode, event) == true) {
+                    return true
+                }
             }
         }
 
@@ -5281,7 +6417,7 @@ class MainActivity : AppCompatActivity() {
                     keyCode == KeyEvent.KEYCODE_POUND ||
                     keyCode == KeyEvent.KEYCODE_DEL ||
                     keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-            if (isInputKey) {
+            if (isInputKey && etLoginInput?.isShown == true) {
                 if (etLoginInput?.hasFocus() != true) {
                     etLoginInput?.requestFocus()
                 }
@@ -5291,8 +6427,28 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // In Chat List: Keypad numbers 1-9 directly open chat 1-9!
+        // In Settings: Route keypad keys to settings input engine matching focused field
+        if (currentScreen == Screen.SETTINGS) {
+            val focusedView =
+                currentFocus
+                    ?: settingsInputEngines.keys
+                        .mapNotNull { findViewById<View>(it) }
+                        .firstOrNull { it.hasFocus() }
+            val focusedId = focusedView?.id
+            if (focusedId != null) {
+                val engine = settingsInputEngines[focusedId]
+                if (engine != null && engine.handleKeyEvent(keyCode, event)) {
+                    return true
+                }
+            }
+        }
+
+        // In Chat List: Keypad 0 opens Settings, numbers 1-9 directly open chat 1-9!
         if (currentScreen == Screen.CHAT_LIST && event.action == KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_0) {
+                showSettingsScreen()
+                return true
+            }
             if (keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9) {
                 val index = keyCode - KeyEvent.KEYCODE_1
                 val target = chatListAdapter?.getItemAt(index)
@@ -5303,24 +6459,20 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (isTabViewFocused()) {
-                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    // Suppress cycleTabs to avoid double key activation when tab TextView holds focus
-                    return super.dispatchKeyEvent(event)
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    cycleTabs(-1)
+                    focusSelectedTabView()
+                    return true
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    cycleTabs(1)
+                    focusSelectedTabView()
+                    return true
                 }
                 if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                     val itemCount = chatListAdapter?.itemCount ?: 0
                     if (itemCount > 0) {
-                        rvChats?.scrollToPosition(0)
-                        rvChats?.post {
-                            val vh = rvChats?.findViewHolderForAdapterPosition(0)
-                            if (vh != null) {
-                                vh.itemView.requestFocus()
-                            } else {
-                                rvChats?.requestFocus()
-                            }
-                        }
-                    } else {
-                        findViewById<View>(R.id.tv_softkey_left)?.requestFocus()
+                        focusChatAt(0)
                     }
                     return true
                 }
@@ -5334,23 +6486,35 @@ class MainActivity : AppCompatActivity() {
                     cycleTabs(1)
                     return true
                 }
+                val vh = currentFocus?.let { rvChats?.findContainingViewHolder(it) }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    val total = chatListAdapter?.itemCount ?: 0
+                    if (vh != null) {
+                        val pos = vh.adapterPosition
+                        if (pos in 0 until (total - 1)) {
+                            if (pos + 1 >= total - 4 && total >= 10) {
+                                telegramManager.loadMoreChats()
+                            }
+                            focusChatAt(pos + 1)
+                            return true
+                        } else if (pos >= total - 1) {
+                            telegramManager.loadMoreChats()
+                            vh.itemView.requestFocus()
+                            return true
+                        }
+                    } else if (total > 0) {
+                        focusChatAt(0)
+                        return true
+                    }
+                }
                 if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                    val focusedView = currentFocus
-                    val rv = rvChats
-                    if (focusedView != null && rv != null) {
-                        val itemView = rv.findContainingItemView(focusedView)
-                        if (itemView != null && rv.getChildAdapterPosition(itemView) == 0) {
-                            val targetTabId =
-                                when {
-                                    isArchivedTabSelected -> R.id.tab_archived
-                                    isFoldersTabSelected -> R.id.tab_folders
-                                    currentChatTypeFilter == ChatType.DIRECT -> R.id.tab_direct
-                                    currentChatTypeFilter == ChatType.GROUP -> R.id.tab_groups
-                                    currentChatTypeFilter == ChatType.CHANNEL -> R.id.tab_channels
-                                    currentChatTypeFilter == ChatType.BOT -> R.id.tab_bots
-                                    else -> R.id.tab_all
-                                }
-                            findViewById<View>(targetTabId)?.requestFocus()
+                    if (vh != null) {
+                        val pos = vh.adapterPosition
+                        if (pos > 0) {
+                            focusChatAt(pos - 1)
+                            return true
+                        } else if (pos == 0) {
+                            focusSelectedTabView()
                             return true
                         }
                     }
@@ -5359,6 +6523,115 @@ class MainActivity : AppCompatActivity() {
         }
 
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun focusSelectedTabView() {
+        val targetTabId =
+            when {
+                isArchivedTabSelected -> R.id.tab_archived
+                isFoldersTabSelected -> R.id.tab_folders
+                currentChatTypeFilter == ChatType.DIRECT -> R.id.tab_direct
+                currentChatTypeFilter == ChatType.GROUP -> R.id.tab_groups
+                currentChatTypeFilter == ChatType.CHANNEL -> R.id.tab_channels
+                currentChatTypeFilter == ChatType.BOT -> R.id.tab_bots
+                else -> R.id.tab_all
+            }
+        findViewById<View>(targetTabId)?.requestFocus()
+    }
+
+    private fun focusChatAt(position: Int) {
+        val rv = rvChats ?: return
+        val total = chatListAdapter?.itemCount ?: 0
+        if (position !in 0 until total) return
+        focusedChatId = chatListAdapter?.getItemAt(position)?.id
+        val existingVh = rv.findViewHolderForAdapterPosition(position)
+        if (existingVh != null) {
+            val portTop = rv.paddingTop
+            val portBottom = rv.height - rv.paddingBottom
+            if (existingVh.itemView.top < portTop) {
+                rv.scrollBy(0, existingVh.itemView.top - portTop)
+            } else if (existingVh.itemView.bottom > portBottom) {
+                rv.scrollBy(0, existingVh.itemView.bottom - portBottom)
+            }
+            existingVh.itemView.requestFocus()
+        } else {
+            rv.scrollToPosition(position)
+            rv.post {
+                val vh = rv.findViewHolderForAdapterPosition(position)
+                if (vh != null) {
+                    vh.itemView.requestFocus()
+                } else {
+                    rv.scrollToPosition(position)
+                    rv.post {
+                        rv.findViewHolderForAdapterPosition(position)?.itemView?.requestFocus()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun focusMessageAt(
+        position: Int,
+        fromDirection: Int = 0,
+    ) {
+        val rv = rvMessages ?: return
+        val count = messageAdapter?.itemCount ?: 0
+        if (position !in 0 until count) return
+        focusedMessageId = messageAdapter?.getItemAt(position)?.id
+        val portTop = rv.paddingTop
+        val portBottom = rv.height - rv.paddingBottom
+        val portHeight = (portBottom - portTop).coerceAtLeast(1)
+        val existingVh = rv.findViewHolderForAdapterPosition(position)
+        if (existingVh != null) {
+            val viewTop = existingVh.itemView.top
+            val viewBottom = existingVh.itemView.bottom
+            val viewHeight = viewBottom - viewTop
+            if (viewHeight > portHeight) {
+                if (fromDirection < 0) {
+                    if (viewBottom > portBottom || viewTop > portTop) {
+                        rv.scrollBy(0, viewBottom - portBottom)
+                    }
+                } else {
+                    if (viewTop < portTop || viewBottom < portBottom) {
+                        rv.scrollBy(0, viewTop - portTop)
+                    }
+                }
+            } else {
+                if (viewTop < portTop) {
+                    rv.scrollBy(0, viewTop - portTop)
+                } else if (viewBottom > portBottom) {
+                    rv.scrollBy(0, viewBottom - portBottom)
+                }
+            }
+            existingVh.itemView.requestFocus()
+        } else {
+            rv.scrollToPosition(position)
+            rv.post {
+                val vh = rv.findViewHolderForAdapterPosition(position)
+                if (vh != null) {
+                    val viewTop = vh.itemView.top
+                    val viewBottom = vh.itemView.bottom
+                    val viewHeight = viewBottom - viewTop
+                    if (viewHeight > portHeight) {
+                        if (fromDirection < 0) {
+                            rv.scrollBy(0, viewBottom - portBottom)
+                        } else {
+                            rv.scrollBy(0, viewTop - portTop)
+                        }
+                    } else if (viewTop < portTop) {
+                        rv.scrollBy(0, viewTop - portTop)
+                    } else if (viewBottom > portBottom) {
+                        rv.scrollBy(0, viewBottom - portBottom)
+                    }
+                    vh.itemView.requestFocus()
+                } else {
+                    rv.scrollToPosition(position)
+                    rv.post {
+                        rv.findViewHolderForAdapterPosition(position)?.itemView?.requestFocus()
+                    }
+                }
+            }
+        }
     }
 
     private fun cycleTabs(direction: Int) {
@@ -5385,24 +6658,88 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(
-        requestCode: Int,
+    private fun pickPhotoAlbum(chat: ChatModel) {
+        commitActiveInputEngines()
+        val intent =
+            Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "image/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            }
+        pendingAlbumChatId = chat.id
+        pendingAlbumCaption = etComposeInput?.text?.toString().orEmpty()
+        pendingAlbumReplyId = activeReplyMessage?.id ?: 0
+        try {
+            albumPickerLauncher.launch(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            pendingAlbumChatId = null
+            showToast("No image picker is installed", true)
+        }
+    }
+
+    private fun receivePhotoAlbum(
         resultCode: Int,
         data: Intent?,
     ) {
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != RESULT_OK || data?.data == null) return
-        val uri = data.data ?: return
+        val chatId = pendingAlbumChatId ?: return
+        val caption = pendingAlbumCaption
+        val replyId = pendingAlbumReplyId
+        pendingAlbumChatId = null
+        pendingAlbumCaption = ""
+        pendingAlbumReplyId = 0
+        if (resultCode != RESULT_OK || data == null) return
+        val uris = data.clipData?.let { clip -> (0 until clip.itemCount).map { clip.getItemAt(it).uri } } ?: listOfNotNull(data.data)
+        if (uris.size !in 2..10) {
+            showToast("Select 2–10 photos for an album", true)
+            return
+        }
+        lifecycleScope.launch {
+            val files = mutableListOf<File>()
+            try {
+                withContext(Dispatchers.IO) {
+                    uris.forEach { uri ->
+                        val mime = contentResolver.getType(uri).orEmpty()
+                        require(mime.startsWith("image/")) { "Choose image files only" }
+                        val file = File.createTempFile("album_", ".image", cacheDir)
+                        files.add(file)
+                        val stream = contentResolver.openInputStream(uri) ?: error("Cannot read selected photo")
+                        stream.use { source -> file.outputStream().use { target -> source.copyTo(target) } }
+                        require(file.length() > 0) { "Selected photo is empty" }
+                    }
+                }
+                telegramManager.features.sendAlbum(chatId, files.map { it.absolutePath }, caption, replyId) { result ->
+                    if (result.isFailure) files.forEach { it.delete() }
+                    runOnUiThread {
+                        if (isDestroyed || isFinishing) return@runOnUiThread
+                        if (result.isSuccess) {
+                            showToast("Album queued for sending")
+                            if (activeChat?.id == chatId && etComposeInput?.text?.toString() == caption && (activeReplyMessage?.id ?: 0L) == replyId) {
+                                etComposeInput?.setText("")
+                                clearReplyOrEditMode()
+                            }
+                        } else {
+                            showToast(result.exceptionOrNull()?.message ?: "Album could not be sent", true)
+                        }
+                    }
+                }
+            } catch (error: Exception) {
+                files.forEach { it.delete() }
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                showToast(error.message ?: "Could not prepare album", true)
+            }
+        }
+    }
+
+    private fun handlePickerResult(
+        result: ActivityResult,
+        ext: String,
+        successToast: String,
+        sendAction: (chatId: Long, path: String, caption: String) -> Unit,
+    ) {
+        if (result.resultCode != RESULT_OK || result.data?.data == null) return
+        val uri = result.data?.data ?: return
         val chat = activeChat ?: return
         try {
-            val ext =
-                when (requestCode) {
-                    REQ_PICK_PHOTO -> "jpg"
-                    REQ_PICK_VIDEO -> "mp4"
-                    else -> "bin"
-                }
             val tempFile = File(cacheDir, "upload_${System.currentTimeMillis()}.$ext")
             contentResolver.openInputStream(uri)?.use { input ->
                 tempFile.outputStream().use { output ->
@@ -5411,19 +6748,9 @@ class MainActivity : AppCompatActivity() {
             }
             if (tempFile.exists() && tempFile.length() > 0L) {
                 val caption = etComposeInput?.text?.toString()?.trim().orEmpty()
-                when (requestCode) {
-                    REQ_PICK_PHOTO -> {
-                        telegramManager.sendPhoto(chat.id, tempFile.absolutePath, caption)
-                        showToast("Photo sent!")
-                    }
-                    REQ_PICK_VIDEO -> {
-                        telegramManager.sendVideo(chat.id, tempFile.absolutePath, 0, caption)
-                        showToast("Video sent!")
-                    }
-                    else -> {
-                        telegramManager.sendDocument(chat.id, tempFile.absolutePath, caption)
-                        showToast("File sent!")
-                    }
+                sendAction(chat.id, tempFile.absolutePath, caption)
+                if (successToast.isNotEmpty()) {
+                    showToast(successToast)
                 }
                 if (caption.isNotEmpty()) {
                     etComposeInput?.setText("")
@@ -5440,20 +6767,30 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_CALL_AUDIO_PERM) {
+            val action = pendingCallPermission
+            pendingCallPermission = null
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                action?.invoke()
+            } else {
+                showToast("Microphone permission is required for calls", isError = true)
+            }
+        }
         if (requestCode == REQ_AUDIO_PERM && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             activeChat?.let { startVoiceRecordingFlow(it) }
         }
         if (requestCode == REQ_LOC_PERM && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             activeChat?.let { sendLocationFlow(it) }
         }
-        if (requestCode == REQ_PHONE_PERM && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == REQ_PHONE_PERM && grantResults.isNotEmpty()) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                if (telegramManager.authState.value is AuthState.Ready && telegramManager.syncContactsEnabled) {
+                    telegramManager.syncContacts()
+                }
+            }
             if (currentScreen == Screen.LOGIN) {
                 showLoginScreen(telegramManager.authState.value)
             }
         }
-    }
-
-    override fun onBackPressed() {
-        super.onBackPressed()
     }
 }

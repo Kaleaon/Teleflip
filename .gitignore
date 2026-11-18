@@ -41,6 +41,9 @@ local.properties
 screen*.png
 screen.png
 *.log
+window_dump*.xml
+platform-tools/
+platform-tools.zip
 
 # OS-specific files
 .DS_Store

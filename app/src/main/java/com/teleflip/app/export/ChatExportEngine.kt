@@ -5,7 +5,9 @@ import android.os.Environment
 import com.teleflip.app.telegram.TelegramManager
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
@@ -19,6 +21,7 @@ import java.util.Locale
 import java.util.concurrent.CancellationException
 
 object ChatExportEngine {
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun exportChatHistory(
         context: Context,
         scope: CoroutineScope,
@@ -30,7 +33,7 @@ object ChatExportEngine {
         onProgress: (completedCount: Int) -> Unit,
         onComplete: (Result<List<File>>) -> Unit,
     ): Job {
-        return scope.launch(Dispatchers.IO) {
+        return scope.launch(Dispatchers.IO, start = CoroutineStart.ATOMIC) {
             val allMessages = mutableListOf<ExportMessage>()
             var fromMessageId = 0L
             val limit = 100
