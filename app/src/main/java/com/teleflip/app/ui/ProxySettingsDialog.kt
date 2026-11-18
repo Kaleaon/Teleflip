@@ -36,14 +36,6 @@ class ProxySettingsDialog(
         setupDismissKeys()
 
         tvError = findViewById(R.id.tv_proxy_error)
-        val softkeyBar = findViewById<View>(R.id.softkey_bar)
-        val tvLeft = findViewById<TextView>(R.id.tv_softkey_left)
-        val tvCenter = findViewById<TextView>(R.id.tv_softkey_center)
-        val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
-
-        if (tvLeft != null && tvCenter != null && tvRight != null) {
-            softkeyManager = SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight)
-        }
         val tvMode = findViewById<TextView>(R.id.tv_proxy_input_mode)
         val tvStatus = findViewById<TextView>(R.id.tv_proxy_active_status)
         val btnSocks5 = findViewById<Button>(R.id.btn_proxy_type_socks5)
@@ -388,7 +380,7 @@ class ProxySettingsDialog(
     private fun updateSoftkeys() {
         val focused = currentFocus
         if (focused is EditText) {
-            softkeyManager?.update(
+            setupSoftkeys(
                 left = "Clear",
                 center = "Save",
                 right = "Close",
@@ -406,7 +398,7 @@ class ProxySettingsDialog(
                 },
             )
         } else {
-            softkeyManager?.update(
+            setupSoftkeys(
                 left = "",
                 center = "Select",
                 right = "Close",
