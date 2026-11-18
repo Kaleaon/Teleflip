@@ -134,7 +134,11 @@ abstract class BaseDialog(
         return isBack || super.onKeyDown(keyCode, event)
     }
 
-    protected fun isBackOrRightSoftKey(keyCode: Int): Boolean {
-        return SoftkeyUtils.isBackOrSoftRightKey(keyCode)
-    }
+    protected fun isSoftLeftKey(keyCode: Int): Boolean = SoftkeyUtils.isSoftLeftKey(keyCode)
+
+    protected fun isSoftRightKey(keyCode: Int): Boolean = SoftkeyUtils.isSoftRightKey(keyCode)
+
+    protected fun isBackOrRightSoftKey(keyCode: Int): Boolean = SoftkeyUtils.isBackOrSoftRightKey(keyCode)
+
+    protected fun isCenterKey(keyCode: Int): Boolean = SoftkeyUtils.isCenterKey(keyCode)
 }

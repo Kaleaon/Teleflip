@@ -116,6 +116,13 @@ class ChatExportProgressDialog : BaseDialog {
                 cancelExportAndDismiss()
             }
         }
+
+        setupSoftkeys(
+            left = "",
+            center = "",
+            right = "Cancel",
+            onRight = { cancelExportAndDismiss() },
+        )
     }
 
     private fun cancelExportAndDismiss() {

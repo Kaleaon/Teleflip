@@ -90,6 +90,7 @@ class SearchDialog(
             center = "Select",
             right = "Back",
             onLeft = {
+                keypadEngine?.commitCurrentChar()
                 etSearchInput.setText("")
                 etSearchInput.requestFocus()
             },
@@ -461,6 +462,7 @@ class SearchDialog(
         }
 
         if (SoftkeyUtils.isSoftLeftKey(keyCode)) {
+            keypadEngine?.commitCurrentChar()
             etSearchInput.setText("")
             etSearchInput.requestFocus()
             return true

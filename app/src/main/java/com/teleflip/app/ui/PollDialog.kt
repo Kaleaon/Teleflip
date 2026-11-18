@@ -80,15 +80,6 @@ class PollDialog(
         val btnSubmit = findViewById<Button>(R.id.btn_poll_submit)
         val btnBack = findViewById<Button>(R.id.btn_poll_back)
 
-        val tvSoftLeft = findViewById<TextView>(R.id.tv_softkey_left)
-        val tvSoftCenter = findViewById<TextView>(R.id.tv_softkey_center)
-        val tvSoftRight = findViewById<TextView>(R.id.tv_softkey_right)
-        val softkeyBar = findViewById<View>(R.id.softkey_bar)
-
-        if (tvSoftLeft != null && tvSoftCenter != null && tvSoftRight != null) {
-            softkeyManager = SoftkeyManager(softkeyBar, tvSoftLeft, tvSoftCenter, tvSoftRight)
-        }
-
         val editFields = listOfNotNull(etQuestion, etOpt1, etOpt2, etOpt3, etOpt4, etExplanation)
         editFields.forEach { field ->
             field.doAfterTextChanged {
@@ -303,9 +294,8 @@ class PollDialog(
     }
 
     private fun updateSoftkeys() {
-        val manager = softkeyManager ?: return
         val isFirstStep = currentStep == 1
-        manager.update(
+        setupSoftkeys(
             left = "Clear",
             center = if (isFirstStep) "Next" else "Submit",
             right = if (isFirstStep) "Cancel" else "Back",

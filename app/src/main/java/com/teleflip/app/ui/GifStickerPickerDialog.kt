@@ -98,24 +98,14 @@ class GifStickerPickerDialog(
 
         buildInitialPacks()
 
-        val softkeyBar = findViewById<View>(R.id.softkey_bar)
-        val tvLeft = findViewById<TextView>(R.id.tv_softkey_left)
-        val tvCenter = findViewById<TextView>(R.id.tv_softkey_center)
-        val tvRight = findViewById<TextView>(R.id.tv_softkey_right)
-
-        if (tvLeft != null && tvCenter != null && tvRight != null) {
-            softkeyManager =
-                SoftkeyManager(softkeyBar, tvLeft, tvCenter, tvRight).apply {
-                    update(
-                        left = "Prev",
-                        center = "Send",
-                        right = "Next",
-                        onLeft = { prevPack() },
-                        onCenter = { sendFocusedItem() },
-                        onRight = { nextPack() },
-                    )
-                }
-        }
+        setupSoftkeys(
+            left = "Prev",
+            center = "Send",
+            right = "Next",
+            onLeft = { prevPack() },
+            onCenter = { sendFocusedItem() },
+            onRight = { nextPack() },
+        )
 
         val rv = findViewById<RecyclerView>(R.id.rv_picker_grid)
         rv?.layoutManager = GridLayoutManager(context, GRID_COLUMNS)

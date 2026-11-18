@@ -46,27 +46,6 @@ class OptionsMenuDialog(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_options_menu)
-        setupSoftkeys(
-            left = "",
-            center = "Select",
-            right = "Close",
-            onLeft = null,
-            onCenter = {
-                val focused = currentFocus
-                val rv = findViewById<RecyclerView>(R.id.rv_menu_options)
-                if (focused != null && rv != null) {
-                    val itemView = rv.findContainingItemView(focused)
-                    if (itemView != null) {
-                        val pos = rv.getChildAdapterPosition(itemView)
-                        if (pos in options.indices) {
-                            dismiss()
-                            options[pos].action.invoke()
-                        }
-                    }
-                }
-            },
-            onRight = { dismiss() },
-        )
 
         findViewById<TextView>(R.id.tv_menu_title)?.text = title
 
@@ -75,6 +54,23 @@ class OptionsMenuDialog(
         rv?.adapter = MenuAdapter()
 
         updatePage()
+        setupSoftkeys(
+            left = "",
+            center = "Select",
+            right = "Back",
+            onCenter = {
+                val focused = currentFocus
+                val vh = focused?.let { rv?.findContainingViewHolder(it) }
+                if (vh != null) {
+                    val pos = vh.adapterPosition
+                    if (pos in visibleOptions.indices) {
+                        dismiss()
+                        visibleOptions[pos].action.invoke()
+                    }
+                }
+            },
+            onRight = { dismiss() },
+        )
         // Focus the first option
         rv?.post {
             rv.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
