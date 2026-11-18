@@ -48,8 +48,6 @@ class PollDialog(
 
     override fun getErrorTextView(): TextView? = tvError
 
-    private lateinit var softkeyManager: SoftkeyManager
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_create_poll)
@@ -305,9 +303,9 @@ class PollDialog(
     }
 
     private fun updateSoftkeys() {
-        if (!::softkeyManager.isInitialized) return
+        val manager = softkeyManager ?: return
         val isFirstStep = currentStep == 1
-        softkeyManager.update(
+        manager.update(
             left = "Clear",
             center = if (isFirstStep) "Next" else "Submit",
             right = if (isFirstStep) "Cancel" else "Back",
@@ -344,7 +342,7 @@ class PollDialog(
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
-        if (::softkeyManager.isInitialized && softkeyManager.handleKeyEvent(keyCode, event)) {
+        if (softkeyManager?.handleKeyEvent(keyCode, event) == true) {
             return true
         }
 

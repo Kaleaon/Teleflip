@@ -30,8 +30,6 @@ class ProxySettingsDialog(
 
     override fun getErrorTextView(): TextView? = tvError
 
-    private var softkeyManager: SoftkeyManager? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_proxy_settings)

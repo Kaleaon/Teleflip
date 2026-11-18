@@ -47,8 +47,6 @@ class SearchDialog(
     private lateinit var tvEmptyTitle: TextView
     private lateinit var progressBar: ProgressBar
 
-    private var softkeyManager: SoftkeyManager? = null
-
     private var keypadEngine: KeypadInputEngine? = null
 
     private var chatAdapter: ChatListAdapter? = null
@@ -87,12 +85,7 @@ class SearchDialog(
         tvEmptyTitle = findViewById(R.id.tv_search_empty_title)
         progressBar = findViewById(R.id.progress_search)
 
-        val tvSoftkeyLeft: TextView = findViewById(R.id.tv_search_softkey_left)
-        val tvSoftkeyCenter: TextView = findViewById(R.id.tv_search_softkey_center)
-        val tvSoftkeyRight: TextView = findViewById(R.id.tv_search_softkey_right)
-
-        softkeyManager = SoftkeyManager(tvSoftkeyLeft, tvSoftkeyCenter, tvSoftkeyRight)
-        softkeyManager?.update(
+        setupSoftkeys(
             left = "Clear",
             center = "Select",
             right = "Back",
@@ -104,6 +97,7 @@ class SearchDialog(
                 handleCenterPress()
             },
             onRight = {
+                keypadEngine?.commitCurrentChar()
                 dismiss()
             },
         )
@@ -413,6 +407,17 @@ class SearchDialog(
         super.dismiss()
     }
 
+    override fun <T : View> findViewById(id: Int): T {
+        val mappedId =
+            when (id) {
+                R.id.tv_search_softkey_left -> R.id.tv_softkey_left
+                R.id.tv_search_softkey_center -> R.id.tv_softkey_center
+                R.id.tv_search_softkey_right -> R.id.tv_softkey_right
+                else -> id
+            }
+        return super.findViewById(mappedId)
+    }
+
     private fun handleCenterPress(): Boolean {
         val focused = currentFocus
         if (focused != null && focused !== etSearchInput && focused !== tabChats && focused !== tabContacts && focused !== tabMessages) {
@@ -460,7 +465,6 @@ class SearchDialog(
             etSearchInput.requestFocus()
             return true
         }
-
         if (etSearchInput.hasFocus()) {
             val isInputKey =
                 (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||
@@ -508,7 +512,6 @@ class SearchDialog(
                     return true
                 }
             }
-
             return super.onKeyDown(keyCode, event)
         } else {
             val isKeypadCharKey =
@@ -611,7 +614,6 @@ class SearchDialog(
                     return true
                 }
             }
-
             return super.onKeyDown(keyCode, event)
         }
     }

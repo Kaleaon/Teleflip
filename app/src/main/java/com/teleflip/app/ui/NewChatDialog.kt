@@ -23,12 +23,26 @@ class NewChatDialog(
     private var etInput: EditText? = null
     private var btnDirect: Button? = null
     private var keypadEngine: KeypadInputEngine? = null
-    internal var softkeyManager: SoftkeyManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_new_chat)
-        setupDismissKeys()
+        setupSoftkeys(
+            left = "Clear",
+            center = "Select",
+            right = "Back",
+            onLeft = {
+                keypadEngine?.commitCurrentChar()
+                etInput?.setText("")
+            },
+            onCenter = {
+                handleCenterAction()
+            },
+            onRight = {
+                keypadEngine?.commitCurrentChar()
+                dismiss()
+            },
+        )
 
         val livInput = findViewById<LabeledInputView>(R.id.liv_new_chat_input)
         val input = livInput?.editText
@@ -205,7 +219,6 @@ class NewChatDialog(
             handleCenterAction()
             return true
         }
-
         val input = etInput
         val isInputKey =
             (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) ||

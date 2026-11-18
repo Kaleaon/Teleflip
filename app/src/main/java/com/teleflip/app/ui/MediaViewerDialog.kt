@@ -45,7 +45,6 @@ class MediaViewerDialog(
     private var tvZoomBadge: TextView? = null
     private var tvStatus: TextView? = null
     private var tvCaption: TextView? = null
-    internal var softkeyManager: SoftkeyManager? = null
     private var layoutProgress: View? = null
     private var pbProgress: ProgressBar? = null
     private var tvTime: TextView? = null

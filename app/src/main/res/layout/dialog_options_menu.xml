@@ -31,4 +31,6 @@
         android:layout_weight="1" />
     <TextView android:id="@+id/tv_menu_hint" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_secondary" android:textSize="12sp" />
 
+    <include layout="@layout/layout_softkeys" />
+
 </LinearLayout>

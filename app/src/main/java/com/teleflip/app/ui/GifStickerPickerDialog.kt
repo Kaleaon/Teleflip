@@ -53,7 +53,6 @@ class GifStickerPickerDialog(
     internal val currentPack: PickerPack?
         get() = packs.getOrNull(currentPackIndex)
 
-    private var softkeyManager: SoftkeyManager? = null
     private var adapter: PickerGridAdapter? = null
 
     companion object {
